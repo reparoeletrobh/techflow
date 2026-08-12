@@ -367,7 +367,8 @@ async function carregarPainelMeta(){
   const bd = document.getElementById('badge-cq');
   if(bd){
     const conc = (c.CONCLUIDAS && c.CONCLUIDAS.hoje) || 0;
-    bd.textContent = hoje + '/' + conc;
+    const entTudo = (c.ENTRARAM && c.ENTRARAM.hoje) || 0;
+    bd.textContent = entTudo + '/' + conc;
     bd.title = hoje + ' entraram hoje · ' + conc + ' concluída(s) hoje';
     bd.style.background = conc >= hoje && hoje > 0 ? 'rgba(74,222,128,.16)'
       : (hoje ? 'rgba(245,158,11,.16)' : '');

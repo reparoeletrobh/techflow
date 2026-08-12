@@ -239,8 +239,9 @@ async function atualizarBadgeQualidade(){
   try{
     var c = await fetch('/api/qualidade?action=contadores').then(function(r){return r.json();});
     if(!c || !c.ok){ el.textContent=''; return; }
-    var ent = (c.ENTRARAM && c.ENTRARAM.hojeSemGarantia != null)
-      ? c.ENTRARAM.hojeSemGarantia : ((c.ENTRARAM && c.ENTRARAM.hoje) || 0);
+    // 🏷️ a badge mostra tudo que entrou hoje, inclusive avulsa e garantia —
+    // a exclusão vale só para a meta de 25, não para o acompanhamento do dia
+    var ent = (c.ENTRARAM && c.ENTRARAM.hoje) || 0;
     var con = (c.CONCLUIDAS && c.CONCLUIDAS.hoje) || 0;
     if(!ent && !con){ el.textContent=''; el.style.background='transparent'; return; }
     el.textContent = ent + '/' + con;

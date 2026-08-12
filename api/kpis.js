@@ -427,6 +427,87 @@ module.exports = async function handler(req, res) {
         (e.valor ? ' | R$ ' + e.valor.toFixed(2) : '')) });
   }
 
+  // ── 🌱 SEMEAR: preenche o livro-razão do ciclo atual com o que já aconteceu ──
+  // Uma vez só: daqui em diante cada etapa se registra sozinha no instante do fato.
+  if ((req.query || {}).action === 'semear') {
+    const Jm = janela({ periodo: 'semana' });
+    const d8m = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const noCiclo = d => { const t = new Date(d || 0).getTime(); return t >= Jm.ini && t <= Jm.fim; };
+    // o que já está no livro, para não duplicar
+    const jaTem = new Set((await _funil.ler(Jm.ini, Jm.fim))
+      .map(e => e.etapa + '|' + String(e.tel || '').slice(-8)));
+    const novos = [];
+    const juntar = (etapa, tel, nome, valor, frente, canal, quando, ref) => {
+      const k = etapa + '|' + d8m(tel);
+      if (!tel || jaTem.has(k)) return;
+      jaTem.add(k);
+      novos.push({ etapa, ts: quando, tel: String(tel).replace(/\D/g, '').slice(-11),
+        nome: String(nome || '').slice(0, 40), valor: Number(valor || 0) || 0,
+        frente, canal, quem: '', ref: String(ref || '').slice(0, 40) });
+    };
+    // 1) fichas
+    for (const [k, frente] of [['fichas_adm', 'adm'], ['fichas_tv', 'tv']]) {
+      const b = await dbGet(k);
+      for (const f of (((b || {}).fichas) || [])) {
+        if (!noCiclo(f.criadoEm)) continue;
+        const id = String(f.id || '');
+        if (['remarcar', 'reagendamento'].includes(String(f.origem || '')) ||
+            id.startsWith('rem_') || id.startsWith('fic_reag_')) continue;
+        juntar('ficha', f.telefone, f.nome, 0, frente, 'planilha', f.criadoEm, f.id);
+      }
+    }
+    // 2) logística
+    for (const [k, frente] of [['reparoeletro_logistica', 'adm'], ['tv_logistica', 'tv']]) {
+      const b = await dbGet(k);
+      for (const f of (((b || {}).fichas) || [])) {
+        if (!noCiclo(f.criadoEm)) continue;
+        const bot = /bot/i.test(String(f.origem || '') + ' ' + String(f.criadoPor || ''));
+        juntar('logistica', f.telefone, f.nome, 0, frente, bot ? 'bot' : 'manual', f.criadoEm, f.id);
+      }
+    }
+    // 3) orçamentos e aprovações — pipe, arquivo e balcão
+    for (const [k, frente, canalPadrao] of [
+      ['reparoeletro_pipe', 'adm', 'online'], ['tv_pipe', 'tv', 'online'],
+      ['reparoeletro_arquivo', 'adm', 'online'], ['tv_arquivo', 'tv', 'online'],
+      ['reparoeletro_frenteloja', 'adm', 'balcao'],
+    ]) {
+      const b = await dbGet(k);
+      const lista = (((b || {}).cards) || []).concat(((b || {}).fichas) || []);
+      for (const c of lista) {
+        const balcao = canalPadrao === 'balcao' || String(c.origem || '') === 'frenteloja' ||
+          c.aprovadoNoBalcao === true;
+        const canal = balcao ? 'balcao' : 'online';
+        const valor = Number(c.valor || (c.orcamento && c.orcamento.valor) || 0);
+        const nome = c.nomeContato || c.nome || '';
+        if (noCiclo(c.orcamentoEm)) juntar('orcamento', c.telefone, nome, valor, frente, canal, c.orcamentoEm, c.id);
+        if (noCiclo(c.aprovadoEm)) juntar('aprovado', c.telefone, nome, valor, frente, canal, c.aprovadoEm, c.id);
+      }
+    }
+    novos.sort((a, b2) => String(a.ts).localeCompare(String(b2.ts)));
+    const resumo = novos.reduce((o, e) => {
+      const k = e.etapa + ' ' + e.frente + ' ' + e.canal; o[k] = (o[k] || 0) + 1; return o; }, {});
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        ciclo: Jm.rotulo, vaoSerRegistrados: novos.length,
+        POR_TIPO: resumo,
+        AMOSTRA: novos.slice(0, 40).map(e => String(e.ts).slice(5, 16).replace('T', ' ') +
+          ' | ' + e.etapa.padEnd(10) + ' | ' + e.frente.toUpperCase() + ' | ' + e.canal.padEnd(8) +
+          ' | ' + String(e.nome).slice(0, 20) + ' ' + String(e.tel).slice(-4) +
+          (e.valor ? ' | R$ ' + e.valor.toFixed(2) : '')),
+        dica: 'para gravar: &aplicar=1' });
+    }
+    let n = 0;
+    for (const e of novos) {
+      try {
+        await fetch(`${U}/rpush/kpi_funil/${encodeURIComponent(JSON.stringify(e))}`,
+          { headers: { Authorization: `Bearer ${T}` } });
+        n++;
+      } catch (x) {}
+    }
+    return res.status(200).json({ ok: true, registrados: n, POR_TIPO: resumo,
+      observacao: 'a partir de agora cada etapa se registra sozinha — esta ação não precisa ser repetida' });
+  }
+
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
