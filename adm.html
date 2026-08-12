@@ -158,6 +158,14 @@ async function abrirResolver(){
   + '</div>';
   document.body.appendChild(ov);
 }
+
+function copiarErroResolver(){
+  var t = document.getElementById('txt-erro');
+  if(!t) return;
+  t.select(); t.setSelectionRange(0, 999999);
+  try { document.execCommand('copy'); alert('✅ copiado — cole na conversa com o suporte'); }
+  catch(e){ alert('selecione o texto e copie manualmente'); }
+}
 async function confirmarResolver(){
   var b = document.getElementById('btn-conf-resolver');
   var saida = document.getElementById('resolver-saida');
@@ -167,15 +175,29 @@ async function confirmarResolver(){
   if(!r){ if(saida) saida.innerHTML = '<div style="color:#f87171;font-size:12px;">erro ao executar</div>';
     if(b){ b.disabled=false; b.textContent='✅ Executar'; } return; }
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
+  window._erroResolver = (r.DIAGNOSTICO && r.DIAGNOSTICO.textoParaCopiar) || '';
   if(saida) saida.innerHTML = '<div style="background:#0f1319;border:1px solid '
-    + (r.ok?'rgba(74,222,128,.4)':'rgba(245,158,11,.4)') + ';border-radius:9px;padding:11px 13px;'
+    + (r.ok?'rgba(74,222,128,.4)':'rgba(239,68,68,.45)') + ';border-radius:9px;padding:11px 13px;'
     + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:220px;overflow-y:auto;">'
-    + '<b style="color:'+(r.ok?'#4ade80':'#fbbf24')+';">'+(r.ok?'✅ concluído':'⚠️ concluído com avisos')+'</b><br>'
+    + '<b style="color:'+(r.ok?'#4ade80':'#f87171')+';">'+(r.ok?'✅ concluído':'🚨 houve falha')+'</b><br>'
     + (r.feitos||[]).map(function(x){return '• '+e2(x);}).join('<br>')
     + ((r.erros||[]).length ? '<br><b style="color:#f87171;">erros:</b><br>'+r.erros.map(function(x){return '• '+e2(x);}).join('<br>') : '')
-  + '</div>';
-  if(b){ b.textContent = '✔ feito — atualizando…'; }
-  setTimeout(function(){
+  + '</div>'
+  + (window._erroResolver
+    ? '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:9px;'
+      + 'padding:11px 13px;margin-top:9px;">'
+      + '<div style="font-size:11.5px;font-weight:900;color:#f87171;">📋 Detalhes do erro — envie para o suporte</div>'
+      + '<textarea id="txt-erro" readonly style="width:100%;height:120px;margin-top:7px;background:#0b0e13;'
+      + 'border:1px solid #242b39;border-radius:7px;padding:8px;color:#c9ced6;font-family:ui-monospace,monospace;'
+      + 'font-size:10px;resize:vertical;">'+e2(window._erroResolver)+'</textarea>'
+      + '<button onclick="copiarErroResolver()" style="margin-top:7px;background:#1d4ed8;border:none;'
+      + 'border-radius:8px;padding:7px 14px;color:#fff;font-weight:800;cursor:pointer;font-size:11.5px;">'
+      + '📋 Copiar tudo</button>'
+    + '</div>'
+    : '');
+  if(b){ b.disabled=false; b.textContent = r.ok ? '✔ feito' : '↻ tentar de novo'; }
+  // só fecha sozinho quando deu tudo certo — com erro, fica aberto para você copiar
+  if(r.ok) setTimeout(function(){
     var ov=document.getElementById('ov-resolver'); if(ov)ov.remove();
     exameDoSistema();
   }, 2600);

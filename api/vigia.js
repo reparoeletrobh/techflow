@@ -495,12 +495,29 @@ module.exports = async function handler(req, res) {
     const base = 'https://reparoeletroadm.com/api/';
     const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
     const feitos = [], erros = [];
+    const detalhesErro = [];
     const chamar = async (rotulo, url) => {
+      const inicio = Date.now();
       try {
-        const r = await fetch(base + url + '&k=' + K).then(x => x.json());
-        if (r && r.ok !== false) feitos.push(rotulo + ': ' + JSON.stringify(r).slice(0, 110));
-        else erros.push(rotulo + ': ' + (r.error || 'falhou'));
-      } catch (e) { erros.push(rotulo + ': ' + e.message); }
+        const resp = await fetch(base + url + '&k=' + K);
+        const txt = await resp.text();
+        let r = null;
+        try { r = JSON.parse(txt); } catch (e) {
+          detalhesErro.push({ etapa: rotulo, url, httpStatus: resp.status,
+            erro: 'resposta não é JSON', respostaCrua: txt.slice(0, 300) });
+          erros.push(rotulo + ': resposta inválida (HTTP ' + resp.status + ')');
+          return;
+        }
+        if (r && r.ok !== false) { feitos.push(rotulo + ': ' + JSON.stringify(r).slice(0, 110)); return; }
+        // 🔍 guarda tudo que o endpoint devolveu, para diagnóstico
+        detalhesErro.push({ etapa: rotulo, url, httpStatus: resp.status,
+          erro: r.error || 'sem mensagem', retornoCompleto: r,
+          duracaoMs: Date.now() - inicio });
+        erros.push(rotulo + ': ' + (r.error || 'falhou'));
+      } catch (e) {
+        detalhesErro.push({ etapa: rotulo, url, erro: e.message, tipo: 'exceção' });
+        erros.push(rotulo + ': ' + e.message);
+      }
     };
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
@@ -527,7 +544,22 @@ module.exports = async function handler(req, res) {
     if (quer('criadas')) await chamar('fichas travadas', 'wa-bot?action=destravar-criadas&aplicar=1');
     if (quer('garantia')) await chamar('fila de garantia', 'garantia?action=sincronizar-fila&aplicar=1');
     return res.status(200).json({ ok: erros.length === 0, feitos, erros,
-      proximoPasso: 'rode o exame-completo de novo para confirmar' });
+      // 📋 bloco pronto para copiar e enviar ao suporte quando algo falha
+      DIAGNOSTICO: detalhesErro.length ? {
+        quando: new Date().toISOString(),
+        quantasFalharam: detalhesErro.length,
+        detalhes: detalhesErro,
+        textoParaCopiar: '=== FALHA AO RESOLVER — ' +
+          new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT ===\n' +
+          detalhesErro.map(d => '• ' + d.etapa + '\n  url: ' + (d.url || '?') +
+            '\n  http: ' + (d.httpStatus || '?') + '\n  erro: ' + d.erro +
+            (d.respostaCrua ? '\n  resposta: ' + d.respostaCrua : '') +
+            (d.retornoCompleto ? '\n  retorno: ' + JSON.stringify(d.retornoCompleto).slice(0, 400) : '')
+          ).join('\n\n'),
+      } : null,
+      proximoPasso: erros.length
+        ? 'copie o campo textoParaCopiar e envie para o suporte'
+        : 'rode o exame-completo de novo para confirmar' });
   }
 
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──

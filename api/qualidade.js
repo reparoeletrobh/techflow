@@ -299,6 +299,43 @@ export default async function handler(req, res) {
     insp.aprovadoEm = new Date().toISOString();
     await dbSet(KEY, db);
 
+    // ── 🏪 FRENTE DE LOJA: aprovado no CQ → conserto realizado lá também ──
+    // Antes o técnico marcava Loja Feito e a ficha ia direto para conserto realizado.
+    // Agora ela passa pelo Controle de Qualidade, então quem move é a aprovação daqui.
+    let frenteLoja = null;
+    try {
+      const FL = await dbGet('reparoeletro_frenteloja');
+      const d8q = String(insp.telefone || '').replace(/\D/g, '').slice(-8);
+      const nomeQ = String(insp.cliente || '').toLowerCase().trim();
+      if (FL && Array.isArray(FL.fichas) && (d8q.length >= 8 || nomeQ)) {
+        const f = FL.fichas.find(x => {
+          const t = String(x.telefone || '').replace(/\D/g, '').slice(-8);
+          const n = String(x.nomeContato || x.nome || '').toLowerCase().trim();
+          const jaFeito = ['conserto_realizado', 'entregue', 'finalizado'].includes(String(x.phase || ''));
+          if (jaFeito) return false;
+          return (d8q.length >= 8 && t === d8q) || (nomeQ && n === nomeQ);
+        });
+        if (f) {
+          const agora = new Date().toISOString();
+          f.phase = 'conserto_realizado';
+          f.movedAt = agora;
+          f.consertoRealizadoEm = agora;
+          f.viaControleQualidade = true;
+          f.history = (f.history || []).concat([{ phase: 'conserto_realizado', ts: agora,
+            via: 'controle_qualidade', inspecao: insp.os || insp.id }]);
+          await dbSet('reparoeletro_frenteloja', FL);
+          // confirma que persistiu
+          const conf = await dbGet('reparoeletro_frenteloja');
+          const ok2 = ((conf || {}).fichas || []).some(x => x.id === f.id &&
+            String(x.phase || '') === 'conserto_realizado');
+          frenteLoja = ok2 ? { movido: true, ficha: f.nomeContato || f.nome, id: f.id }
+                           : { movido: false, erro: 'a gravação não persistiu' };
+        } else {
+          frenteLoja = { movido: false, motivo: 'cliente não encontrado no Frente de Loja em fase aberta' };
+        }
+      }
+    } catch (e) { frenteLoja = { movido: false, erro: e.message }; }
+
     // ── 📲 AVISA O CLIENTE com o resultado do controle de qualidade ──
     let avisoCliente = null;
     try {
