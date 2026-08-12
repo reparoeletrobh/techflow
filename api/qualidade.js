@@ -44,6 +44,52 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── ➕ FICHA AVULSA: produção do técnico que não veio da esteira ──
+  // Ex.: equipamento de venda, reforma de magnetron. Conta para o técnico,
+  // mas NÃO dispara nenhum comunicado ao cliente — não há cliente envolvido.
+  if (req.method === 'POST' && action === 'criar-avulsa') {
+    const b = req.body || {};
+    const tecnico = String(b.tecnico || '').trim();
+    const descricao = String(b.descricao || '').trim();
+    if (!tecnico) return res.status(400).json({ ok: false, error: 'informe o técnico' });
+    if (!descricao) return res.status(400).json({ ok: false, error: 'descreva o que foi feito' });
+    const txt = descricao.toLowerCase();
+    const tipo = /micro-?ondas|magnetron/.test(txt) ? 'microondas'
+      : /purificador|bebedouro/.test(txt) ? 'purificador'
+      : /adega/.test(txt) ? 'adega'
+      : /forno/.test(txt) ? 'forno'
+      : /\btv\b|televis/.test(txt) ? 'tv' : 'outro';
+    const num = db.config.proximoNum || ((db.inspecoes || []).length + 1);
+    const insp = {
+      id: 'insp_avl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      os: 'AVL-' + String(num).padStart(4, '0'),
+      cardId: null,
+      cliente: String(b.cliente || '').trim() || '— produção interna —',
+      telefone: '',
+      equipamento: tipo,
+      equipamentoTexto: descricao.slice(0, 120),
+      tecnico,
+      categoria: String(b.categoria || 'producao_interna'),   // venda · reforma · producao_interna
+      obsTecnica: String(b.obs || '').slice(0, 400) || null,
+      valor: Number(b.valor || 0) || 0,
+      avulsa: true,
+      semComunicado: true,          // 🔇 nunca avisa cliente
+      status: 'aguardando',
+      checklist: {},
+      criadoEm: new Date().toISOString(),
+      criadaPor: String(b.criadaPor || 'operação').slice(0, 30),
+    };
+    db.inspecoes.unshift(insp);
+    db.config.proximoNum = num + 1;
+    await dbSet(KEY, db);
+    // confirma que persistiu
+    const conf = (await dbGet(KEY)) || {};
+    const ok2 = ((conf.inspecoes) || []).some(x => x.id === insp.id);
+    if (!ok2) return res.status(200).json({ ok: false, error: 'a gravação não persistiu — tente de novo' });
+    return res.status(200).json({ ok: true, inspecao: insp,
+      aviso: 'ficha avulsa criada — nenhum comunicado será enviado' });
+  }
+
   // ── 📊 CONTADORES: por dia, semana e por técnico ──
   if (action === 'contadores') {
     const insp = db.inspecoes || [];
@@ -56,6 +102,7 @@ export default async function handler(req, res) {
 
     // 🎯 a meta de 25/dia NÃO conta as que vieram de garantia
     const deGarantia = i => /garantia/i.test(String(i.origem || '') + ' ' + String(i.tipo || ''));
+    const ehAvulsaC = i => i.avulsa === true;
     const entrouHoje = insp.filter(i => dia(i.criadoEm) === hoje);
     const entrouSemana = insp.filter(i => dia(i.criadoEm) >= iniSemana);
     const hojeSemGarantia = entrouHoje.filter(i => !deGarantia(i));
@@ -81,6 +128,9 @@ export default async function handler(req, res) {
         hojeSemGarantia: hojeSemGarantia.length,
         semanaSemGarantia: semanaSemGarantia.length,
         deGarantiaHoje: entrouHoje.length - hojeSemGarantia.length },
+      AVULSAS: { hoje: entrouHoje.filter(ehAvulsaC).length,
+        semana: entrouSemana.filter(ehAvulsaC).length,
+        obs: 'produção interna: venda, reforma — conta para o técnico e para a meta' },
       META: { alvo: 25, feito: hojeSemGarantia.length,
         falta: Math.max(0, 25 - hojeSemGarantia.length),
         percentual: Math.round(hojeSemGarantia.length / 25 * 100) + '%' },
@@ -337,8 +387,11 @@ export default async function handler(req, res) {
     } catch (e) { frenteLoja = { movido: false, erro: e.message }; }
 
     // ── 📲 AVISA O CLIENTE com o resultado do controle de qualidade ──
+    // 🔇 ficha avulsa é produção interna: não há cliente para avisar
     let avisoCliente = null;
+    const ehAvulsa = insp.avulsa === true || insp.semComunicado === true;
     try {
+      if (ehAvulsa) throw { _pular: true };
       const tel = String(insp.telefone || '').replace(/\D/g, '');
       if (tel.length >= 10) {
         const EQ = { microondas: 'micro-ondas', purificador: 'purificador',
