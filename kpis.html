@@ -302,7 +302,7 @@ function blocoFrente(nome, d, cor, etiqueta){
           null, null, L[0])
       + passo('02','Conversas iniciadas', d.conversas, 'var(--a2)',
           d.custoPorConversa ? '<b style="color:var(--a2)">'+moeda(d.custoPorConversa)+'</b> por conversa'
-            : (d.conversas ? 'primeiro contato de cada cliente' : 'nenhuma conversa nova'),
+            : (d.conversas ? 'iniciadas pelo anúncio' : 'nenhuma conversa nova'),
           null, null, L[1])
       + passo('03','Fichas criadas', d.fichas, 'var(--a3)',
           d.custoPorFicha ? moeda(d.custoPorFicha)+' por ficha' : '',
@@ -313,7 +313,7 @@ function blocoFrente(nome, d, cor, etiqueta){
           d.fichaParaLogistica, null, L[3])
       + passo('05','Orçamentos', d.orcamentos, 'var(--a5)', 'diagnóstico registrado',
           d.logisticaParaOrcamento, null, L[4])
-      + passo('06','Aprovados', d.aprovados.total, 'var(--a6)',
+      + passo('06','Passaram por aprovado', d.aprovados.total, 'var(--a6)',
           '<div class="split">'+chip(d.aprovados.bot,'bot '+d.aprovados.pctBot+'%','var(--verde)')
           + chip(d.aprovados.manual,'manual '+(100-d.aprovados.pctBot)+'%','var(--dim)')+'</div>',
           d.orcamentoParaAprovado, null, L[5])
@@ -382,8 +382,9 @@ async function carregar(){
   + blocoFrente('ADM', r.ADM, 'var(--a1)', 'linha branca')
   + blocoFrente('TV', r.TV, 'var(--a6)', 'televisores');
   document.getElementById('rodape').innerHTML =
-    'As conversas contam o primeiro contato de cada cliente no período · '
-    + 'os aprovados usam a data real da aprovação<br>'
+    'conversas: ' + esc(r.origemDasConversas || '—') + '<br>'
+    + 'aprovados: quem passou pela fase no período, mesmo que já tenha avançado depois<br>'
+    + 'investimento: gasto real das datas, incluindo campanhas já encerradas<br>'
     + 'período de ' + esc(r.periodo.de) + ' a ' + esc(r.periodo.ate);
 }
 

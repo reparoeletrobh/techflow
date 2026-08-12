@@ -51,23 +51,47 @@ function janela(q) {
 }
 
 // gasto real na Meta no período, separado por frente
+// 💰 gasto e conversas iniciadas no período, direto da Meta.
+// O relatório por período traz TODA campanha que teve entrega naquelas datas,
+// inclusive as já pausadas ou encerradas depois — é o gasto real do período,
+// não o que está ativo agora.
+const ehTvNome = n => /\btv\b|televis|tela|led|barramento|apagad|imagem/i.test(String(n || ''));
+
 async function investimento(de, ate) {
-  const vazio = { adm: 0, tv: 0, total: 0, fonte: 'sem token da Meta' };
-  if (!TOKEN) return vazio;
+  const vazio = { adm: 0, tv: 0, total: 0,
+    convAdm: 0, convTv: 0, convTotal: 0,
+    fonte: 'conta de anúncios não conectada', campanhas: 0 };
+  if (!TOKEN || !CONTA) return vazio;
   try {
-    const url = `${GRAPH}/act_${CONTA}/insights`
-      + `?level=campaign&fields=campaign_name,spend`
+    // 📨 a Meta informa quantas conversas cada campanha iniciou
+    const CONV = ['onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.total_messaging_connection'];
+    let url = `${GRAPH}/act_${CONTA}/insights`
+      + `?level=campaign&fields=campaign_name,spend,actions`
       + `&time_range=${encodeURIComponent(JSON.stringify({ since: de, until: ate }))}`
+      + `&action_report_time=conversion&use_account_attribution_setting=true`
       + `&limit=500&access_token=${TOKEN}`;
-    const r = await fetch(url).then(x => x.json());
-    if (!r || !r.data) return { ...vazio, fonte: (r && r.error && r.error.message) || 'sem retorno' };
-    let adm = 0, tv = 0;
-    for (const c of r.data) {
-      const v = parseFloat(c.spend || 0) || 0;
-      if (/\btv\b|televis|tela |led |barramento|apagad/i.test(String(c.campaign_name || ''))) tv += v;
-      else adm += v;
+    let adm = 0, tv = 0, cAdm = 0, cTv = 0, n = 0;
+    let paginas = 0;
+    while (url && paginas < 6) {
+      const r = await fetch(url).then(x => x.json());
+      if (!r || r.error) return { ...vazio, fonte: (r && r.error && r.error.message) || 'sem retorno' };
+      for (const c of (r.data || [])) {
+        n++;
+        const gasto = parseFloat(c.spend || 0) || 0;
+        let conv = 0;
+        for (const a of (c.actions || [])) {
+          if (CONV.includes(String(a.action_type))) { conv += parseInt(a.value || 0, 10) || 0; break; }
+        }
+        if (ehTvNome(c.campaign_name)) { tv += gasto; cTv += conv; }
+        else { adm += gasto; cAdm += conv; }
+      }
+      url = (r.paging && r.paging.next) || null;
+      paginas++;
     }
-    return { adm: +adm.toFixed(2), tv: +tv.toFixed(2), total: +(adm + tv).toFixed(2), fonte: 'Meta Ads' };
+    return { adm: +adm.toFixed(2), tv: +tv.toFixed(2), total: +(adm + tv).toFixed(2),
+      convAdm: cAdm, convTv: cTv, convTotal: cAdm + cTv,
+      campanhas: n, fonte: 'Meta Ads · ' + n + ' campanha(s) com entrega no período' };
   } catch (e) { return { ...vazio, fonte: e.message }; }
 }
 
@@ -115,7 +139,21 @@ module.exports = async function handler(req, res) {
     const cards = ((pipeDb || {}).cards) || [];
     const orcs = cards.filter(c => dentro(c.orcamentoEm || c.criadoEm) &&
       (Number(c.valor || 0) > 0 || c.orcamentoEm));
-    const aprov = cards.filter(c => c.aprovadoEm && dentro(c.aprovadoEm));
+    // ✅ contam os que PASSARAM pela aprovação no período, mesmo que já tenham
+    // seguido para produção, entrega ou finalizado — olhar só quem está parado
+    // na coluna hoje esconderia todo card que avançou depois
+    const quandoAprovou = c => {
+      if (c.aprovadoEm) return new Date(c.aprovadoEm).getTime();
+      const h = (c.history || [])
+        .filter(x => String(x.phase || x.phaseId || '') === 'aprovados')
+        .map(x => new Date(x.ts || x.timestamp || 0).getTime())
+        .filter(Boolean).sort((a, b) => a - b);
+      return h.length ? h[0] : 0;
+    };
+    const aprov = cards.filter(c => {
+      const t = quandoAprovou(c);
+      return t && t >= J.ini && t <= J.fim;
+    });
     const aprovBot = aprov.filter(c => /bot/i.test(String(c.aprovadoPor || '')));
     const faturamento = aprov.reduce((s, c) => s + (Number(c.valor || 0) || 0), 0);
     return {
@@ -137,6 +175,11 @@ module.exports = async function handler(req, res) {
 
   const adm = montar(fA, lgA, ppA);
   const tv = montar(fT, lgT, ppT);
+  // 📨 a contagem da Meta é a oficial de conversas iniciadas pelo tráfego;
+  // o histórico do WhatsApp serve de reserva quando a Meta não responde
+  const usarMeta = inv.convTotal > 0;
+  const convAdmFinal = usarMeta ? inv.convAdm : convAdm;
+  const convTvFinal = usarMeta ? inv.convTv : convTv;
   const taxa = (a, b) => b ? Math.round(a / b * 100) : 0;
   const custo = (v, n) => n ? +(v / n).toFixed(2) : 0;
 
@@ -171,19 +214,24 @@ module.exports = async function handler(req, res) {
     },
     // 📖 de onde sai cada número, para conferência
     FONTES: {
-      investimento: 'Meta Ads · insights por campanha no período · campanha com TV, televisão, tela, LED ou barramento no nome conta como TV; o resto como ADM',
-      conversas: 'histórico do WhatsApp (wa_evt_list) · conta o PRIMEIRO contato de cada telefone dentro do período; quem já falou antes não conta de novo',
-      conversasPorFrente: 'a conversa é de TV se o telefone tiver ficha em fichas_tv; caso contrário conta como ADM',
+      investimento: 'Meta Ads · gasto real das datas escolhidas, incluindo campanhas já pausadas ou encerradas depois · campanha com TV, televisão, tela, LED ou barramento no nome conta como TV; o resto como ADM',
+      conversas: usarMeta
+        ? 'Meta Ads · conversas iniciadas pelo anúncio no período, atribuídas à campanha que as gerou'
+        : 'histórico do WhatsApp · primeiro contato de cada telefone no período (a Meta não retornou dados)',
+      conversasPorFrente: usarMeta ? 'pela campanha que gerou a conversa'
+        : 'a conversa é de TV se o telefone tiver ficha em fichas_tv',
       fichas: 'fichas_adm e fichas_tv · pela data de criação · não conta retorno do remarcar, que já foi contado na primeira entrada',
       logistica: 'reparoeletro_logistica e tv_logistica · pela data de criação · é do bot quando a origem ou quem cadastrou menciona bot',
       orcamentos: 'cards do pipe com data de orçamento ou valor preenchido, dentro do período',
-      aprovados: 'cards do pipe com carimbo de aprovação no período · é do bot quando aprovadoPor menciona bot',
-      faturamento: 'soma do valor dos cards aprovados no período',
+      aprovados: 'cards que PASSARAM pela fase de aprovação dentro do período, pelo carimbo ou pelo histórico — inclui os que já avançaram para produção, entrega ou finalizado',
+      faturamento: 'soma do valor desses mesmos cards, na data em que passaram pela aprovação',
       custoPorAprovado: 'investimento ÷ aprovados',
       atencao: 'as etapas medem coisas que acontecem em momentos diferentes: uma ficha criada hoje pode ser aprovada semana que vem, então as taxas entre etapas não são de um mesmo grupo de clientes',
     },
-    ADM: enriquecer(adm, inv.adm, convAdm),
-    TV: enriquecer(tv, inv.tv, convTv),
+    origemDasConversas: usarMeta ? 'Meta Ads (conversas iniciadas pelo anúncio)'
+      : 'histórico do WhatsApp (primeiro contato de cada cliente)',
+    ADM: enriquecer(adm, inv.adm, convAdmFinal),
+    TV: enriquecer(tv, inv.tv, convTvFinal),
     TOTAL: {
       investimento: inv.total,
       faturamento: +(adm.faturamento + tv.faturamento).toFixed(2),
