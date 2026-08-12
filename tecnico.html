@@ -359,9 +359,21 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 .meta-loading{font-family:var(--fm);font-size:12px;color:var(--muted);padding:60px 0;text-align:center;}
 
 /* ── MODAL ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity 0.2s;padding:14px;}
+/* 📱 no celular o modal vira folha que sobe de baixo e rola por dentro,
+   para o botão de confirmar nunca ficar fora da tela */
+@media (max-width:640px){
+  .modal-overlay{align-items:flex-end;padding:0;}
+  .modal{width:100%;max-width:100%;max-height:92vh;border-radius:16px 16px 0 0;
+    padding:20px 18px calc(20px + env(safe-area-inset-bottom));}
+  .tecnico-btn{padding:11px 14px;font-size:14px;}
+  .modal-title{font-size:16.5px;}
+}
+@media (max-height:560px){
+  .modal{max-height:96vh;padding:16px;}
+}
 .modal-overlay.open{opacity:1;pointer-events:all;}
-.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:26px;max-width:380px;width:90%;transform:scale(0.95);transition:transform 0.2s;}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:26px;max-width:380px;width:90%;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:scale(0.95);transition:transform 0.2s;}
 .modal-overlay.open .modal{transform:scale(1);}
 .modal-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:8px;}
 .modal-title span{color:var(--accent);}

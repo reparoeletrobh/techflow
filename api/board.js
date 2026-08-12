@@ -677,6 +677,10 @@ module.exports = async function handler(req, res) {
         : board.cards.find(c => c.flFichaId === String(movFlFichaId));
       if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
       card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      // 🆔 card sem identificador impede vincular a inspeção — cria um estável
+      if (!card.id) card.id = card.pipefyId || card.flFichaId ||
+        ('bd_' + String(card.telefone || '').replace(/\D/g, '').slice(-8) + '_' +
+         Date.now().toString(36));
       card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
       // 🔍 observação técnica do Controle de Qualidade — INTERNA, nunca vai ao cliente
       if (phaseId === 'controle_qualidade') {
@@ -689,7 +693,16 @@ module.exports = async function handler(req, res) {
           const q = (await dbGet(KQ)) || { inspecoes: [], config: { tecnicos: [], proximoNum: 1 } };
           q.inspecoes = q.inspecoes || [];
           q.config = q.config || { tecnicos: [], proximoNum: 1 };
-          const jaTem = q.inspecoes.some(i => String(i.cardId || '') === String(card.id) &&
+          // 🔑 dois equipamentos do mesmo cliente compartilham o identificador do card,
+          // então comparar só por ele fazia o segundo ser tratado como repetido e
+          // ficar sem inspeção. A comparação passa a incluir o equipamento e o técnico.
+          const assinatura = c => String(c.cardId || '') + '|' +
+            String(c.equipamentoTexto || c.equipamento || '').toLowerCase().trim() + '|' +
+            String(c.tecnico || '').toLowerCase().trim();
+          const minha = { cardId: card.id,
+            equipamentoTexto: card.equipamento || card.descricao || '',
+            tecnico: card.tecnicoServico || '' };
+          const jaTem = q.inspecoes.some(i => assinatura(i) === assinatura(minha) &&
             i.status !== 'aprovado');
           if (!jaTem) {
             const num = q.config.proximoNum || (q.inspecoes.length + 1);
@@ -723,13 +736,13 @@ module.exports = async function handler(req, res) {
             let confirmou = false;
             for (let tent = 1; tent <= 3 && !confirmou; tent++) {
               const conf = (await dbGet(KQ)) || { inspecoes: [] };
-              confirmou = (conf.inspecoes || []).some(i => String(i.cardId || '') === String(card.id));
+              confirmou = (conf.inspecoes || []).some(i => assinatura(i) === assinatura(minha));
               if (confirmou) break;
               await new Promise(s => setTimeout(s, 200 * tent));
               const novo = (await dbGet(KQ)) || { inspecoes: [], config: { proximoNum: 1 } };
               novo.inspecoes = novo.inspecoes || [];
               novo.config = novo.config || { proximoNum: 1 };
-              if (!novo.inspecoes.some(i => String(i.cardId || '') === String(card.id))) {
+              if (!novo.inspecoes.some(i => assinatura(i) === assinatura(minha))) {
                 novo.inspecoes.unshift(q.inspecoes[0]);
                 novo.config.proximoNum = Math.max(novo.config.proximoNum || 1, num + 1);
                 await dbSet(KQ, novo);
