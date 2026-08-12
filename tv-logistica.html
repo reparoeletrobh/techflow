@@ -719,7 +719,9 @@ function cardHTML(f, phase) {
   // Motorista Parceiro, onde a ficha permanece após o motorista combinar
   let relogio = '';
   const _hc = f.horarioColeta || f.agendadoPara;
-  if (_hc && !isNaN(new Date(_hc).getTime())) {
+  // 🕐 a coluna Horário Marcado já mostra o seu próprio badge junto aos botões —
+  // sem esta ressalva a data aparecia duas vezes na mesma ficha
+  if (phase !== 'horario_marcado' && _hc && !isNaN(new Date(_hc).getTime())) {
     const _d = new Date(_hc).getTime() - Date.now();
     const _a = Math.abs(_d), _h = Math.floor(_a/3600000), _m = Math.floor((_a%3600000)/60000);
     const _f = _d >= 0 ? (_h > 0 ? `em ${_h}h${_m>0?_m+'m':''}` : `em ${_m}min`)
