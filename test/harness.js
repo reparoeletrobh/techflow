@@ -570,6 +570,25 @@ function check(nome, cond, extra) {
   // ── 📒 cada etapa do funil precisa registrar no livro-razão ──
   // ── 🔒 a camada de gravação segura precisa resistir à sobreposição ──
   // ── 🔁 devolução do remarcar com a camada segura ──
+  // ── 🔁 ficha já devolvida e atendida NÃO pode ser recriada ──
+  console.log('▶ Cenário RC — recriar-perdidas respeita devolução já feita');
+  {
+    const logi2 = carregarHandler('api/logistica.js');
+    const ontem = new Date(Date.now() - 26 * 3600000).toISOString();
+    KV['reparoeletro_logistica'] = { fichas: [{
+      id: 'LOG-JA', nome: 'Cliente Atendido', telefone: '5531977776666',
+      phase: 'em_rota', remarcadoEm: ontem,
+      voltouProspeccao: ontem,          // devolução confirmada na época
+    }] };
+    KV['fichas_adm'] = { fichas: [] };  // a ficha já saiu daqui: foi atendida
+    const rC = res();
+    const dia = new Date(Date.now() - 26 * 3600000).toISOString().slice(0, 10);
+    await logi2(req({ action: 'recriar-perdidas', dia, ...K }), rC);
+    const d = rC.dado || {};
+    check('recriar: não considera perdida quem já foi devolvido',
+      (d.marcadasComoDevolvidas || 0) === 0, JSON.stringify(d).slice(0, 110));
+  }
+
   console.log('▶ Cenário RM — ficha remarcada chega em Entrar em Contato');
   {
     const logi = carregarHandler('api/logistica.js');

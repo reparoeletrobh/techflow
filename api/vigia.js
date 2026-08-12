@@ -72,6 +72,9 @@ module.exports = async function handler(req, res) {
       for (const f of ((b || {}).fichas || [])) {
         const q = new Date(f.enviadoProspeccaoEm || f.remarcadoEm || 0).getTime();
         if (!q || q < corte) continue;
+        // ✅ a devolução foi confirmada na época: a ficha pode ter saído do
+        // atendimento depois porque a equipe a tratou, e isso não é perda
+        if (f.voltouProspeccao) continue;
         const onde = mapa[d8(f.telefone)] || [];
         const chegou = onde.some(o => (o.banco === 'fichas_adm' || o.banco === 'fichas_tv') &&
           (o.origem === 'remarcar' || String(o.id || '').startsWith('rem_') ||

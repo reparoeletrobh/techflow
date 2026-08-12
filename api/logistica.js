@@ -309,6 +309,52 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action
 
+  // ── ↩️ DESFAZER-RECRIACAO: remove fichas recriadas indevidamente ──
+  if (action === 'desfazer-recriacao') {
+    const min = Math.min(720, Math.max(5, parseInt(req.query.minutos || '60', 10)));
+    const desde = Date.now() - min * 60000;
+    const dg2 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [lgA2, lgT2] = await Promise.all([dbGet('reparoeletro_logistica'), dbGet('tv_logistica')]);
+    // quem já tinha devolução confirmada antes desta janela
+    const jaDevolvido = new Set();
+    for (const b of [lgA2, lgT2]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        const v = new Date(f.voltouProspeccao || 0).getTime();
+        if (v && v < desde) jaDevolvido.add(dg2(f.telefone));
+      }
+    }
+    const alvo = [];
+    for (const chave of ['fichas_adm', 'fichas_tv']) {
+      const db = await dbGet(chave);
+      for (const f of (((db || {}).fichas) || [])) {
+        const q = new Date(f.criadoEm || 0).getTime();
+        if (!q || q < desde) continue;
+        const id = String(f.id || '');
+        if (!id.startsWith('fic_reag_') && String(f.origem || '') !== 'remarcar') continue;
+        if (!jaDevolvido.has(dg2(f.telefone))) continue;   // esta é legítima
+        alvo.push({ chave, id: f.id, nome: f.nome, tel: dg2(f.telefone) });
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        recriadasIndevidamente: alvo.length,
+        criterio: 'ficha criada agora para cliente cuja devolução já havia sido confirmada antes',
+        L: alvo.map(a => a.chave + ' | ' + String(a.nome || '?').slice(0, 22) + ' ' + a.tel.slice(-4)),
+        dica: 'para remover: &aplicar=1' });
+    }
+    let n = 0;
+    for (const chave of ['fichas_adm', 'fichas_tv']) {
+      const ids = new Set(alvo.filter(a => a.chave === chave).map(a => String(a.id)));
+      if (!ids.size) continue;
+      const db = await dbGet(chave);
+      const antes = (db.fichas || []).length;
+      db.fichas = (db.fichas || []).filter(f => !ids.has(String(f.id)));
+      n += antes - db.fichas.length;
+      await dbSet(chave, db);
+    }
+    return res.status(200).json({ ok: true, removidas: n });
+  }
+
   // ── 📜 LOG-DEVOLUCOES: histórico com desfecho de cada devolução ──
   if (action === 'log-devolucoes') {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
@@ -416,6 +462,10 @@ module.exports = async function handler(req, res) {
         if (!f.enviadoProspeccaoEm && !f.remarcadoEm) continue;
         const q = new Date(f.enviadoProspeccaoEm || f.remarcadoEm).getTime();
         if (!q || q < ini || q >= fim) continue;
+        // ✅ a própria ficha registra que a devolução foi feita. Ignorar isso e
+        // procurar só em fichas_adm recriava tudo que a equipe já tinha atendido,
+        // porque a ficha atendida sai daquele banco ao virar coleta.
+        if (f.voltouProspeccao) continue;
         if (temRemarcar.has(dg(f.telefone))) continue;
         perdidas.push({ f, sis, quando: f.enviadoProspeccaoEm || f.remarcadoEm });
       }
