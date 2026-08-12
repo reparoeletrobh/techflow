@@ -285,6 +285,67 @@ module.exports = async function handler(req, res) {
       observacao: 'apenas datas obtidas do histórico real — nada foi estimado' });
   }
 
+  // ── 🔍 CONFERIR-APROVADOS: lista nominal, para bater com a contagem manual ──
+  if ((req.query || {}).action === 'conferir-aprovados') {
+    const Jc = janela(req.query || {});
+    const d8c = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const noPeriodo = d => { const t = new Date(d || 0).getTime(); return t >= Jc.ini && t <= Jc.fim; };
+    const FASES_OK = ['aprovados', 'producao', 'video_enviado', 'analise_compra',
+      'equipamento_comprado', 'programar_entrega', 'solicitar_entrega', 'entrega_solicitada',
+      'receber', 'erp', 'garantia', 'finalizado', 'conserto_realizado', 'entregue'];
+    const quando = c => {
+      if (c.aprovadoEm) return c.aprovadoEm;
+      const h2 = (c.history || [])
+        .filter(x => ['aprovados', 'producao'].includes(String(x.phase || x.phaseId || '')))
+        .map(x => x.ts || x.timestamp).filter(Boolean).sort();
+      return h2[0] || null;
+    };
+    const achados = [], forales = [];
+    const vistos = new Map();
+    for (const [k, lista, tipo] of [
+      ['reparoeletro_pipe', ((await dbGet('reparoeletro_pipe')) || {}).cards || [], 'pipe'],
+      ['reparoeletro_arquivo', ((await dbGet('reparoeletro_arquivo')) || {}).cards || [], 'arquivo'],
+      ['reparoeletro_frenteloja', ((await dbGet('reparoeletro_frenteloja')) || {}).fichas || [], 'balcão'],
+    ]) {
+      for (const c of lista) {
+        const fase = String(c.phaseId || c.phase || '');
+        const passou = FASES_OK.includes(fase) || !!c.aprovadoEm ||
+          (c.history || []).some(x => ['aprovados', 'producao'].includes(String(x.phase || x.phaseId || '')));
+        if (!passou) continue;
+        const q = quando(c);
+        const tel = d8c(c.telefone);
+        const item = { banco: k, tipo, nome: c.nomeContato || c.nome || '?', tel,
+          fase, quando: q, valor: Number(c.valor || (c.orcamento && c.orcamento.valor) || 0),
+          origem: c.origem || null, noBalcao: c.aprovadoNoBalcao === true,
+          semData: !q };
+        if (!q || !noPeriodo(q)) { forales.push(item); continue; }
+        // 🔁 o mesmo cliente pode ter ficha no balcão E card no pipe: conta uma vez
+        const chave = tel + '|' + String(q).slice(0, 10);
+        if (vistos.has(chave)) { vistos.get(chave).duplicadoEm = (vistos.get(chave).duplicadoEm || []).concat(k); continue; }
+        vistos.set(chave, item); achados.push(item);
+      }
+    }
+    const ehBal = i => i.tipo === 'balcão' || i.origem === 'frenteloja' || i.noBalcao;
+    const balcao = achados.filter(ehBal), online = achados.filter(i => !ehBal(i));
+    const fmt = i => (ehBal(i) ? '🏪 ' : '💻 ') + String(i.nome).slice(0, 22) + ' ' + i.tel.slice(-4) +
+      ' | ' + String(i.quando || '').slice(5, 16).replace('T', ' ') +
+      ' | ' + i.fase + ' | R$ ' + i.valor.toFixed(2) + ' | ' + i.banco +
+      (i.duplicadoEm ? ' | também em ' + i.duplicadoEm.join(',') : '');
+    return res.status(200).json({ ok: true,
+      periodo: { de: Jc.de, ate: Jc.ate, rotulo: Jc.rotulo,
+        inicio: new Date(Jc.ini - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' '),
+        fim: new Date(Jc.fim - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') },
+      TOTAL: achados.length, BALCAO: balcao.length, ONLINE: online.length,
+      duplicadosEvitados: achados.filter(i => i.duplicadoEm).length,
+      foraDoPeriodoOuSemData: forales.length,
+      semDataDeAprovacao: forales.filter(i => i.semData).length,
+      LISTA_BALCAO: balcao.map(fmt),
+      LISTA_ONLINE: online.map(fmt),
+      SEM_DATA: forales.filter(i => i.semData).slice(0, 40)
+        .map(i => (ehBal(i) ? '🏪 ' : '💻 ') + String(i.nome).slice(0, 22) + ' ' + i.tel.slice(-4) +
+          ' | ' + i.fase + ' | ' + i.banco + ' — sem data de aprovação, não entra em nenhum período') });
+  }
+
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
