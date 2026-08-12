@@ -715,6 +715,22 @@ async function abrirLogs(){
 
 function cardHTML(f, phase) {
   const tempo = tempoRelativo(f.movedAt || f.criadoEm);
+  // 🕐 relógio do horário combinado — vale para QUALQUER coluna, inclusive
+  // Motorista Parceiro, onde a ficha permanece após o motorista combinar
+  let relogio = '';
+  const _hc = f.horarioColeta || f.agendadoPara;
+  if (_hc && !isNaN(new Date(_hc).getTime())) {
+    const _d = new Date(_hc).getTime() - Date.now();
+    const _a = Math.abs(_d), _h = Math.floor(_a/3600000), _m = Math.floor((_a%3600000)/60000);
+    const _f = _d >= 0 ? (_h > 0 ? `em ${_h}h${_m>0?_m+'m':''}` : `em ${_m}min`)
+                       : (_h > 0 ? `${_h}h${_m>0?_m+'m':''} atrás` : `${_m}min atrás`);
+    const _c = _d < 0 ? 'venc-late' : _d < 3600000 ? 'venc-warn' : 'venc-ok';
+    const _i = _d < 0 ? '🔴' : _d < 3600000 ? '🟠' : '🟢';
+    const _hora = new Date(_hc).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+    const _dia  = new Date(_hc).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'});
+    relogio = `<div class="venc-badge ${_c}">${_i} ${_dia} às ${_hora} · ${_f}</div>`
+      + (f.agendadoObs ? `<div class="card-obs">🗒 ${escHtml(f.agendadoObs).slice(0,120)}</div>` : '');
+  }
   const col   = COLS.find(c => c.id === phase) || {};
   const barCor = col.cor || '#444';
 
@@ -732,7 +748,7 @@ function cardHTML(f, phase) {
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
       </div>`;
   } else if (phase === 'horario_marcado') {
-    // Badge de vencimento
+    // Badge de vencimento (esta coluna já mostra o seu; o relógio geral cobre as demais)
     let vencBadge = '';
     if (f.horarioColeta && !isNaN(new Date(f.horarioColeta).getTime())) {
       const diff  = new Date(f.horarioColeta).getTime() - Date.now();
@@ -834,6 +850,7 @@ function cardHTML(f, phase) {
     ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
     <div class="card-nome">${escHtml(nomeFormatado(f))}</div>
     ${f.telefone ? `<div class="card-tel">📞 ${escHtml(mascaraTel(f.telefone))}</div>` : ''}
+    ${relogio}
     ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
     ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
     ${f.observacao ? `<div class="card-obs">📌 ${escHtml(f.observacao).slice(0,140)}</div>` : ''}

@@ -69,6 +69,25 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 </div>
 <div id="lista"></div>
 <script>
+// 🕐 relógio do horário combinado, para o motorista ver na própria ficha
+function relogioHTML(f){
+  var q = f.agendadoPara || f.horarioColeta;
+  if(!q || isNaN(new Date(q).getTime())) return '';
+  var d = new Date(q).getTime() - Date.now();
+  var a = Math.abs(d), hh = Math.floor(a/3600000), mm = Math.floor((a%3600000)/60000);
+  var quando = d>=0 ? (hh>0 ? 'em '+hh+'h'+(mm>0?mm+'m':'') : 'em '+mm+'min')
+                    : (hh>0 ? hh+'h'+(mm>0?mm+'m':'')+' atrás' : mm+'min atrás');
+  var cor = d<0 ? '#f87171' : d<3600000 ? '#fbbf24' : '#4ade80';
+  var ic  = d<0 ? '🔴' : d<3600000 ? '🟠' : '🟢';
+  var hora = new Date(q).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+  var dia  = new Date(q).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'});
+  return '<div style="background:rgba(255,255,255,.05);border:1px solid '+cor+';border-radius:8px;'
+    + 'padding:7px 10px;margin:7px 0;font-size:13px;font-weight:800;color:'+cor+';">'
+    + ic+' Combinado: '+dia+' às '+hora+' · '+quando+'</div>'
+    + (f.agendadoObs ? '<div style="font-size:12px;color:#9aa3b0;margin:-3px 0 7px;">🗒 '
+        + String(f.agendadoObs).replace(/</g,'&lt;')+'</div>' : '');
+}
+
 // ── 🏷️ selo de triagem de TV: PRIORIDADE (verde piscando) ou NÃO COLETAR ──
 function seloTriagem(f){
   var s = f && f.seloTriagem;
@@ -256,7 +275,7 @@ function render(){
           '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
           '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
 
-          '<button class="b" style="background:#7c3aed;" onclick="agendar(\''+f.id+'\')">🕐 '+((f.agendadoPara||f.horarioColeta)?'Reagendar':'Combinar horário')+'</button>'+
+          relogioHTML(f)+'<button class="b" style="background:#7c3aed;" onclick="agendar(\''+f.id+'\')">🕐 '+((f.agendadoPara||f.horarioColeta)?'Reagendar':'Combinar horário')+'</button>'+
           '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
           '<button class="b" style="background:#dc2626;min-width:44%;" onclick="cancelado(\''+f.id+'\')">❌ Cancelado</button>'+
           '<button class="b b-col" style="min-width:52%;" onclick="coletado(\''+f.id+'\')">✅ COLETADO</button>'+
