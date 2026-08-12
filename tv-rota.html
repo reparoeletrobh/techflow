@@ -256,7 +256,7 @@ function render(){
           '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
           '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
 
-          '<button class="b" style="background:#7c3aed;" onclick="agendar(\''+f.id+'\')">🕐 '+(f.agendadoPara?'Reagendar':'Combinar horário')+'</button>'+
+          '<button class="b" style="background:#7c3aed;" onclick="agendar(\''+f.id+'\')">🕐 '+((f.agendadoPara||f.horarioColeta)?'Reagendar':'Combinar horário')+'</button>'+
           '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
           '<button class="b" style="background:#dc2626;min-width:44%;" onclick="cancelado(\''+f.id+'\')">❌ Cancelado</button>'+
           '<button class="b b-col" style="min-width:52%;" onclick="coletado(\''+f.id+'\')">✅ COLETADO</button>'+
@@ -268,8 +268,8 @@ function render(){
 
 // ── 🕐 HORÁRIO COMBINADO COM O CLIENTE ────────────────────────────────
 function agendaHtml(f){
-  if(!f.agendadoPara)return '';
-  var d=new Date(f.agendadoPara), ag=Date.now();
+  if(!(f.agendadoPara||f.horarioColeta))return '';
+  var d=new Date((f.agendadoPara||f.horarioColeta)), ag=Date.now();
   var falta=(d.getTime()-ag)/60000;                 // minutos
   var passou=falta<0;
   var perto=falta>=0&&falta<=60;                    // pisca na última hora
@@ -289,7 +289,7 @@ async function agendar(id){
   var f=null;
   var _lst=(_dados&&_dados.fichas)||[];
   for(var i=0;i<_lst.length;i++){if(_lst[i].id===id){f=_lst[i];break;}}
-  var atual=f&&f.agendadoPara?new Date(f.agendadoPara):null;
+  var atual=f&&(f.agendadoPara||f.horarioColeta)?new Date((f.agendadoPara||f.horarioColeta)):null;
   var hj=new Date();
   var dPad=atual?atual.toLocaleDateString('pt-BR'):hj.toLocaleDateString('pt-BR');
   var data=prompt('📅 Que DIA o cliente combinou?\n\nPode escrever: 11/08 · 11-08 · hoje · amanhã\n\nDeixe vazio e clique OK para REMOVER o agendamento.',dPad.slice(0,5));

@@ -533,6 +533,14 @@ module.exports = async function handler(req, res) {
     if (arq.fichas.length > 4000) arq.fichas = arq.fichas.slice(0, 4000);
     await dbSet('tv_logistica_arquivo', arq);
     await dbSet(LOG_KEY, db);
+    // confirma que persistiu — o banco pode recusar gravação concorrente
+    try {
+      const conf = await dbGet(LOG_KEY);
+      const c2 = ((conf || {}).fichas || []).find(x => x.id === id);
+      const ok2 = limpar ? !(c2 || {}).agendadoPara : String((c2 || {}).agendadoPara || '') === String(quando);
+      if (!ok2) return res.status(200).json({ ok: false,
+        error: 'a gravação não persistiu — tente de novo em alguns segundos' });
+    } catch (e) {}
     return res.status(200).json({ ok:true, arquivadas: paraArq.length, restantes: db.fichas.length,
       totalNoArquivo: arq.fichas.length,
       nomes: paraArq.slice(0,10).map(f => f.nome||'—') });
@@ -792,14 +800,33 @@ module.exports = async function handler(req, res) {
     if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
     if (limpar) {
       delete f.agendadoPara; delete f.agendadoObs; delete f.agendadoEm;
+      delete f.horarioColeta;
+      // desmarcar devolve a ficha ao motorista, sem horário
+      if (String(f.phase || '') === 'horario_marcado') {
+        f.phase = 'motorista_parceiro';
+        f.movedAt = new Date().toISOString();
+      }
     } else {
       if (!quando) return res.status(400).json({ ok: false, error: 'informe quando (ISO)' });
       f.agendadoPara = quando;
+      // 🕐 a tela da equipe lê horarioColeta — gravar só agendadoPara deixava o
+      // relógio invisível para quem acompanha a rota
+      f.horarioColeta = quando;
       f.agendadoObs = String(obs || '').slice(0, 140);
       f.agendadoEm = new Date().toISOString();
       f.historicoAgenda = (f.historicoAgenda || []).concat([{
         para: quando, obs: f.agendadoObs, em: f.agendadoEm,
       }]).slice(-10);
+      // 🕐 combinar horário move a ficha para Horário Marcado — antes ela ficava
+      // em Motorista Parceiro e nada mudava na tela da equipe
+      const faseAntes = String(f.phase || '');
+      if (faseAntes !== 'horario_marcado') {
+        f.phase = 'horario_marcado';
+        f.horarioMarcadoEm = f.agendadoEm;
+        f.movedAt = f.agendadoEm;
+        f.history = (f.history || []).concat([{ phase: 'horario_marcado', ts: f.agendadoEm,
+          via: 'motorista', para: quando }]);
+      }
     }
     await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
