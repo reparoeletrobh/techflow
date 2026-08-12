@@ -153,10 +153,6 @@
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/tv-logistica?action=reprocessar-remarcar&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/20 * * * *"
-    },
-    {
       "path": "/api/rotina?action=de-hora-em-hora&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "25 * * * *"
     },

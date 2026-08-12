@@ -494,6 +494,14 @@ function check(nome, cond, extra) {
       faltando.length === 0, 'faltam: ' + faltando.join(', '));
   }
 
+  // ── ⏱️ a Vercel só executa 40 cron jobs: acima disso os últimos são ignorados ──
+  console.log('▶ Cenário C1 — quantidade de crons dentro do limite da Vercel');
+  {
+    const v = JSON.parse(require('fs').readFileSync('vercel.json', 'utf8'));
+    const n = (v.crons || []).length;
+    check('crons dentro do limite de 40', n <= 40, n + ' agendamentos');
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
   await wabot(req({ action:'enviar', forcarJanela:'1', ...K }, { tel:'5531990007099',

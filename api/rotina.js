@@ -32,6 +32,9 @@ module.exports = async function handler(req, res) {
       'logistica?action=processar-pendentes&aplicar=1'));
     feitos.push(await chamar('mensagens aguardando a janela reabrir',
       'wa-bot?action=despachar-pendentes&aplicar=1'));
+    // rede de segurança do remarcar: passou de 20 para 10 minutos ao entrar aqui
+    feitos.push(await chamar('rede de segurança do remarcar',
+      'tv-logistica?action=reprocessar-remarcar&aplicar=1'));
   }
 
   // ── 🕐 de hora em hora: rede de segurança ──
