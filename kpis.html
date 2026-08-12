@@ -329,14 +329,20 @@ function blocoFrente(nome, d, cor, etiqueta){
           '<div class="split">'+chip(d.logistica.bot,'bot '+d.logistica.pctBot+'%','var(--verde)')
           + chip(d.logistica.manual,'manual '+(100-d.logistica.pctBot)+'%','var(--dim)')+'</div>',
           d.fichaParaLogistica, null, L[3])
-      + passo('05','Orçamentos', d.orcamentos, 'var(--a5)', 'diagnóstico registrado',
+      + passo('05','Orçamentos', d.orcamentos.total, 'var(--a5)',
+          '<div class="split">'+chip(d.orcamentos.balcao,'loja '+d.orcamentos.pctBalcao+'%','var(--ambar)')
+          + chip(d.orcamentos.online,'online '+(100-d.orcamentos.pctBalcao)+'%','var(--a2)')+'</div>',
           d.logisticaParaOrcamento, null, L[4])
       + passo('06','Passaram por aprovado', d.aprovados.total, 'var(--a6)',
-          '<div class="split">'+chip(d.aprovados.bot,'bot '+d.aprovados.pctBot+'%','var(--verde)')
-          + chip(d.aprovados.manual,'manual '+(100-d.aprovados.pctBot)+'%','var(--dim)')+'</div>',
+          '<div class="split">'+chip(d.aprovados.balcao,'loja '+d.aprovados.pctBalcao+'%','var(--ambar)')
+          + chip(d.aprovados.online,'online '+(100-d.aprovados.pctBalcao)+'%','var(--a2)')+'</div>',
           d.orcamentoParaAprovado, null, L[5])
       + passo('07','Faturamento', moeda(d.faturamento), 'var(--verde)',
-          d.ticketMedio ? 'ticket médio '+moeda(d.ticketMedio) : '', null, null, L[6])
+          (d.faturamentoBalcao||d.faturamentoOnline)
+            ? '<div class="split">'+chip(moeda(d.faturamentoBalcao).replace('R$ ',''),'loja','var(--ambar)')
+              + chip(moeda(d.faturamentoOnline).replace('R$ ',''),'online','var(--a2)')+'</div>'
+            : (d.ticketMedio ? 'ticket médio '+moeda(d.ticketMedio) : ''),
+          null, null, L[6])
       + passo('08','Custo por aprovado', d.custoPorAprovado?moeda(d.custoPorAprovado):'—', 'var(--ambar)',
           d.custoPorAprovado && d.ticketMedio
             ? ((d.custoPorAprovado/d.ticketMedio*100).toFixed(0))+'% do ticket médio' : '',

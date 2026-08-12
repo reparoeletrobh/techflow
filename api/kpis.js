@@ -200,16 +200,102 @@ module.exports = async function handler(req, res) {
       observacao: 'card sem carimbo e sem histórico não entra em nenhum período — ele existe, mas não se sabe quando foi aprovado' });
   }
 
+  // ── ⏪ RETROATIVO: reconstrói os carimbos que faltam, a partir do histórico ──
+  if ((req.query || {}).action === 'retroativo') {
+    const desde = String(req.query.desde || '2026-08-08');
+    const corte = new Date(desde + 'T00:00:00-03:00').getTime();
+    const dataDe = (c, fases) => {
+      const h2 = (c.history || [])
+        .filter(x => fases.includes(String(x.phase || x.phaseId || '')))
+        .map(x => new Date(x.ts || x.timestamp || 0).getTime())
+        .filter(Boolean).sort((a, b) => a - b);
+      return h2.length ? new Date(h2[0]).toISOString() : null;
+    };
+    const previa = { aprovacao: [], orcamento: [], semHistorico: [] };
+    const BANCOS = ['reparoeletro_pipe', 'tv_pipe', 'reparoeletro_frenteloja'];
+    const alteracoes = {};
+    for (const k of BANCOS) {
+      const b = await dbGet(k);
+      if (!b) continue;
+      const lista = k === 'reparoeletro_frenteloja' ? (b.fichas || []) : (b.cards || []);
+      for (const c of lista) {
+        const nasceu = new Date(c.criadoEm || c.movedAt || 0).getTime();
+        const doPeriodo = (c.history || []).some(x => new Date(x.ts || 0).getTime() >= corte) ||
+          nasceu >= corte;
+        if (!doPeriodo) continue;
+        const doBalcao = k === 'reparoeletro_frenteloja' || String(c.origem || '') === 'frenteloja';
+        const quem = String(c.nomeContato || c.nome || '?').slice(0, 20) + ' ' +
+          String(c.telefone || '').replace(/\D/g, '').slice(-4);
+        // 💰 aprovação: no balcão é a ida para produção; no pipe é a entrada em aprovados
+        if (!c.aprovadoEm) {
+          const d = doBalcao ? dataDe(c, ['producao', 'aprovados'])
+                             : dataDe(c, ['aprovados']);
+          if (d && new Date(d).getTime() >= corte) {
+            alteracoes[k] = alteracoes[k] || [];
+            alteracoes[k].push({ id: c.id, campo: 'aprovadoEm', valor: d, doBalcao });
+            previa.aprovacao.push((doBalcao ? '🏪 ' : '💻 ') + quem + ' → ' + d.slice(0, 16).replace('T', ' '));
+          } else if (['aprovados', 'producao'].includes(String(c.phase || c.phaseId || ''))) {
+            previa.semHistorico.push(quem + ' (está em ' + (c.phase || c.phaseId) + ' mas sem histórico datável)');
+          }
+        }
+        // 📄 orçamento
+        if (!c.orcamentoEm) {
+          const d = doBalcao ? dataDe(c, ['orcamento_cadastrado', 'producao', 'aprovados'])
+                             : dataDe(c, ['aguardando_aprovacao', 'orcamento', 'aprovados']);
+          const alt = d || (Number(c.valor || 0) > 0 && nasceu >= corte ? new Date(nasceu).toISOString() : null);
+          if (alt && new Date(alt).getTime() >= corte) {
+            alteracoes[k] = alteracoes[k] || [];
+            alteracoes[k].push({ id: c.id, campo: 'orcamentoEm', valor: alt, doBalcao });
+            previa.orcamento.push((doBalcao ? '🏪 ' : '💻 ') + quem + ' → ' + alt.slice(0, 16).replace('T', ' '));
+          }
+        }
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia', desde,
+        aprovacoesACarimbar: previa.aprovacao.length,
+        orcamentosACarimbar: previa.orcamento.length,
+        semHistoricoDatavel: previa.semHistorico.length,
+        criterio: {
+          balcao: 'aprovação = ida para produção pelo botão APROVADO; orçamento = quando foi cadastrado',
+          pipe: 'aprovação = primeira entrada em aprovados no histórico; orçamento = entrada em aguardando aprovação',
+          semHistorico: 'não é carimbado — inventar data seria pior que deixar sem',
+        },
+        APROVACOES: previa.aprovacao.slice(0, 60),
+        ORCAMENTOS: previa.orcamento.slice(0, 60),
+        SEM_HISTORICO: previa.semHistorico.slice(0, 30),
+        dica: 'para gravar: &aplicar=1' });
+    }
+    let gravadas = 0;
+    for (const [k, alts] of Object.entries(alteracoes)) {
+      const b = await dbGet(k);
+      if (!b) continue;
+      const lista = k === 'reparoeletro_frenteloja' ? (b.fichas || []) : (b.cards || []);
+      for (const a of alts) {
+        const c = lista.find(x => String(x.id) === String(a.id));
+        if (!c || c[a.campo]) continue;
+        c[a.campo] = a.valor;
+        c.carimboRetroativo = true;
+        if (a.doBalcao && a.campo === 'aprovadoEm') c.aprovadoNoBalcao = true;
+        gravadas++;
+      }
+      await dbSet(k, b);
+    }
+    return res.status(200).json({ ok: true, gravadas,
+      observacao: 'apenas datas obtidas do histórico real — nada foi estimado' });
+  }
+
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
   // 📦 cards e fichas antigas migram para o arquivo — sem incluí-lo, qualquer
   // período passado aparece com aprovados, orçamentos e logística muito abaixo do real
-  const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, inv] = await Promise.all([
+  const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, fl, inv] = await Promise.all([
     dbGet('fichas_adm'), dbGet('fichas_tv'),
     dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
     dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+    dbGet('reparoeletro_frenteloja'),
     investimento(J.de, J.ate),
   ]);
   // o arquivo guarda tanto cards quanto fichas — separa cada tipo
@@ -246,6 +332,8 @@ module.exports = async function handler(req, res) {
     const porBot = logs.filter(f => /bot/i.test(String(f.origem || '') + ' ' + String(f.criadoPor || '')));
     // pipe: orçamentos e aprovados
     const cards = ((pipeDb || {}).cards) || [];
+    const ehBalcao = c => String(c.origem || '') === 'frenteloja' ||
+      c.aprovadoNoBalcao === true || String(c.id || '').includes('-loja');
     const orcs = cards.filter(c => dentro(c.orcamentoEm || c.criadoEm) &&
       (Number(c.valor || 0) > 0 || c.orcamentoEm));
     // ✅ contam os que PASSARAM pela aprovação no período, mesmo que já tenham
@@ -265,19 +353,34 @@ module.exports = async function handler(req, res) {
     });
     const aprovBot = aprov.filter(c => /bot/i.test(String(c.aprovadoPor || '')));
     const faturamento = aprov.reduce((s, c) => s + (Number(c.valor || 0) || 0), 0);
+    const orcBalcao = orcs.filter(ehBalcao).length;
+    const aprovBalcao = aprov.filter(ehBalcao);
+    const fatBalcao = aprovBalcao.reduce((s, c) => s + (Number(c.valor || 0) || 0), 0);
     return {
       fichas: fichas.length,
       logistica: { total: logs.length, bot: porBot.length, manual: logs.length - porBot.length,
         pctBot: logs.length ? Math.round(porBot.length / logs.length * 100) : 0 },
-      orcamentos: orcs.length,
+      orcamentos: { total: orcs.length, balcao: orcBalcao, online: orcs.length - orcBalcao,
+        pctBalcao: orcs.length ? Math.round(orcBalcao / orcs.length * 100) : 0 },
       aprovados: { total: aprov.length, bot: aprovBot.length, manual: aprov.length - aprovBot.length,
+        balcao: aprovBalcao.length, online: aprov.length - aprovBalcao.length,
+        pctBalcao: aprov.length ? Math.round(aprovBalcao.length / aprov.length * 100) : 0,
         pctBot: aprov.length ? Math.round(aprovBot.length / aprov.length * 100) : 0 },
       faturamento: +faturamento.toFixed(2),
+      faturamentoBalcao: +fatBalcao.toFixed(2),
+      faturamentoOnline: +(faturamento - fatBalcao).toFixed(2),
       ticketMedio: aprov.length ? +(faturamento / aprov.length).toFixed(2) : 0,
     };
   }
 
-  const adm = montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm), juntarCards(ppA, arqAdm));
+  // 🏪 todo atendimento do balcão gera orçamento — inclusive o que ainda não
+  // virou card no pipe, que de outro modo ficaria fora da contagem
+  const fichasFL = (((fl || {}).fichas) || []).map(f => ({
+    ...f, origem: 'frenteloja',
+    valor: (f.orcamento && f.orcamento.valor) || f.valor || 0,
+  }));
+  const adm = montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm),
+    { cards: (((ppA || {}).cards) || []).concat(arqAdm.cards).concat(fichasFL) });
   const tv = montar(juntarFichas(fT, arqTv), juntarFichas(lgT, arqTv), juntarCards(ppT, arqTv));
   const temMeta = inv.convTotal > 0 || !!TOKEN;
   const convAdmFinal = inv.convAdm;
@@ -295,9 +398,11 @@ module.exports = async function handler(req, res) {
     logistica: d.logistica,
     fichaParaLogistica: taxa(d.logistica.total, d.fichas),
     orcamentos: d.orcamentos,
-    logisticaParaOrcamento: taxa(d.orcamentos, d.logistica.total),
+    logisticaParaOrcamento: taxa(d.orcamentos.total, d.logistica.total),
     aprovados: d.aprovados,
-    orcamentoParaAprovado: taxa(d.aprovados.total, d.orcamentos),
+    orcamentoParaAprovado: taxa(d.aprovados.total, d.orcamentos.total),
+    faturamentoBalcao: d.faturamentoBalcao,
+    faturamentoOnline: d.faturamentoOnline,
     faturamento: d.faturamento,
     ticketMedio: d.ticketMedio,
     custoPorAprovado: custo(gasto, d.aprovados.total),
