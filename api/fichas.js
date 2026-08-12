@@ -92,6 +92,83 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── ✅ CONFERE-PLANILHA: contagem oficial, planilha × sistema, com carimbo ──
+  if (action === 'confere-planilha') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const d8c = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const agora = new Date();
+    const carimbo = new Date(agora.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+    // 1) a planilha
+    let daPlanilha = [], erroPlanilha = null;
+    try {
+      const csv = await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text());
+      const rows = parseCSV(csv);
+      const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+      const iH = cab.findIndex(x => /hora|data/.test(x));
+      const iT = cab.findIndex(x => /numero|telefone|whats/.test(x));
+      const iN = cab.findIndex(x => /nome/.test(x));
+      const iE = cab.findIndex(x => /^equipamento$/.test(x));
+      const [dd, mm, aa] = [dia.slice(8, 10), dia.slice(5, 7), dia.slice(2, 4)];
+      for (const r of rows.slice(1)) {
+        const dt = String(r[iH] || '');
+        if (!dt.startsWith(dd + '/' + mm + '/' + aa)) continue;
+        const eq = String(r[iE] || '');
+        daPlanilha.push({ tel: String(r[iT] || '').replace(/\D/g, ''),
+          nome: String(r[iN] || '?').trim(), equipamento: eq,
+          hora: dt.slice(9, 14),
+          ehTv: /\btv\b|televis|polegada/i.test(eq + ' ' + String(r[iN] || '')) });
+      }
+    } catch (e) { erroPlanilha = e.message; }
+
+    // 2) o sistema — entradas reais do dia (sem os retornos do remarcar)
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000;
+    const ehRetorno = f => ['remarcar', 'reagendamento'].includes(String(f.origem || '')) ||
+      f.reagendarColeta === true ||
+      String(f.id || '').startsWith('rem_') || String(f.id || '').startsWith('fic_reag_');
+    const [fa, ft] = await Promise.all([dbGet(KEY_ADM), dbGet(KEY_TV)]);
+    const doSistema = [];
+    for (const [b, sis] of [[fa, 'ADM'], [ft, 'TV']]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        const t = new Date(f.criadoEm || f.registradoEm || 0).getTime();
+        if (!t || t < ini || t >= fim) continue;
+        if (ehRetorno(f)) continue;
+        doSistema.push({ sis, tel: String(f.telefone || '').replace(/\D/g, ''),
+          nome: f.nome || '?', equipamento: f.equipamento || '' });
+      }
+    }
+    // 3) cruzamento
+    const telSis = new Set(doSistema.map(x => d8c(x.tel)).filter(x => x.length >= 8));
+    const telPla = new Set(daPlanilha.map(x => d8c(x.tel)).filter(x => x.length >= 8));
+    const faltamNoSistema = daPlanilha.filter(x => !telSis.has(d8c(x.tel)));
+    const sobramNoSistema = doSistema.filter(x => !telPla.has(d8c(x.tel)));
+    const bate = faltamNoSistema.length === 0 && sobramNoSistema.length === 0;
+
+    return res.status(200).json({ ok: bate,
+      dia, conferidoEm: carimbo + ' BRT',
+      PLANILHA: { total: daPlanilha.length,
+        tv: daPlanilha.filter(x => x.ehTv).length,
+        adm: daPlanilha.filter(x => !x.ehTv).length,
+        erro: erroPlanilha },
+      SISTEMA: { total: doSistema.length,
+        adm: doSistema.filter(x => x.sis === 'ADM').length,
+        tv: doSistema.filter(x => x.sis === 'TV').length },
+      diferenca: doSistema.length - daPlanilha.length,
+      VEREDITO: erroPlanilha ? '🚨 não consegui ler a planilha: ' + erroPlanilha
+        : bate ? '✅ conferido — planilha e sistema batem'
+        : '⚠️ ' + faltamNoSistema.length + ' na planilha sem ficha · ' +
+          sobramNoSistema.length + ' no sistema sem linha na planilha',
+      FALTAM_NO_SISTEMA: faltamNoSistema.map(x => x.hora + ' | ' +
+        String(x.nome).slice(0, 20) + ' ' + d8c(x.tel).slice(-4) + ' | ' +
+        String(x.equipamento).slice(0, 24)),
+      SOBRAM_NO_SISTEMA: sobramNoSistema.map(x => x.sis + ' | ' +
+        String(x.nome).slice(0, 20) + ' ' + d8c(x.tel).slice(-4) + ' | ' +
+        String(x.equipamento).slice(0, 24)),
+      comoCorrigir: faltamNoSistema.length
+        ? '/api/fichas?action=sync-completo&dias=1&aplicar=1' : null });
+  }
+
   // ── 🔬 AUDITAR-CRIADAS: o que há na coluna Ficha Criada, dado por dado ──
   if (action === 'auditar-criadas') {
     const sis = String(req.query.sistema || 'adm').toLowerCase();
