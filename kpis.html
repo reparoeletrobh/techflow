@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KPIs — Reparo Eletro</title>
+<style>
+:root{
+  --bg:#07090d; --painel:#0d1117; --card:#12161d; --linha:#1e2430;
+  --txt:#f0f2f5; --dim:#8b93a3; --fraco:#5a6270;
+  --azul:#60a5fa; --verde:#4ade80; --ambar:#fbbf24; --roxo:#a78bfa;
+  --rosa:#f472b6; --ciano:#22d3ee; --vermelho:#f87171;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  padding:20px 22px 60px;-webkit-font-smoothing:antialiased;}
+a{color:inherit;text-decoration:none;}
+
+/* ── topo ── */
+.topo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
+.titulo{font-size:26px;font-weight:900;letter-spacing:-.5px;
+  background:linear-gradient(95deg,#60a5fa,#a78bfa 45%,#f472b6);
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+.sub{font-size:12px;color:var(--fraco);font-family:var(--mono);}
+.voltar{background:var(--card);border:1px solid var(--linha);border-radius:9px;
+  padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--dim);cursor:pointer;}
+.voltar:hover{color:var(--txt);border-color:#2f3a4d;}
+
+/* ── filtros ── */
+.filtros{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:20px;}
+.fbtn{background:var(--card);border:1px solid var(--linha);border-radius:10px;
+  padding:9px 17px;font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s;}
+.fbtn:hover{color:var(--txt);border-color:#2f3a4d;transform:translateY(-1px);}
+.fbtn.on{background:linear-gradient(135deg,rgba(96,165,250,.18),rgba(167,139,250,.14));
+  border-color:var(--azul);color:var(--azul);box-shadow:0 0 0 1px rgba(96,165,250,.2);}
+.data-in{background:var(--card);border:1px solid var(--linha);border-radius:9px;
+  padding:8px 11px;color:var(--txt);font-size:12.5px;font-family:var(--mono);outline:none;}
+.data-in:focus{border-color:var(--azul);}
+
+/* ── resumo geral ── */
+.resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:22px;}
+.rcard{background:linear-gradient(160deg,var(--painel),#0a0d13);border:1px solid var(--linha);
+  border-radius:15px;padding:17px 19px;position:relative;overflow:hidden;}
+.rcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.rcard.inv::before{background:linear-gradient(90deg,var(--ambar),transparent);}
+.rcard.fat::before{background:linear-gradient(90deg,var(--verde),transparent);}
+.rcard.apr::before{background:linear-gradient(90deg,var(--azul),transparent);}
+.rcard.roi::before{background:linear-gradient(90deg,var(--roxo),transparent);}
+.rlbl{font-size:10px;font-weight:800;color:var(--fraco);letter-spacing:.08em;text-transform:uppercase;}
+.rval{font-family:var(--mono);font-size:29px;font-weight:700;line-height:1.1;margin-top:7px;letter-spacing:-1px;}
+.rsub{font-size:11px;color:var(--fraco);margin-top:4px;}
+
+/* ── funil ── */
+.frente{background:var(--painel);border:1px solid var(--linha);border-radius:17px;
+  padding:19px 21px;margin-bottom:16px;}
+.fhead{display:flex;align-items:center;gap:11px;margin-bottom:16px;flex-wrap:wrap;}
+.fnome{font-size:18px;font-weight:900;letter-spacing:-.3px;}
+.fnome.adm{color:var(--azul);}
+.fnome.tv{color:var(--rosa);}
+.ftag{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.05em;}
+.ftag.adm{background:rgba(96,165,250,.14);color:var(--azul);}
+.ftag.tv{background:rgba(244,114,182,.14);color:var(--rosa);}
+.froi{margin-left:auto;font-family:var(--mono);font-size:15px;font-weight:700;}
+
+.funil{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:0;}
+.etapa{position:relative;padding:14px 15px;border-right:1px solid var(--linha);}
+.etapa:last-child{border-right:none;}
+.eord{font-size:9px;font-weight:800;color:var(--fraco);font-family:var(--mono);}
+.elbl{font-size:10.5px;font-weight:800;color:var(--dim);margin-top:5px;letter-spacing:.02em;line-height:1.3;}
+.eval{font-family:var(--mono);font-size:25px;font-weight:700;margin-top:8px;line-height:1;letter-spacing:-1px;}
+.edet{font-size:10.5px;color:var(--fraco);margin-top:6px;line-height:1.55;}
+.epct{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:5px;margin-top:7px;}
+.epct.bom{background:rgba(74,222,128,.14);color:var(--verde);}
+.epct.medio{background:rgba(251,191,36,.14);color:var(--ambar);}
+.epct.ruim{background:rgba(248,113,113,.14);color:var(--vermelho);}
+.barra{height:3px;border-radius:2px;background:#161c26;margin-top:9px;overflow:hidden;}
+.barra i{display:block;height:100%;border-radius:2px;}
+
+.split{display:flex;gap:6px;margin-top:7px;}
+.chip{flex:1;background:#0c1016;border:1px solid var(--linha);border-radius:7px;padding:5px 7px;text-align:center;}
+.chip b{display:block;font-family:var(--mono);font-size:14px;font-weight:700;line-height:1.1;}
+.chip span{font-size:8.5px;color:var(--fraco);font-weight:700;letter-spacing:.03em;}
+
+.carregando{text-align:center;padding:70px 20px;color:var(--fraco);font-size:14px;}
+.rodape{font-size:11px;color:var(--fraco);text-align:center;margin-top:20px;line-height:1.7;}
+@media(max-width:640px){
+  body{padding:14px 13px 50px;}
+  .titulo{font-size:21px;}
+  .etapa{border-right:none;border-bottom:1px solid var(--linha);}
+  .eval{font-size:22px;}
+}
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <div>
+    <div class="titulo">Funil de Resultado</div>
+    <div class="sub" id="carimbo">carregando…</div>
+  </div>
+  <a href="/adm" class="voltar" style="margin-left:auto;">← Menu</a>
+</div>
+
+<div class="filtros">
+  <button class="fbtn on" id="f-dia"   onclick="periodo('dia')">Hoje</button>
+  <button class="fbtn"    id="f-semana" onclick="periodo('semana')">Semana</button>
+  <button class="fbtn"    id="f-mes"    onclick="periodo('mes')">Mês</button>
+  <input type="date" id="dt-de"  class="data-in">
+  <input type="date" id="dt-ate" class="data-in">
+  <button class="fbtn" onclick="periodo('personalizado')">Aplicar</button>
+  <button class="fbtn" onclick="carregar()" style="margin-left:auto;">↻</button>
+</div>
+
+<div id="conteudo"><div class="carregando">⏳ montando o funil…</div></div>
+
+<div class="rodape" id="rodape"></div>
+
+<script>
+var _per = 'dia';
+function periodo(p){
+  _per = p;
+  ['dia','semana','mes'].forEach(function(x){
+    var b=document.getElementById('f-'+x); if(b) b.classList.toggle('on', x===p);
+  });
+  carregar();
+}
+function moeda(v){
+  return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function classePct(p){ return p>=60?'bom':p>=30?'medio':'ruim'; }
+function corPct(p){ return p>=60?'var(--verde)':p>=30?'var(--ambar)':'var(--vermelho)'; }
+function esc(s){ return String(s==null?'':s).replace(/</g,'&lt;'); }
+
+function etapa(ord, lbl, val, cor, det, pct, pctLbl, barra){
+  return '<div class="etapa">'
+    + '<div class="eord">'+ord+'</div>'
+    + '<div class="elbl">'+lbl+'</div>'
+    + '<div class="eval" style="color:'+cor+'">'+val+'</div>'
+    + (det ? '<div class="edet">'+det+'</div>' : '')
+    + (pct!=null ? '<div class="epct '+classePct(pct)+'">'+pct+'% '+(pctLbl||'')+'</div>' : '')
+    + (barra!=null ? '<div class="barra"><i style="width:'+Math.min(100,barra)+'%;background:'+cor+'"></i></div>' : '')
+  + '</div>';
+}
+
+function blocoFrente(nome, d, classe){
+  var roiCor = d.retorno>=3?'var(--verde)':d.retorno>=1?'var(--ambar)':'var(--vermelho)';
+  return '<div class="frente">'
+    + '<div class="fhead">'
+      + '<span class="fnome '+classe+'">'+nome+'</span>'
+      + '<span class="ftag '+classe+'">'+(classe==='adm'?'linha branca':'televisores')+'</span>'
+      + '<span class="froi" style="color:'+roiCor+'">'
+        + (d.retorno? d.retorno.toFixed(2).replace('.',',')+'× retorno' : '—')
+      + '</span>'
+    + '</div>'
+    + '<div class="funil">'
+      + etapa('01','INVESTIMENTO', moeda(d.investimento), 'var(--ambar)',
+          d.custoPorConversa ? moeda(d.custoPorConversa)+' por conversa' : '', null, null, null)
+      + etapa('02','CONVERSAS INICIADAS', d.conversas, 'var(--ciano)',
+          d.custoPorConversa ? 'custo '+moeda(d.custoPorConversa) : '', null, null, null)
+      + etapa('03','FICHAS CRIADAS', d.fichas, 'var(--azul)',
+          d.custoPorFicha ? 'custo '+moeda(d.custoPorFicha) : '',
+          d.conversaParaFicha, 'das conversas', d.conversaParaFicha)
+      + etapa('04','LOGÍSTICA CRIADA', d.logistica.total, 'var(--roxo)',
+          '<div class="split">'
+          + '<div class="chip"><b style="color:var(--verde)">'+d.logistica.bot+'</b><span>BOT '+d.logistica.pctBot+'%</span></div>'
+          + '<div class="chip"><b style="color:var(--dim)">'+d.logistica.manual+'</b><span>MANUAL '+(100-d.logistica.pctBot)+'%</span></div>'
+          + '</div>',
+          d.fichaParaLogistica, 'das fichas', d.fichaParaLogistica)
+      + etapa('05','ORÇAMENTOS', d.orcamentos, 'var(--rosa)', '',
+          d.logisticaParaOrcamento, 'da logística', d.logisticaParaOrcamento)
+      + etapa('06','APROVADOS', d.aprovados.total, 'var(--verde)',
+          '<div class="split">'
+          + '<div class="chip"><b style="color:var(--verde)">'+d.aprovados.bot+'</b><span>BOT '+d.aprovados.pctBot+'%</span></div>'
+          + '<div class="chip"><b style="color:var(--dim)">'+d.aprovados.manual+'</b><span>MANUAL '+(100-d.aprovados.pctBot)+'%</span></div>'
+          + '</div>',
+          d.orcamentoParaAprovado, 'dos orçamentos', d.orcamentoParaAprovado)
+      + etapa('07','FATURAMENTO', moeda(d.faturamento), 'var(--verde)',
+          d.ticketMedio ? 'ticket '+moeda(d.ticketMedio) : '', null, null, null)
+      + etapa('08','CUSTO POR APROVADO', d.custoPorAprovado?moeda(d.custoPorAprovado):'—', 'var(--ambar)',
+          d.custoPorAprovado && d.ticketMedio
+            ? ((d.custoPorAprovado/d.ticketMedio*100).toFixed(0))+'% do ticket' : '', null, null, null)
+    + '</div>'
+  + '</div>';
+}
+
+async function carregar(){
+  var cx = document.getElementById('conteudo');
+  cx.innerHTML = '<div class="carregando">⏳ montando o funil…</div>';
+  var qs = 'periodo='+_per;
+  if(_per==='personalizado'){
+    var de=(document.getElementById('dt-de')||{}).value, ate=(document.getElementById('dt-ate')||{}).value;
+    if(!de||!ate){ alert('Escolha as duas datas.'); return; }
+    qs += '&de='+de+'&ate='+ate;
+  }
+  var r = null;
+  try { r = await fetch('/api/kpis?'+qs).then(function(x){return x.json();}); } catch(e){}
+  if(!r || !r.ok){
+    cx.innerHTML = '<div class="carregando" style="color:var(--vermelho)">não consegui carregar os indicadores'
+      + (r&&r.error?'<br><span style="font-size:12px">'+esc(r.error)+'</span>':'')+'</div>';
+    return;
+  }
+  document.getElementById('carimbo').textContent = (r.periodo.rotulo||'') + ' · atualizado ' + (r.geradoEm||'');
+  var t = r.TOTAL||{};
+  var roiCor = t.retorno>=3?'var(--verde)':t.retorno>=1?'var(--ambar)':'var(--vermelho)';
+  cx.innerHTML = '<div class="resumo">'
+    + '<div class="rcard inv"><div class="rlbl">Investimento total</div>'
+      + '<div class="rval" style="color:var(--ambar)">'+moeda(t.investimento)+'</div>'
+      + '<div class="rsub">'+esc(r.fonteInvestimento||'')+'</div></div>'
+    + '<div class="rcard fat"><div class="rlbl">Faturamento aprovado</div>'
+      + '<div class="rval" style="color:var(--verde)">'+moeda(t.faturamento)+'</div>'
+      + '<div class="rsub">'+(t.aprovados||0)+' cliente(s) aprovado(s)</div></div>'
+    + '<div class="rcard apr"><div class="rlbl">Custo por aprovado</div>'
+      + '<div class="rval" style="color:var(--azul)">'
+        + (t.aprovados?moeda(t.investimento/t.aprovados):'—')+'</div>'
+      + '<div class="rsub">média das duas frentes</div></div>'
+    + '<div class="rcard roi"><div class="rlbl">Retorno sobre investimento</div>'
+      + '<div class="rval" style="color:'+roiCor+'">'+(t.retorno?t.retorno.toFixed(2).replace('.',',')+'×':'—')+'</div>'
+      + '<div class="rsub">faturamento ÷ investimento</div></div>'
+  + '</div>'
+  + blocoFrente('ADM', r.ADM, 'adm')
+  + blocoFrente('TV', r.TV, 'tv');
+  document.getElementById('rodape').innerHTML =
+    'As conversas contam o primeiro contato de cada cliente no período · '
+    + 'os aprovados usam a data real da aprovação<br>'
+    + 'período de ' + esc(r.periodo.de) + ' a ' + esc(r.periodo.ate);
+}
+
+// datas padrão
+(function(){
+  var hoje = new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+  var de = document.getElementById('dt-de'), ate = document.getElementById('dt-ate');
+  if(de) de.value = hoje.slice(0,8)+'01';
+  if(ate) ate.value = hoje;
+})();
+carregar();
+setInterval(carregar, 300000);
+</script>
+</body>
+</html>
