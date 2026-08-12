@@ -522,6 +522,7 @@ export default async function handler(req, res) {
     if (checklist) insp.checklist = checklist;
     if (inspetor) insp.inspetor = String(inspetor);
     insp.status = 'reprovado';
+    insp.reprovadoEm = new Date().toISOString();   // 📅 data e hora da reprovação
     insp.reprovacoes = insp.reprovacoes || [];
     insp.reprovacoes.push({
       em: new Date().toISOString(),

@@ -227,6 +227,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <script>
+// ── 📅 data e hora legíveis, em horário de Brasília ──
+function fmtDH(d){
+  if(!d) return '—';
+  var t = new Date(d);
+  if(isNaN(t.getTime())) return '—';
+  return t.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'})
+    + ' às ' + t.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+}
+// ⏱ há quanto tempo espera — só para o que ainda não foi inspecionado
+function esperaHTML(i){
+  if(i.status!=='aguardando' || !i.criadoEm) return '';
+  var ms = Date.now() - new Date(i.criadoEm).getTime();
+  if(ms < 0 || isNaN(ms)) return '';
+  var h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000);
+  var txt = h>=24 ? Math.floor(h/24)+'d '+(h%24)+'h' : (h>0 ? h+'h'+(m>0?m+'min':'') : m+'min');
+  var cor = h>=24 ? '#f87171' : h>=4 ? '#fbbf24' : '#5b6373';
+  return ' <span style="color:'+cor+';font-weight:700;">· esperando há '+txt+'</span>';
+}
+// ⏱ quanto tempo levou entre entrar e ser aprovado
+function duracaoHTML(i){
+  if(!i.criadoEm || !i.aprovadoEm) return '';
+  var ms = new Date(i.aprovadoEm).getTime() - new Date(i.criadoEm).getTime();
+  if(!(ms>0)) return '';
+  var h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000);
+  var txt = h>=24 ? Math.floor(h/24)+'d '+(h%24)+'h' : (h>0 ? h+'h'+(m>0?m+'min':'') : m+'min');
+  return ' <span style="color:#5b6373;">· levou '+txt+'</span>';
+}
+
 // ── ➕ FICHA AVULSA: produção do técnico fora da esteira ──
 async function abrirAvulsa(){
   // 👨‍🔧 busca a lista oficial, a mesma do Mover OS — não depende do que está
@@ -496,10 +524,13 @@ function render(){
       '<div class="hd"><div><div class="nm">'+esc(i.cliente)+'</div>'+
       '<div class="eq">'+(EQUIP_LBL[i.equipamento]||i.equipamento)+(i.equipDesc?' · '+esc(i.equipDesc):'')+'</div></div>'+pill+'</div>'+
       '<div class="meta">'+i.id+(i.os?' · OS '+esc(i.os):'')+
+      // 📅 quando entrou no controle de qualidade, e há quanto tempo espera
+      (i.criadoEm?'<br>📥 Entrou: <b>'+fmtDH(i.criadoEm)+'</b>'+esperaHTML(i):'')+
       (i.tecnico?'<br>🔧 Técnico: <b>'+esc(i.tecnico)+'</b>':'')+
       (i.inspetor?' · 🔍 Inspetor: <b>'+esc(i.inspetor)+'</b>':'')+
       (rep?'<br>⚠️ '+rep+' reprovação(ões) anteriores':'')+
-      (i.aprovadoEm?'<br>✅ '+fmtD(i.aprovadoEm):'')+'</div>'+
+      (i.aprovadoEm?'<br>✅ Aprovado: <b>'+fmtDH(i.aprovadoEm)+'</b>'+duracaoHTML(i):'')+
+      (i.reprovadoEm?'<br>🔧 Reprovado: '+fmtDH(i.reprovadoEm):'')+'</div>'+
       '<div class="acts">'+acts+'</div></div>';
   }).join('');
 }
