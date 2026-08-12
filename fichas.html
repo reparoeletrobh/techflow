@@ -152,7 +152,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 <div class="stats">
   <div class="stat-box">
-    <span class="stat-lbl">📥 Fichas entraram</span>
+    <span class="stat-lbl">📥 Fichas entraram <span id="lbl-retornos" style="font-weight:400;opacity:.65;"></span></span>
     <span class="stat-val c-green" id="st-hoje">0</span><span class="stat-lbl"> hoje</span>
     <span style="color:#1e2228;margin:0 4px;">|</span>
     <span class="stat-val c-green" id="st-semana">0</span><span class="stat-lbl"> semana</span>
@@ -291,9 +291,24 @@ function render(){
   inicioSemana.setHours(0,0,0,0);
 
   // Fichas que entraram
-  var ficHoje  = _fichas.filter(function(f){return f.criadoEm && new Date(f.criadoEm)>=inicioHoje;}).length;
-  var ficSem   = _fichas.filter(function(f){return f.criadoEm && new Date(f.criadoEm)>=inicioSemana;}).length;
+  // 🎯 ficha que VOLTOU do remarcar não é entrada nova — ela já foi contada quando
+  // o cliente apareceu pela primeira vez. Contá-la de novo inflava o número do dia.
+  var ehRetorno = function(f){
+    var id = String(f.id||'');
+    return ['remarcar','reagendamento'].indexOf(String(f.origem||'')) >= 0
+      || f.reagendarColeta === true
+      || id.indexOf('rem_') === 0 || id.indexOf('fic_reag_') === 0
+      || id.indexOf('rec_') === 0 || id.indexOf('sc_') === 0;
+  };
+  var _novas = _fichas.filter(function(f){ return !ehRetorno(f); });
+  var _retornosHoje = _fichas.filter(function(f){
+    return ehRetorno(f) && f.criadoEm && new Date(f.criadoEm)>=inicioHoje; }).length;
+  var ficHoje  = _novas.filter(function(f){return f.criadoEm && new Date(f.criadoEm)>=inicioHoje;}).length;
+  var ficSem   = _novas.filter(function(f){return f.criadoEm && new Date(f.criadoEm)>=inicioSemana;}).length;
   var ficTotal = _fichas.length;
+  window._retornosHoje = _retornosHoje;
+  var _lblR = document.getElementById('lbl-retornos');
+  if(_lblR) _lblR.textContent = _retornosHoje ? '(+'+_retornosHoje+' retorno'+(_retornosHoje>1?'s':'')+')' : '';
 
   // Contato feito
   var contHoje = _fichas.filter(function(f){return f.contatoFeitoEm && new Date(f.contatoFeitoEm)>=inicioHoje;}).length;

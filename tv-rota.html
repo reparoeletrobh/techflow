@@ -326,7 +326,25 @@ async function agendar(id){
   }
   var iso = ano+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0')
     +'T'+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':00-03:00';
-  if(isNaN(new Date(iso).getTime())){ alert('Essa data não existe. Confira o dia e o mês.'); return; }
+  // 🔍 valida o dia dentro do mês e mostra o que foi entendido, para o motorista corrigir
+  var diasNoMes = new Date(ano, mes, 0).getDate();
+  if(dia > diasNoMes){
+    alert('O mês '+String(mes).padStart(2,'0')+' tem só '+diasNoMes+' dias.\n\n'
+      + 'Você escreveu: '+data+'\nEntendi como: dia '+dia+', mês '+mes+'.\n\n'
+      + 'Escreva assim: '+String(Math.min(dia,diasNoMes)).padStart(2,'0')+'/'+String(mes).padStart(2,'0'));
+    return;
+  }
+  var dTeste = new Date(ano, mes-1, dia, hh, mm);
+  if(isNaN(dTeste.getTime()) || dTeste.getDate() !== dia || (dTeste.getMonth()+1) !== mes){
+    alert('Não consegui montar essa data.\n\nVocê escreveu: '+data+' às '+hora+'\n'
+      + 'Entendi: dia '+dia+' · mês '+mes+' · ano '+ano+' · '+hh+':'+String(mm).padStart(2,'0')+'\n\n'
+      + 'Escreva a data assim: 12/08 — ou "hoje" / "amanhã".');
+    return;
+  }
+  // 📅 monta a partir dos números validados, sem depender de leitura de texto
+  var iso2 = ano+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0')
+    +'T'+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':00-03:00';
+  iso = iso2;
   var r=await fetch('/api/tv-logistica?action=rota-agendar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id,quando:iso,obs:obs})}).then(function(x){return x.json();})
     .catch(function(e){return{ok:false,error:'sem conexão — tente de novo'};});
