@@ -79,6 +79,11 @@ a{color:inherit;text-decoration:none;}
    baixo que o da anterior, formando a escada que desce para a direita */
 .funil{display:flex;align-items:flex-end;gap:5px;overflow-x:auto;padding-bottom:6px;
   scrollbar-width:thin;}
+.funil{position:relative;}
+/* linha-guia sutil na altura dos números-chave */
+.funil::before{content:'';position:absolute;left:0;right:0;bottom:70px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.09) 12%,rgba(255,255,255,.09) 88%,transparent);
+  pointer-events:none;z-index:1;}
 .funil::-webkit-scrollbar{height:5px;}
 .funil::-webkit-scrollbar-thumb{background:var(--linha);border-radius:3px;}
 .passo{flex:1 1 0;min-width:126px;position:relative;display:flex;flex-direction:column;
@@ -100,16 +105,22 @@ a{color:inherit;text-decoration:none;}
   border-top:4px solid transparent;border-bottom:4px solid transparent;z-index:2;}
 .pn{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--fraco);letter-spacing:.06em;
   position:absolute;top:12px;left:14px;}
+/* 📏 tudo abaixo do rótulo é posicionado a partir da BASE comum, em alturas fixas,
+   então os números-chave de todas as etapas ficam exatamente na mesma linha */
+.passo .plbl{position:absolute;left:14px;right:14px;bottom:94px;}
+.passo .pval{position:absolute;left:14px;right:14px;bottom:56px;}
+.passo .ptaxa{position:absolute;left:14px;bottom:33px;}
+.passo .pdet{position:absolute;left:14px;right:14px;bottom:12px;}
 /* 📏 rótulo e número ocupam alturas fixas, então TODOS os números do funil
    ficam na mesma linha de visão, independentemente da altura da coluna */
 .plbl{font-size:10px;font-weight:750;color:var(--dim);letter-spacing:.045em;text-transform:uppercase;
-  line-height:1.3;height:26px;display:flex;align-items:flex-end;}
+  line-height:1.25;height:25px;display:flex;align-items:flex-end;}
 .pval{font-family:var(--mono);font-size:27px;font-weight:680;letter-spacing:-1.5px;line-height:1;
-  height:30px;display:flex;align-items:center;margin-top:2px;
+  height:30px;display:flex;align-items:center;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 0 26px currentColor;filter:saturate(1.15);}
 .pinfo{display:contents;}
-.pdet{font-size:10px;color:var(--fraco);margin-top:7px;line-height:1.45;min-height:28px;}
+.pdet{font-size:10px;color:var(--fraco);line-height:1.4;height:29px;overflow:hidden;}
 /* o que sobra da altura vai para o rodapé da coluna, dando a forma do funil */
 .pfundo{margin-top:auto;}
 
@@ -293,7 +304,8 @@ function passo(n, lbl, val, cor, det, taxa, taxaLbl, altura){
 
 function blocoFrente(nome, d, cor, etiqueta){
   var roiCor = d.retorno>=3?'var(--verde)':d.retorno>=1?'var(--ambar)':'var(--vermelho)';
-  var L = [268, 250, 233, 216, 199, 182, 165, 148];   // altura decrescente, em pixels
+  // altura decrescente — a menor ainda comporta a faixa fixa de conteúdo (132px)
+  var L = [272, 252, 232, 213, 194, 176, 158, 140];
   var chip = function(v,t,c){ return '<span class="chip"><b style="color:'+c+'">'+v+'</b> '+t+'</span>'; };
   return '<div class="frente">'
     + '<div class="fhead">'
