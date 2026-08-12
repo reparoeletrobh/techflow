@@ -529,8 +529,9 @@ function check(nome, cond, extra) {
     const adm = fs4.readFileSync('adm.html', 'utf8');
     const v = JSON.parse(fs4.readFileSync('vercel.json', 'utf8'));
     const rotas = new Set((v.rewrites || []).map(r => r.source));
-    const urls = [...new Set((adm.match(/data-url="\/[a-z-]+"/g) || [])
-      .map(x => x.replace(/data-url="|"/g, '')))];
+    const urls = [...new Set((adm.match(/data-url="\/[a-z.-]+"/g) || [])
+      .map(x => x.replace(/data-url="|"/g, '')))]
+      .filter(u => !u.endsWith('.html'));   // .html vai direto ao arquivo, não precisa de rota
     const semRota = urls.filter(u => !rotas.has(u) && !fs4.existsSync('.' + u + '.html') === false ? false : !rotas.has(u));
     check('menu: todas as páginas têm rewrite', semRota.length === 0, 'sem rota: ' + semRota.join(', '));
   }

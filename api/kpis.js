@@ -5,14 +5,26 @@
 const U = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
 const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
 const GRAPH = 'https://graph.facebook.com/v20.0';
-const CONTA = (process.env.META_AD_ACCOUNT || '1267284360833794').replace(/^act_/, '');
-const TOKEN = (process.env.META_ACCESS_TOKEN || '').trim();
+// 🔑 os nomes usados no projeto são META_ADS_ACCOUNT e META_ADS_TOKEN — com os
+// nomes errados o investimento vinha sempre zerado
+const CONTA = String(process.env.META_ADS_ACCOUNT || '1267284360833794').trim().replace(/^act_/, '');
+const TOKEN = String(process.env.META_ADS_TOKEN || '').trim();
 
 async function dbGet(k) {
   try {
     const r = await fetch(`${U}/get/${k}`, { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
     return r && r.result ? JSON.parse(r.result) : null;
   } catch (e) { return null; }
+}
+// 📨 os eventos do WhatsApp ficam numa LISTA do Redis, não numa chave comum
+async function lerEventos() {
+  try {
+    const r = await fetch(`${U}/lrange/wa_evt_list/-8000/-1`,
+      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+    const out = [];
+    for (const s of (r.result || [])) { try { out.push(JSON.parse(s)); } catch (e) {} }
+    return out;
+  } catch (e) { return []; }
 }
 const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
 const soDia = d => String(d || '').slice(0, 10);
@@ -72,12 +84,12 @@ module.exports = async function handler(req, res) {
     dbGet('fichas_adm'), dbGet('fichas_tv'),
     dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
-    dbGet('wa_eventos'), investimento(J.de, J.ate),
+    lerEventos(), investimento(J.de, J.ate),
   ]);
 
   // conversas iniciadas: telefones cujo PRIMEIRO contato caiu no período
   const primeiraMsg = {};
-  const listaEv = Array.isArray(evts) ? evts : ((evts || {}).itens || (evts || {}).eventos || []);
+  const listaEv = Array.isArray(evts) ? evts : [];
   for (const e of listaEv) {
     if (e.dir !== 'in') continue;
     const t = d8(e.tel); if (!t) continue;
@@ -151,6 +163,12 @@ module.exports = async function handler(req, res) {
     periodo: { de: J.de, ate: J.ate, rotulo: J.rotulo, tipo: J.periodo },
     geradoEm: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
     fonteInvestimento: inv.fonte,
+    DIAGNOSTICO: {
+      tokenDaMetaConfigurado: !!TOKEN,
+      contaDeAnuncios: CONTA ? 'act_' + CONTA : '(não configurada)',
+      eventosLidos: listaEv.length,
+      conversasNoPeriodo: conversasNoPeriodo.length,
+    },
     ADM: enriquecer(adm, inv.adm, convAdm),
     TV: enriquecer(tv, inv.tv, convTv),
     TOTAL: {

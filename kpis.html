@@ -6,90 +6,95 @@
 <title>KPIs — Reparo Eletro</title>
 <style>
 :root{
-  --bg:#07090d; --painel:#0d1117; --card:#12161d; --linha:#1e2430;
-  --txt:#f0f2f5; --dim:#8b93a3; --fraco:#5a6270;
-  --azul:#60a5fa; --verde:#4ade80; --ambar:#fbbf24; --roxo:#a78bfa;
-  --rosa:#f472b6; --ciano:#22d3ee; --vermelho:#f87171;
+  --bg:#06070a; --painel:#0c0e13; --card:#111419; --linha:#1c212b;
+  --txt:#f4f6f8; --dim:#7d8694; --fraco:#4d5563;
+  --a1:#38bdf8; --a2:#818cf8; --a3:#a78bfa; --a4:#c084fc;
+  --a5:#e879f9; --a6:#f472b6; --a7:#fb7185; --verde:#34d399;
+  --ambar:#fbbf24; --vermelho:#fb7185;
   --mono:ui-monospace,'SF Mono',Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  padding:20px 22px 60px;-webkit-font-smoothing:antialiased;}
+body{background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,sans-serif;
+  padding:26px 26px 70px;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(ellipse 900px 500px at 12% -8%,rgba(56,189,248,.07),transparent),
+                   radial-gradient(ellipse 700px 450px at 88% 4%,rgba(167,139,250,.06),transparent);
+  background-attachment:fixed;}
 a{color:inherit;text-decoration:none;}
 
-/* ── topo ── */
-.topo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
-.titulo{font-size:26px;font-weight:900;letter-spacing:-.5px;
-  background:linear-gradient(95deg,#60a5fa,#a78bfa 45%,#f472b6);
+.topo{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+.titulo{font-size:29px;font-weight:800;letter-spacing:-1.1px;line-height:1.05;}
+.titulo em{font-style:normal;
+  background:linear-gradient(101deg,var(--a1),var(--a3) 48%,var(--a6));
   -webkit-background-clip:text;background-clip:text;color:transparent;}
-.sub{font-size:12px;color:var(--fraco);font-family:var(--mono);}
-.voltar{background:var(--card);border:1px solid var(--linha);border-radius:9px;
-  padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--dim);cursor:pointer;}
-.voltar:hover{color:var(--txt);border-color:#2f3a4d;}
+.sub{font-size:11.5px;color:var(--fraco);font-family:var(--mono);margin-top:7px;letter-spacing:.02em;}
+.voltar{background:rgba(255,255,255,.03);border:1px solid var(--linha);border-radius:10px;
+  padding:9px 15px;font-size:12.5px;font-weight:600;color:var(--dim);cursor:pointer;transition:.16s;}
+.voltar:hover{color:var(--txt);border-color:#2b3444;background:rgba(255,255,255,.06);}
 
-/* ── filtros ── */
-.filtros{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:20px;}
-.fbtn{background:var(--card);border:1px solid var(--linha);border-radius:10px;
-  padding:9px 17px;font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s;}
-.fbtn:hover{color:var(--txt);border-color:#2f3a4d;transform:translateY(-1px);}
-.fbtn.on{background:linear-gradient(135deg,rgba(96,165,250,.18),rgba(167,139,250,.14));
-  border-color:var(--azul);color:var(--azul);box-shadow:0 0 0 1px rgba(96,165,250,.2);}
-.data-in{background:var(--card);border:1px solid var(--linha);border-radius:9px;
-  padding:8px 11px;color:var(--txt);font-size:12.5px;font-family:var(--mono);outline:none;}
-.data-in:focus{border-color:var(--azul);}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:24px;}
+.fbtn{background:rgba(255,255,255,.025);border:1px solid var(--linha);border-radius:9px;
+  padding:9px 18px;font-size:12.5px;font-weight:650;color:var(--dim);cursor:pointer;transition:.16s;}
+.fbtn:hover{color:var(--txt);border-color:#2b3444;}
+.fbtn.on{background:linear-gradient(135deg,rgba(56,189,248,.14),rgba(167,139,250,.1));
+  border-color:rgba(56,189,248,.5);color:var(--a1);}
+.data-in{background:rgba(255,255,255,.025);border:1px solid var(--linha);border-radius:9px;
+  padding:8px 11px;color:var(--txt);font-size:12px;font-family:var(--mono);outline:none;}
+.data-in:focus{border-color:var(--a1);}
 
-/* ── resumo geral ── */
-.resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:22px;}
-.rcard{background:linear-gradient(160deg,var(--painel),#0a0d13);border:1px solid var(--linha);
-  border-radius:15px;padding:17px 19px;position:relative;overflow:hidden;}
-.rcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
-.rcard.inv::before{background:linear-gradient(90deg,var(--ambar),transparent);}
-.rcard.fat::before{background:linear-gradient(90deg,var(--verde),transparent);}
-.rcard.apr::before{background:linear-gradient(90deg,var(--azul),transparent);}
-.rcard.roi::before{background:linear-gradient(90deg,var(--roxo),transparent);}
-.rlbl{font-size:10px;font-weight:800;color:var(--fraco);letter-spacing:.08em;text-transform:uppercase;}
-.rval{font-family:var(--mono);font-size:29px;font-weight:700;line-height:1.1;margin-top:7px;letter-spacing:-1px;}
-.rsub{font-size:11px;color:var(--fraco);margin-top:4px;}
+/* resumo */
+.resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px;margin-bottom:26px;}
+.rcard{background:linear-gradient(165deg,rgba(255,255,255,.035),rgba(255,255,255,.008));
+  border:1px solid var(--linha);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;
+  backdrop-filter:blur(8px);}
+.rcard::after{content:'';position:absolute;inset:0 auto auto 0;width:100%;height:1px;
+  background:linear-gradient(90deg,var(--c,var(--a1)),transparent 70%);}
+.rlbl{font-size:9.5px;font-weight:750;color:var(--fraco);letter-spacing:.11em;text-transform:uppercase;}
+.rval{font-family:var(--mono);font-size:30px;font-weight:640;line-height:1;margin-top:9px;letter-spacing:-1.5px;}
+.rsub{font-size:10.5px;color:var(--fraco);margin-top:6px;}
 
-/* ── funil ── */
-.frente{background:var(--painel);border:1px solid var(--linha);border-radius:17px;
-  padding:19px 21px;margin-bottom:16px;}
-.fhead{display:flex;align-items:center;gap:11px;margin-bottom:16px;flex-wrap:wrap;}
-.fnome{font-size:18px;font-weight:900;letter-spacing:-.3px;}
-.fnome.adm{color:var(--azul);}
-.fnome.tv{color:var(--rosa);}
-.ftag{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.05em;}
-.ftag.adm{background:rgba(96,165,250,.14);color:var(--azul);}
-.ftag.tv{background:rgba(244,114,182,.14);color:var(--rosa);}
-.froi{margin-left:auto;font-family:var(--mono);font-size:15px;font-weight:700;}
+/* frente */
+.frente{background:var(--painel);border:1px solid var(--linha);border-radius:19px;
+  padding:22px 24px;margin-bottom:18px;}
+.fhead{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.fnome{font-size:20px;font-weight:800;letter-spacing:-.5px;}
+.ftag{font-size:9.5px;font-weight:750;padding:4px 10px;border-radius:20px;letter-spacing:.07em;text-transform:uppercase;}
+.froi{margin-left:auto;text-align:right;}
+.froi b{display:block;font-family:var(--mono);font-size:22px;font-weight:640;line-height:1;letter-spacing:-1px;}
+.froi span{font-size:9.5px;color:var(--fraco);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 
-.funil{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:0;}
-.etapa{position:relative;padding:14px 15px;border-right:1px solid var(--linha);}
-.etapa:last-child{border-right:none;}
-.eord{font-size:9px;font-weight:800;color:var(--fraco);font-family:var(--mono);}
-.elbl{font-size:10.5px;font-weight:800;color:var(--dim);margin-top:5px;letter-spacing:.02em;line-height:1.3;}
-.eval{font-family:var(--mono);font-size:25px;font-weight:700;margin-top:8px;line-height:1;letter-spacing:-1px;}
-.edet{font-size:10.5px;color:var(--fraco);margin-top:6px;line-height:1.55;}
-.epct{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;
-  padding:2px 7px;border-radius:5px;margin-top:7px;}
-.epct.bom{background:rgba(74,222,128,.14);color:var(--verde);}
-.epct.medio{background:rgba(251,191,36,.14);color:var(--ambar);}
-.epct.ruim{background:rgba(248,113,113,.14);color:var(--vermelho);}
-.barra{height:3px;border-radius:2px;background:#161c26;margin-top:9px;overflow:hidden;}
-.barra i{display:block;height:100%;border-radius:2px;}
+/* 🔻 FUNIL: cada etapa mais estreita que a anterior */
+.funil{display:flex;flex-direction:column;gap:7px;}
+.passo{margin:0 auto;position:relative;display:flex;align-items:center;gap:15px;
+  background:linear-gradient(100deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  border:1px solid var(--linha);border-radius:13px;padding:14px 20px;transition:.2s;}
+.passo:hover{border-color:rgba(255,255,255,.16);transform:translateX(2px);}
+.passo::before{content:'';position:absolute;left:0;top:12%;bottom:12%;width:3px;
+  border-radius:0 3px 3px 0;background:var(--c);}
+.pn{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--fraco);min-width:18px;}
+.pinfo{flex:1;min-width:0;}
+.plbl{font-size:11px;font-weight:750;color:var(--dim);letter-spacing:.05em;text-transform:uppercase;}
+.pdet{font-size:11px;color:var(--fraco);margin-top:3px;}
+.pval{font-family:var(--mono);font-size:26px;font-weight:640;letter-spacing:-1.2px;line-height:1;
+  text-align:right;white-space:nowrap;}
+.ptaxa{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;
+  white-space:nowrap;min-width:52px;text-align:center;}
+.t-bom{background:rgba(52,211,153,.13);color:var(--verde);}
+.t-medio{background:rgba(251,191,36,.13);color:var(--ambar);}
+.t-ruim{background:rgba(251,113,133,.13);color:var(--vermelho);}
+.split{display:flex;gap:5px;margin-top:6px;}
+.chip{background:rgba(0,0,0,.3);border:1px solid var(--linha);border-radius:6px;padding:3px 8px;
+  font-size:10px;font-weight:700;color:var(--dim);}
+.chip b{font-family:var(--mono);}
 
-.split{display:flex;gap:6px;margin-top:7px;}
-.chip{flex:1;background:#0c1016;border:1px solid var(--linha);border-radius:7px;padding:5px 7px;text-align:center;}
-.chip b{display:block;font-family:var(--mono);font-size:14px;font-weight:700;line-height:1.1;}
-.chip span{font-size:8.5px;color:var(--fraco);font-weight:700;letter-spacing:.03em;}
-
-.carregando{text-align:center;padding:70px 20px;color:var(--fraco);font-size:14px;}
-.rodape{font-size:11px;color:var(--fraco);text-align:center;margin-top:20px;line-height:1.7;}
-@media(max-width:640px){
-  body{padding:14px 13px 50px;}
-  .titulo{font-size:21px;}
-  .etapa{border-right:none;border-bottom:1px solid var(--linha);}
-  .eval{font-size:22px;}
+.carregando{text-align:center;padding:80px 20px;color:var(--fraco);font-size:14px;}
+.rodape{font-size:10.5px;color:var(--fraco);text-align:center;margin-top:24px;line-height:1.8;}
+@media(max-width:760px){
+  body{padding:16px 14px 50px;}
+  .titulo{font-size:23px;}
+  .passo{width:100% !important;padding:12px 15px;gap:11px;}
+  .pval{font-size:21px;}
+  .plbl{font-size:10px;}
 }
 </style>
 <script>
@@ -153,7 +158,7 @@ a{color:inherit;text-decoration:none;}
 
 <div class="topo">
   <div>
-    <div class="titulo">Funil de Resultado</div>
+    <div class="titulo">Funil de <em>Resultado</em></div>
     <div class="sub" id="carimbo">carregando…</div>
   </div>
   <a href="/adm" class="voltar" style="margin-left:auto;">← Menu</a>
@@ -200,54 +205,58 @@ function classePct(p){ return p>=60?'bom':p>=30?'medio':'ruim'; }
 function corPct(p){ return p>=60?'var(--verde)':p>=30?'var(--ambar)':'var(--vermelho)'; }
 function esc(s){ return String(s==null?'':s).replace(/</g,'&lt;'); }
 
-function etapa(ord, lbl, val, cor, det, pct, pctLbl, barra){
-  return '<div class="etapa">'
-    + '<div class="eord">'+ord+'</div>'
-    + '<div class="elbl">'+lbl+'</div>'
-    + '<div class="eval" style="color:'+cor+'">'+val+'</div>'
-    + (det ? '<div class="edet">'+det+'</div>' : '')
-    + (pct!=null ? '<div class="epct '+classePct(pct)+'">'+pct+'% '+(pctLbl||'')+'</div>' : '')
-    + (barra!=null ? '<div class="barra"><i style="width:'+Math.min(100,barra)+'%;background:'+cor+'"></i></div>' : '')
+// 🔻 cada passo do funil é mais estreito que o anterior
+function passo(n, lbl, val, cor, det, taxa, taxaLbl, largura){
+  var cls = taxa==null ? '' : (taxa>=60?'t-bom':taxa>=30?'t-medio':'t-ruim');
+  return '<div class="passo" style="width:'+largura+'%;--c:'+cor+'">'
+    + '<span class="pn">'+n+'</span>'
+    + '<div class="pinfo">'
+      + '<div class="plbl">'+lbl+'</div>'
+      + (det ? '<div class="pdet">'+det+'</div>' : '')
+    + '</div>'
+    + (taxa!=null ? '<span class="ptaxa '+cls+'">'+taxa+'%</span>' : '')
+    + '<div class="pval" style="color:'+cor+'">'+val+'</div>'
   + '</div>';
 }
 
-function blocoFrente(nome, d, classe){
+function blocoFrente(nome, d, cor, etiqueta){
   var roiCor = d.retorno>=3?'var(--verde)':d.retorno>=1?'var(--ambar)':'var(--vermelho)';
+  var L = [100, 93, 86, 78, 70, 62, 54, 46];   // largura decrescente
+  var chip = function(v,t,c){ return '<span class="chip"><b style="color:'+c+'">'+v+'</b> '+t+'</span>'; };
   return '<div class="frente">'
     + '<div class="fhead">'
-      + '<span class="fnome '+classe+'">'+nome+'</span>'
-      + '<span class="ftag '+classe+'">'+(classe==='adm'?'linha branca':'televisores')+'</span>'
-      + '<span class="froi" style="color:'+roiCor+'">'
-        + (d.retorno? d.retorno.toFixed(2).replace('.',',')+'× retorno' : '—')
-      + '</span>'
+      + '<span class="fnome" style="color:'+cor+'">'+nome+'</span>'
+      + '<span class="ftag" style="background:'+cor.replace(')',',.13)').replace('var(--','rgba(0,0,0,0')+';color:'+cor+';background:rgba(255,255,255,.05)">'+etiqueta+'</span>'
+      + '<div class="froi"><b style="color:'+roiCor+'">'
+        + (d.retorno? d.retorno.toFixed(2).replace('.',',')+'×' : '—')
+      + '</b><span>retorno</span></div>'
     + '</div>'
     + '<div class="funil">'
-      + etapa('01','INVESTIMENTO', moeda(d.investimento), 'var(--ambar)',
-          d.custoPorConversa ? moeda(d.custoPorConversa)+' por conversa' : '', null, null, null)
-      + etapa('02','CONVERSAS INICIADAS', d.conversas, 'var(--ciano)',
-          d.custoPorConversa ? 'custo '+moeda(d.custoPorConversa) : '', null, null, null)
-      + etapa('03','FICHAS CRIADAS', d.fichas, 'var(--azul)',
-          d.custoPorFicha ? 'custo '+moeda(d.custoPorFicha) : '',
-          d.conversaParaFicha, 'das conversas', d.conversaParaFicha)
-      + etapa('04','LOGÍSTICA CRIADA', d.logistica.total, 'var(--roxo)',
-          '<div class="split">'
-          + '<div class="chip"><b style="color:var(--verde)">'+d.logistica.bot+'</b><span>BOT '+d.logistica.pctBot+'%</span></div>'
-          + '<div class="chip"><b style="color:var(--dim)">'+d.logistica.manual+'</b><span>MANUAL '+(100-d.logistica.pctBot)+'%</span></div>'
-          + '</div>',
-          d.fichaParaLogistica, 'das fichas', d.fichaParaLogistica)
-      + etapa('05','ORÇAMENTOS', d.orcamentos, 'var(--rosa)', '',
-          d.logisticaParaOrcamento, 'da logística', d.logisticaParaOrcamento)
-      + etapa('06','APROVADOS', d.aprovados.total, 'var(--verde)',
-          '<div class="split">'
-          + '<div class="chip"><b style="color:var(--verde)">'+d.aprovados.bot+'</b><span>BOT '+d.aprovados.pctBot+'%</span></div>'
-          + '<div class="chip"><b style="color:var(--dim)">'+d.aprovados.manual+'</b><span>MANUAL '+(100-d.aprovados.pctBot)+'%</span></div>'
-          + '</div>',
-          d.orcamentoParaAprovado, 'dos orçamentos', d.orcamentoParaAprovado)
-      + etapa('07','FATURAMENTO', moeda(d.faturamento), 'var(--verde)',
-          d.ticketMedio ? 'ticket '+moeda(d.ticketMedio) : '', null, null, null)
-      + etapa('08','CUSTO POR APROVADO', d.custoPorAprovado?moeda(d.custoPorAprovado):'—', 'var(--ambar)',
+      + passo('01','Investimento', moeda(d.investimento), 'var(--a1)',
+          d.custoPorConversa ? moeda(d.custoPorConversa)+' por conversa iniciada' : 'sem gasto no período',
+          null, null, L[0])
+      + passo('02','Conversas iniciadas', d.conversas, 'var(--a2)',
+          d.conversas ? 'primeiro contato de cada cliente' : 'nenhuma conversa nova',
+          null, null, L[1])
+      + passo('03','Fichas criadas', d.fichas, 'var(--a3)',
+          d.custoPorFicha ? moeda(d.custoPorFicha)+' por ficha' : '',
+          d.conversaParaFicha, null, L[2])
+      + passo('04','Logística criada', d.logistica.total, 'var(--a4)',
+          '<div class="split">'+chip(d.logistica.bot,'bot '+d.logistica.pctBot+'%','var(--verde)')
+          + chip(d.logistica.manual,'manual '+(100-d.logistica.pctBot)+'%','var(--dim)')+'</div>',
+          d.fichaParaLogistica, null, L[3])
+      + passo('05','Orçamentos', d.orcamentos, 'var(--a5)', 'diagnóstico registrado',
+          d.logisticaParaOrcamento, null, L[4])
+      + passo('06','Aprovados', d.aprovados.total, 'var(--a6)',
+          '<div class="split">'+chip(d.aprovados.bot,'bot '+d.aprovados.pctBot+'%','var(--verde)')
+          + chip(d.aprovados.manual,'manual '+(100-d.aprovados.pctBot)+'%','var(--dim)')+'</div>',
+          d.orcamentoParaAprovado, null, L[5])
+      + passo('07','Faturamento', moeda(d.faturamento), 'var(--verde)',
+          d.ticketMedio ? 'ticket médio '+moeda(d.ticketMedio) : '', null, null, L[6])
+      + passo('08','Custo por aprovado', d.custoPorAprovado?moeda(d.custoPorAprovado):'—', 'var(--ambar)',
           d.custoPorAprovado && d.ticketMedio
-            ? ((d.custoPorAprovado/d.ticketMedio*100).toFixed(0))+'% do ticket' : '', null, null, null)
+            ? ((d.custoPorAprovado/d.ticketMedio*100).toFixed(0))+'% do ticket médio' : '',
+          null, null, L[7])
     + '</div>'
   + '</div>';
 }
@@ -281,23 +290,30 @@ async function carregar(){
   document.getElementById('carimbo').textContent = (r.periodo.rotulo||'') + ' · atualizado ' + (r.geradoEm||'');
   var t = r.TOTAL||{};
   var roiCor = t.retorno>=3?'var(--verde)':t.retorno>=1?'var(--ambar)':'var(--vermelho)';
-  cx.innerHTML = '<div class="resumo">'
-    + '<div class="rcard inv"><div class="rlbl">Investimento total</div>'
-      + '<div class="rval" style="color:var(--ambar)">'+moeda(t.investimento)+'</div>'
+  var dg = r.DIAGNOSTICO || {};
+  var avisos = [];
+  if(!dg.tokenDaMetaConfigurado) avisos.push('o investimento não aparece porque a conta de anúncios não está conectada');
+  if(!dg.eventosLidos) avisos.push('as conversas não aparecem porque não há histórico de mensagens no período');
+  cx.innerHTML = (avisos.length ? '<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);'
+      + 'border-radius:12px;padding:12px 15px;margin-bottom:18px;font-size:12px;color:var(--ambar);line-height:1.7;">⚠️ '
+      + avisos.map(esc).join('<br>⚠️ ') + '</div>' : '')
+    + '<div class="resumo">'
+    + '<div class="rcard" style="--c:var(--a1)"><div class="rlbl">Investimento</div>'
+      + '<div class="rval" style="color:var(--a1)">'+moeda(t.investimento)+'</div>'
       + '<div class="rsub">'+esc(r.fonteInvestimento||'')+'</div></div>'
-    + '<div class="rcard fat"><div class="rlbl">Faturamento aprovado</div>'
+    + '<div class="rcard" style="--c:var(--verde)"><div class="rlbl">Faturamento aprovado</div>'
       + '<div class="rval" style="color:var(--verde)">'+moeda(t.faturamento)+'</div>'
       + '<div class="rsub">'+(t.aprovados||0)+' cliente(s) aprovado(s)</div></div>'
-    + '<div class="rcard apr"><div class="rlbl">Custo por aprovado</div>'
-      + '<div class="rval" style="color:var(--azul)">'
-        + (t.aprovados?moeda(t.investimento/t.aprovados):'—')+'</div>'
+    + '<div class="rcard" style="--c:var(--a4)"><div class="rlbl">Custo por aprovado</div>'
+      + '<div class="rval" style="color:var(--a4)">'
+        + (t.aprovados&&t.investimento?moeda(t.investimento/t.aprovados):'—')+'</div>'
       + '<div class="rsub">média das duas frentes</div></div>'
-    + '<div class="rcard roi"><div class="rlbl">Retorno sobre investimento</div>'
+    + '<div class="rcard" style="--c:'+roiCor+'"><div class="rlbl">Retorno</div>'
       + '<div class="rval" style="color:'+roiCor+'">'+(t.retorno?t.retorno.toFixed(2).replace('.',',')+'×':'—')+'</div>'
       + '<div class="rsub">faturamento ÷ investimento</div></div>'
   + '</div>'
-  + blocoFrente('ADM', r.ADM, 'adm')
-  + blocoFrente('TV', r.TV, 'tv');
+  + blocoFrente('ADM', r.ADM, 'var(--a1)', 'linha branca')
+  + blocoFrente('TV', r.TV, 'var(--a6)', 'televisores');
   document.getElementById('rodape').innerHTML =
     'As conversas contam o primeiro contato de cada cliente no período · '
     + 'os aprovados usam a data real da aprovação<br>'
