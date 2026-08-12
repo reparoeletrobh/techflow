@@ -479,10 +479,29 @@ module.exports = async function handler(req, res) {
         const canal = balcao ? 'balcao' : 'online';
         const valor = Number(c.valor || (c.orcamento && c.orcamento.valor) || 0);
         const nome = c.nomeContato || c.nome || '';
-        if (noCiclo(c.orcamentoEm)) juntar('orcamento', c.telefone, nome, valor, frente, canal, c.orcamentoEm, c.id);
-        if (noCiclo(c.aprovadoEm)) juntar('aprovado', c.telefone, nome, valor, frente, canal, c.aprovadoEm, c.id);
+        // 📅 o campo próprio só passou a existir hoje: para o restante do ciclo,
+        // a data vem do histórico, que registra a saída de cada fase
+        const doHistorico = (fases) => {
+          const hs = (c.history || [])
+            .filter(x => fases.includes(String(x.phase || x.phaseId || '')))
+            .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+          return hs[0] || null;
+        };
+        const qOrc = c.orcamentoEm || doHistorico(['aguardando_aprovacao', 'orcamento_cadastrado']);
+        // no balcão, sair de orçamento/produção é o momento da aprovação
+        const qApr = c.aprovadoEm || doHistorico(balcao ? ['aprovados', 'producao', 'pago'] : ['aprovados']);
+        if (noCiclo(qOrc)) juntar('orcamento', c.telefone, nome, valor, frente, canal, qOrc, c.id);
+        if (noCiclo(qApr)) juntar('aprovado', c.telefone, nome, valor, frente, canal, qApr, c.id);
       }
     }
+    // 🏪 a seção Balcão registra toda aprovação presencial — completa o que faltar
+    try {
+      const bal = await dbGet('reparoeletro_balcao');
+      for (const b2 of (Array.isArray(bal) ? bal : ((bal || {}).itens || []))) {
+        if (!noCiclo(b2.entradaEm)) continue;
+        juntar('aprovado', b2.telefone, b2.nomeContato, 0, 'adm', 'balcao', b2.entradaEm, b2.pipefyId);
+      }
+    } catch (e) {}
     novos.sort((a, b2) => String(a.ts).localeCompare(String(b2.ts)));
     const resumo = novos.reduce((o, e) => {
       const k = e.etapa + ' ' + e.frente + ' ' + e.canal; o[k] = (o[k] || 0) + 1; return o; }, {});
