@@ -1,3 +1,4 @@
+const _funil = require('./_funil');
 const U = (process.env.UPSTASH_URL   ||'').replace(/['"]/g,'').trim();
 const T = (process.env.UPSTASH_TOKEN ||'').replace(/[\n\r'"]/g,'').trim();
 
@@ -687,6 +688,8 @@ export default async function handler(req, res) {
       const chave = x.ehTv ? KEY_TV : KEY_ADM;
       const db = (await dbGet(chave)) || { fichas: [] };
       db.fichas = db.fichas || [];
+      _funil.registrar('ficha', { telefone: x.telefone, nome: x.nome,
+        frente: x.ehTv ? 'tv' : 'adm', canal: 'planilha' }).catch(() => {});
       db.fichas.unshift({
         id: 'sc_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,

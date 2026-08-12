@@ -1,3 +1,4 @@
+const _funil = require('./_funil');
 
 // Helper: cria/move card no tv_pipe
 async function moverNoTvPipe(phase, dados){
@@ -612,6 +613,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && action === 'criar') {
     const { nome, telefone, endereco, equipamento, defeito, pipefyCardId, texto } = req.body || {};
     if (!nome) return res.status(400).json({ ok: false, error: 'nome obrigatorio' });
+    // 📒 livro-razão: a logística nasce agora, e é agora que fica registrada
+    _funil.registrar('logistica', { telefone, nome, frente: 'tv',
+      canal: /bot/i.test(String((req.body && (req.body.origem || req.body.criadoPor)) || '')) ? 'bot' : 'manual',
+    }).catch(() => {});
 
     const db = await dbGet(LOG_KEY) || defaultDB();
     const id = 'LOG-' + String(db.nextId || 1).padStart(4, '0');

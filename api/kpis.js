@@ -1,3 +1,4 @@
+const _funil = require('./_funil');
 // ═══════════════════════════════════════════════════════════════════
 // KPIs — o funil inteiro, do dinheiro investido até o faturamento.
 // Investimento → Conversas → Fichas → Logística → Orçamentos → Aprovados
@@ -385,6 +386,41 @@ module.exports = async function handler(req, res) {
         ' | criado ' + String(x.criadoEm || '').slice(0, 10) +
         '\n     🚩 ' + x.sinais.join(' · ') +
         '\n     histórico: ' + x.historico.join(' → ')) });
+  }
+
+  // ── 📒 LIVRO-RAZÃO: o funil lido dos eventos gravados no instante do fato ──
+  if ((req.query || {}).action === 'livro') {
+    const Jl = janela(req.query || {});
+    const evs = await _funil.ler(Jl.ini, Jl.fim);
+    const cont = (etapa, filtro) => evs.filter(e => e.etapa === etapa && (!filtro || filtro(e))).length;
+    const soma = (etapa, filtro) => evs.filter(e => e.etapa === etapa && (!filtro || filtro(e)))
+      .reduce((s, e) => s + (Number(e.valor) || 0), 0);
+    const porFrente = f => {
+      const daF = e => e.frente === f;
+      return {
+        fichas: cont('ficha', daF),
+        logistica: { total: cont('logistica', daF), bot: cont('logistica', e => daF(e) && e.canal === 'bot') },
+        orcamentos: { total: cont('orcamento', daF),
+          balcao: cont('orcamento', e => daF(e) && e.canal === 'balcao'),
+          online: cont('orcamento', e => daF(e) && e.canal !== 'balcao') },
+        aprovados: { total: cont('aprovado', daF),
+          balcao: cont('aprovado', e => daF(e) && e.canal === 'balcao'),
+          online: cont('aprovado', e => daF(e) && e.canal !== 'balcao') },
+        faturamento: +soma('aprovado', daF).toFixed(2),
+      };
+    };
+    return res.status(200).json({ ok: true,
+      periodo: { rotulo: Jl.rotulo,
+        inicio: new Date(Jl.ini - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' '),
+        fim: new Date(Jl.fim - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') },
+      eventosNoPeriodo: evs.length,
+      ADM: porFrente('adm'), TV: porFrente('tv'),
+      observacao: 'contagem lida do registro gravado no instante de cada etapa — não depende do estado atual dos cards',
+      ULTIMOS: evs.slice(-25).reverse().map(e =>
+        String(e.ts).slice(5, 16).replace('T', ' ') + ' | ' + e.etapa.padEnd(10) +
+        ' | ' + e.frente.toUpperCase() + ' | ' + e.canal.padEnd(7) +
+        ' | ' + String(e.nome || '?').slice(0, 20) + ' ' + String(e.tel || '').slice(-4) +
+        (e.valor ? ' | R$ ' + e.valor.toFixed(2) : '')) });
   }
 
   const J = janela(req.query || {});

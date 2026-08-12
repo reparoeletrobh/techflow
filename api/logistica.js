@@ -1,3 +1,4 @@
+const _funil = require('./_funil');
 
 // ── fmt4dig: padrão Nome 4díg do telefone ────────────────────────────────
 function fmt4dig(nome, tel) {
@@ -901,6 +902,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && action === 'criar') {
     const { nome, telefone, endereco, equipamento, defeito, pipefyCardId, texto } = req.body || {};
     if (!nome) return res.status(400).json({ ok: false, error: 'nome obrigatorio' });
+    // 📒 livro-razão: a logística nasce agora, e é agora que fica registrada
+    _funil.registrar('logistica', { telefone, nome, frente: 'adm',
+      canal: /bot/i.test(String((req.body && (req.body.origem || req.body.criadoPor)) || '')) ? 'bot' : 'manual',
+    }).catch(() => {});
 
     const db = await dbGet(LOG_KEY) || defaultDB();
     const id = 'LOG-' + String(db.nextId || 1).padStart(4, '0');

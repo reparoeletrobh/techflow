@@ -1,3 +1,4 @@
+const _funil = require('./_funil');
 
 // ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
 async function pipefyBestEffort(fn) {
@@ -296,7 +297,11 @@ export default async function handler(req,res){
     const now=new Date().toISOString();
     ficha.orcamento={valor:parseFloat(valor)||0,formaPagamento:formaPagamento||'pix',status:decisao};
     // 📅 momento em que o orçamento foi apresentado ao cliente no balcão
-    if(!ficha.orcamentoEm) ficha.orcamentoEm=now;
+    if(!ficha.orcamentoEm){
+      ficha.orcamentoEm=now;
+      _funil.registrar('orcamento', { telefone: ficha.telefone, nome: ficha.nomeContato,
+        valor: parseFloat(valor)||0, frente: 'adm', canal: 'balcao', ref: ficha.id }).catch(()=>{});
+    }
     ficha.valor=parseFloat(valor)||ficha.valor||0;
 
     // Reprovado: mantém no banco com phase='reprovado' para exibir coluna hoje
@@ -316,6 +321,10 @@ export default async function handler(req,res){
       // a venda presencial não podia ser datada em nenhum relatório
       ficha.aprovadoEm=now;
       ficha.aprovadoPor=String(req.body?.usuario||req.body?.atendente||'balcão').slice(0,30);
+      // 📒 registra no livro-razão do funil, no instante do fato
+      _funil.registrar('aprovado', { telefone: ficha.telefone, nome: ficha.nomeContato,
+        valor: parseFloat(valor)||0, frente: 'adm', canal: 'balcao',
+        quem: ficha.aprovadoPor, ref: ficha.id }).catch(()=>{});
       ficha.history=(ficha.history||[]).concat([
         {phase:'aprovados',ts:now,via:'passar orçamento'},
         {phase:'producao',ts:now}]);
