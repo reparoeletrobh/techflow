@@ -35,6 +35,11 @@ module.exports = async function handler(req, res) {
     // rede de segurança do remarcar: passou de 20 para 10 minutos ao entrar aqui
     feitos.push(await chamar('rede de segurança do remarcar',
       'tv-logistica?action=reprocessar-remarcar&aplicar=1'));
+    // ⏱️ a régua que move de Contato Feito para Entrar em Contato só rodava quando
+    // alguém abria a tela de fichas — agora corre sozinha
+    feitos.push(await chamar('régua de contato', 'fichas?action=load&sistema=adm'));
+    feitos.push(await chamar('régua de contato TV', 'fichas?action=load&sistema=tv'));
+    feitos.push(await chamar('destravar fichas abordadas', 'wa-bot?action=destravar-criadas&aplicar=1'));
   }
 
   // ── 🕐 de hora em hora: rede de segurança ──

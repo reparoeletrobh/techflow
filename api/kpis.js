@@ -111,6 +111,35 @@ async function investimento(de, ate) {
   } catch (e) { return { ...vazio, fonte: e.message }; }
 }
 
+// 📆 desde quando cada fonte tem dado confiável
+async function desdeQuando() {
+  const r = { };
+  const menor = arr => arr.filter(Boolean).sort()[0] || null;
+  try {
+    const [fa, ft, ppA, ppT, lgA] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('reparoeletro_logistica'),
+    ]);
+    r.fichas = menor([...(((fa || {}).fichas) || []), ...(((ft || {}).fichas) || [])]
+      .map(f => String(f.criadoEm || f.registradoEm || '').slice(0, 10)));
+    r.logistica = menor((((lg = lgA) || {}).fichas || []).map(f => String(f.criadoEm || '').slice(0, 10)));
+    const cards = [...(((ppA || {}).cards) || []), ...(((ppT || {}).cards) || [])];
+    r.aprovacoes = menor(cards.map(c => String(c.aprovadoEm || '').slice(0, 10)));
+    r.cards = menor(cards.map(c => String(c.criadoEm || '').slice(0, 10)));
+  } catch (e) {}
+  try {
+    const ev = await fetch(`${U}/lrange/wa_evt_list/0/0`,
+      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+    const primeiro = (ev.result || [])[0];
+    if (primeiro) { const e = JSON.parse(primeiro); r.conversas = String(e.ts || '').slice(0, 10); }
+    const tam = await fetch(`${U}/llen/wa_evt_list`,
+      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+    r.mensagensGuardadas = (tam && tam.result) || 0;
+  } catch (e) {}
+  return r;
+}
+let lg;
+
 module.exports = async function handler(req, res) {
   const _k = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
   if (_k !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
@@ -232,6 +261,7 @@ module.exports = async function handler(req, res) {
       conversasNoPeriodo: conversasNoPeriodo.length,
     },
     // 📖 de onde sai cada número, para conferência
+    DESDE_QUANDO: await desdeQuando(),
     FONTES: {
       investimento: 'Meta Ads · gasto real das datas escolhidas, incluindo campanhas já pausadas ou encerradas depois · campanha com TV, televisão, tela, LED ou barramento no nome conta como TV; o resto como ADM',
       conversas: usarMeta

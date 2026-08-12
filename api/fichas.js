@@ -497,6 +497,21 @@ export default async function handler(req, res) {
         }
       } catch (e) {}
     }
+    // 💬 quem trocou mensagem nas últimas 48h está em atendimento
+    const conversaAtiva = new Set();
+    try {
+      const rEv = await fetch(`${process.env.UPSTASH_URL}/lrange/wa_evt_list/-4000/-1`,
+        { headers: { Authorization: `Bearer ${process.env.UPSTASH_TOKEN}` } }).then(x => x.json());
+      const limite = Date.now() - 48 * 3600000;
+      for (const s of (rEv.result || [])) {
+        try {
+          const e = JSON.parse(s);
+          if (new Date(e.ts || 0).getTime() < limite) continue;
+          const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+          if (d.length >= 8) conversaAtiva.add(d);
+        } catch (x) {}
+      }
+    } catch (e) {}
     const corte = Date.now() - JANELA_DIAS * 86400000;
     const criar = [], jaExistem = [], reentradas = [], descartadas = [];
     for (const r of rows.slice(1)) {
@@ -524,13 +539,22 @@ export default async function handler(req, res) {
       }
       if (quando && quando < corte) continue;          // fora da janela pedida
       const t8 = d8f(tel);
+      // 🔒 já marcada para criar nesta mesma execução? o cliente com duas linhas
+      // na planilha gerava duas fichas, porque a lista de existentes era montada
+      // antes do laço e não enxergava o que estava sendo criado agora
+      if (criar.some(x => d8f(x.telefone) === t8)) continue;
       const ult = ultimaEntrada[t8];
       const eq = String(r[ix.eq] || '');
       const item = { telefone: tel, nome: String(r[ix.nome] || '?').trim(), equipamento: eq,
         defeito: String(r[ix.def] || ''), endereco: String(r[ix.end] || ''),
         ehTv: /\btv\b|televis/i.test(eq), quandoTexto: dt,
         dataPlanilha: quando ? new Date(quando).toISOString() : null };
-      if (!ult) { criar.push(item); continue; }
+      if (!ult) {
+        // 💬 cliente com conversa ativa no WhatsApp já está sendo atendido:
+        // criar ficha nova o coloca numa fila de abordagem que não faz sentido
+        if (conversaAtiva.has(t8)) { jaExistem.push(item); continue; }
+        criar.push(item); continue;
+      }
       const diasDesde = (Date.now() - ult) / 86400000;
       if (diasDesde > REENTRADA_DIAS) {                // 🔁 voltou depois de 30 dias
         item.reentrada = Math.round(diasDesde);
