@@ -92,6 +92,112 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🧹 LIMPAR-TRAVADAS: trata as fichas criadas indevidamente pelo sync ──
+  // Três destinos, conforme a situação de cada uma. Nada é removido sem confirmação.
+  if (action === 'limpar-travadas') {
+    const d8l = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh2 = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [fa, ft, abordados, exc] = await Promise.all([
+      dbGet(KEY_ADM), dbGet(KEY_TV),
+      dbGet('wa_abordados').then(v => v || { tels: {} }), dbGet('prospeccao_excluidos'),
+    ]);
+    // conversa das últimas 48h
+    const conversa = {};
+    try {
+      const r = await fetch(`${process.env.UPSTASH_URL}/lrange/wa_evt_list/-6000/-1`,
+        { headers: { Authorization: `Bearer ${process.env.UPSTASH_TOKEN}` } }).then(x => x.json());
+      for (const s of (r.result || [])) {
+        try {
+          const e = JSON.parse(s);
+          const d = d8l(e.tel); if (!d) continue;
+          conversa[d] = conversa[d] || { in: 0, ultima: null };
+          if (e.dir === 'in') conversa[d].in++;
+          const t = String(e.ts || '');
+          if (!conversa[d].ultima || t > conversa[d].ultima) conversa[d].ultima = t;
+        } catch (x) {}
+      }
+    } catch (e) {}
+    const excl = {};
+    try {
+      const tels = (exc || {}).tels || exc || {};
+      for (const [t, v] of Object.entries(tels)) excl[d8l(t)] = v;
+    } catch (e) {}
+
+    const planos = { duplicada: [], emConversa: [], reexcluida: [], viraContato: [], mantem: [] };
+    const vistos = {};
+    for (const [chave, db, sis] of [[KEY_ADM, fa, 'ADM'], [KEY_TV, ft, 'TV']]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'criada') continue;
+        const t = d8l(f.telefone);
+        const c = conversa[t];
+        const info = { chave, sis, id: f.id, nome: f.nome || '?', tel: t,
+          equipamento: String(f.equipamento || '').slice(0, 22),
+          criadoEm: f.criadoEm, abordadoEm: abordados.tels[t] || null,
+          msgsDele: c ? c.in : 0 };
+        // 1) mesma pessoa com mais de uma ficha parada: fica a mais antiga
+        if (vistos[t]) { info.motivo = 'duplicada — o cliente já tem outra ficha parada';
+          info.fica = vistos[t].id; planos.duplicada.push(info); continue; }
+        vistos[t] = info;
+        // 2) já tinha sido excluída antes
+        if (excl[t]) { info.motivo = 'já havia sido excluída em ' + hh2(excl[t]);
+          planos.reexcluida.push(info); continue; }
+        // 3) cliente em conversa ativa: a ficha não precisa de abordagem
+        if (c && c.in > 0) { info.motivo = 'cliente já conversa com o bot (' + c.in + ' mensagens)';
+          planos.emConversa.push(info); continue; }
+        // 4) abordada sem resposta: vai para Contato Feito
+        if (info.abordadoEm) { info.motivo = 'abordada em ' + hh2(info.abordadoEm) + ' e sem resposta';
+          planos.viraContato.push(info); continue; }
+        planos.mantem.push(info);
+      }
+    }
+    const linha = i => i.sis + ' | ' + String(i.nome).slice(0, 20) + ' ' + i.tel.slice(-4) +
+      ' | ' + i.equipamento + ' | criada ' + hh2(i.criadoEm) + ' | ' + i.motivo;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        RESUMO: {
+          removerDuplicadas: planos.duplicada.length,
+          removerJaExcluidas: planos.reexcluida.length,
+          removerEmConversa: planos.emConversa.length,
+          moverParaContatoFeito: planos.viraContato.length,
+          manterComoEstao: planos.mantem.length,
+        },
+        oQueSeraFeito: [
+          planos.duplicada.length ? '🗑️ remover ' + planos.duplicada.length + ' ficha(s) duplicada(s) — fica a mais antiga de cada cliente' : null,
+          planos.reexcluida.length ? '🗑️ remover ' + planos.reexcluida.length + ' que já haviam sido excluídas antes' : null,
+          planos.emConversa.length ? '🗑️ remover ' + planos.emConversa.length + ' de clientes que já conversam com o bot — o atendimento já existe' : null,
+          planos.viraContato.length ? '➡️ mover ' + planos.viraContato.length + ' para Contato Feito, com o horário real da abordagem' : null,
+        ].filter(Boolean),
+        DUPLICADAS: planos.duplicada.map(linha),
+        JA_EXCLUIDAS: planos.reexcluida.map(linha),
+        EM_CONVERSA: planos.emConversa.map(linha),
+        VIRAM_CONTATO_FEITO: planos.viraContato.map(linha),
+        PERMANECEM: planos.mantem.map(linha),
+        dica: 'para executar: &aplicar=1' });
+    }
+    const remover = new Set([...planos.duplicada, ...planos.reexcluida, ...planos.emConversa]
+      .map(i => String(i.id)));
+    const mover = new Map(planos.viraContato.map(i => [String(i.id), i.abordadoEm]));
+    const feito = { removidas: 0, movidas: 0 };
+    for (const chave of [KEY_ADM, KEY_TV]) {
+      const db = await dbGet(chave);
+      if (!db || !Array.isArray(db.fichas)) continue;
+      const antes = db.fichas.length;
+      db.fichas = db.fichas.filter(f => !remover.has(String(f.id)));
+      feito.removidas += antes - db.fichas.length;
+      for (const f of db.fichas) {
+        if (!mover.has(String(f.id))) continue;
+        f.status = 'contato_feito';
+        f.contatoFeitoEm = mover.get(String(f.id)) || new Date().toISOString();
+        f.abordadoPorBot = true;
+        feito.movidas++;
+      }
+      await dbSet(chave, db);
+    }
+    return res.status(200).json({ ok: true, ...feito,
+      observacao: 'as fichas removidas ficaram registradas nesta resposta',
+      removidasNominalmente: [...planos.duplicada, ...planos.reexcluida, ...planos.emConversa].map(linha) });
+  }
+
   // ── 🔬 AUDITORIA-TRAVADAS: a história completa de cada ficha parada ──
   if (action === 'auditoria-travadas') {
     const d8a = t => String(t || '').replace(/\D/g, '').slice(-8);
