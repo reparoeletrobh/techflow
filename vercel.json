@@ -1281,6 +1281,10 @@
     {
       "source": "/tv/pecas",
       "destination": "/tv-pecas.html"
+    },
+    {
+      "source": "/kpis",
+      "destination": "/kpis.html"
     }
   ],
   "headers": [
