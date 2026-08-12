@@ -75,12 +75,12 @@ a{color:inherit;text-decoration:none;}
 .froi span{font-size:9.5px;color:var(--fraco);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 
 /* ▶️ FUNIL HORIZONTAL: colunas lado a lado, altura decrescente da esquerda para a direita */
-.funil{display:flex;align-items:flex-end;gap:5px;overflow-x:auto;padding-bottom:6px;
+.funil{display:flex;align-items:flex-start;gap:5px;overflow-x:auto;padding-bottom:6px;
   scrollbar-width:thin;}
 .funil::-webkit-scrollbar{height:5px;}
 .funil::-webkit-scrollbar-thumb{background:var(--linha);border-radius:3px;}
 .passo{flex:1 1 0;min-width:126px;position:relative;display:flex;flex-direction:column;
-  justify-content:flex-end;overflow:hidden;
+  justify-content:flex-start;overflow:hidden;
   background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.014));
   border:1px solid var(--linha);border-top:2.5px solid var(--c);
   border-radius:13px 13px 11px 11px;padding:15px 14px 14px;
@@ -96,16 +96,22 @@ a{color:inherit;text-decoration:none;}
 .passo:not(:last-child)::after{content:'';position:absolute;right:-8px;top:50%;
   width:0;height:0;border-left:5px solid var(--linha);
   border-top:4px solid transparent;border-bottom:4px solid transparent;z-index:2;}
-.pn{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--fraco);letter-spacing:.06em;}
-.pinfo{margin-top:auto;}
+.pn{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--fraco);letter-spacing:.06em;
+  height:13px;}
+/* 📏 rótulo e número ocupam alturas fixas, então TODOS os números do funil
+   ficam na mesma linha de visão, independentemente da altura da coluna */
 .plbl{font-size:10px;font-weight:750;color:var(--dim);letter-spacing:.045em;text-transform:uppercase;
-  line-height:1.35;margin-top:9px;min-height:26px;}
-.pdet{font-size:10px;color:var(--fraco);margin-top:5px;line-height:1.45;min-height:26px;}
+  line-height:1.3;margin-top:8px;height:26px;display:flex;align-items:flex-start;}
 .pval{font-family:var(--mono);font-size:27px;font-weight:680;letter-spacing:-1.5px;line-height:1;
-  margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  height:30px;display:flex;align-items:center;margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 0 26px currentColor;filter:saturate(1.15);}
+.pinfo{display:contents;}
+.pdet{font-size:10px;color:var(--fraco);margin-top:7px;line-height:1.45;}
+/* o que sobra da altura vai para o rodapé da coluna, dando a forma do funil */
+.pfundo{margin-top:auto;}
 .ptaxa{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;
-  padding:2px 7px;border-radius:5px;margin-top:9px;}
+  padding:2px 7px;border-radius:5px;margin-top:8px;align-self:flex-start;}
 .t-bom{background:rgba(52,211,153,.13);color:var(--verde);}
 .t-medio{background:rgba(251,191,36,.13);color:var(--ambar);}
 .t-ruim{background:rgba(251,113,133,.13);color:var(--vermelho);}
@@ -275,12 +281,10 @@ function passo(n, lbl, val, cor, det, taxa, taxaLbl, altura){
   var cls = taxa==null ? '' : (taxa>=60?'t-bom':taxa>=30?'t-medio':'t-ruim');
   return '<div class="passo" style="height:'+altura+'px;--c:'+cor+'">'
     + '<span class="pn">'+n+'</span>'
-    + '<div class="pinfo">'
-      + '<div class="plbl">'+lbl+'</div>'
-      + '<div class="pval" style="color:'+cor+'">'+val+'</div>'
-      + (taxa!=null ? '<span class="ptaxa '+cls+'">'+taxa+'% ▸</span>' : '')
-      + (det ? '<div class="pdet">'+det+'</div>' : '')
-    + '</div>'
+    + '<div class="plbl">'+lbl+'</div>'
+    + '<div class="pval" style="color:'+cor+'">'+val+'</div>'
+    + (taxa!=null ? '<span class="ptaxa '+cls+'">'+taxa+'% ▸</span>' : '')
+    + (det ? '<div class="pdet">'+det+'</div>' : '')
   + '</div>';
 }
 
