@@ -44,6 +44,15 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── 👨‍🔧 EQUIPE: a lista oficial de técnicos, igual à do Mover OS ──
+  if (action === 'equipe') {
+    const EQUIPE_OFICIAL = ['Lucas', 'Diego', 'Kassio', 'Roberto', 'Carlos', 'Arthur'];
+    const salvos = (db.config && db.config.tecnicos) || [];
+    // junta os oficiais com quaisquer outros já cadastrados, sem repetir
+    const todos = EQUIPE_OFICIAL.concat(salvos.filter(t => !EQUIPE_OFICIAL.includes(t)));
+    return res.status(200).json({ ok: true, tecnicos: todos, oficiais: EQUIPE_OFICIAL });
+  }
+
   // ── ➕ FICHA AVULSA: produção do técnico que não veio da esteira ──
   // Ex.: equipamento de venda, reforma de magnetron. Conta para o técnico,
   // mas NÃO dispara nenhum comunicado ao cliente — não há cliente envolvido.

@@ -515,6 +515,21 @@ function check(nome, cond, extra) {
     check('menu: todas as páginas têm rewrite', semRota.length === 0, 'sem rota: ' + semRota.join(', '));
   }
 
+  // ── 👨‍🔧 a ficha avulsa deve oferecer os mesmos técnicos do Mover OS ──
+  console.log('▶ Cenário T1 — lista de técnicos igual nas duas telas');
+  {
+    const fs5 = require('fs');
+    const tec = fs5.readFileSync('tecnico.html', 'utf8');
+    const api = fs5.readFileSync('api/qualidade.js', 'utf8');
+    const noMover = [...new Set((tec.match(/pickTecnico\('([^']+)'\)/g) || [])
+      .map(x => x.replace(/pickTecnico\('|'\)/g, '')))].sort();
+    const mE = api.match(/EQUIPE_OFICIAL = \[([^\]]+)\]/);
+    const naQualidade = mE ? mE[1].split(',').map(x => x.trim().replace(/'/g, '')).sort() : [];
+    const faltam = noMover.filter(t => !naQualidade.includes(t));
+    check('técnicos: ficha avulsa oferece os mesmos do Mover OS',
+      faltam.length === 0, 'faltam: ' + faltam.join(', '));
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
   await wabot(req({ action:'enviar', forcarJanela:'1', ...K }, { tel:'5531990007099',
