@@ -346,6 +346,47 @@ module.exports = async function handler(req, res) {
           ' | ' + i.fase + ' | ' + i.banco + ' — sem data de aprovação, não entra em nenhum período') });
   }
 
+  // ── 🕵️ SUSPEITOS: aprovações cuja data pode ter vindo errada do carimbo retroativo ──
+  if ((req.query || {}).action === 'suspeitos') {
+    const Js = janela(req.query || {});
+    const d8s = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh3 = d => d ? String(d).slice(5, 16).replace('T', ' ') : '—';
+    const L = [];
+    for (const k of ['reparoeletro_pipe', 'reparoeletro_arquivo']) {
+      const b = await dbGet(k);
+      for (const c of (((b || {}).cards) || [])) {
+        const t = new Date(c.aprovadoEm || 0).getTime();
+        if (!t || t < Js.ini || t > Js.fim) continue;
+        const hist = (c.history || []).map(x => ({
+          fase: String(x.phase || x.phaseId || '?'),
+          ts: String(x.ts || x.timestamp || '') })).filter(x => x.ts).sort((a, b2) => a.ts.localeCompare(b2.ts));
+        const entrouAprovados = hist.find(x => x.fase === 'aprovados');
+        const primeiroMov = hist[0];
+        // 🚩 sinais de que a data pode não ser a da aprovação real
+        const sinais = [];
+        if (c.carimboRetroativo) sinais.push('carimbo reconstruído');
+        if (!entrouAprovados) sinais.push('nunca registrou passagem por aprovados');
+        if (primeiroMov && primeiroMov.ts.slice(0, 10) < Js.de) sinais.push('card já existia antes do ciclo');
+        if (c.criadoEm && String(c.criadoEm).slice(0, 10) < Js.de) sinais.push('criado antes do ciclo');
+        if (!sinais.length) continue;
+        L.push({ nome: c.nomeContato || c.nome || '?', tel: d8s(c.telefone).slice(-4),
+          fase: String(c.phaseId || c.phase || ''), aprovadoEm: c.aprovadoEm,
+          criadoEm: c.criadoEm, sinais,
+          historico: hist.slice(0, 6).map(x => x.fase + ' ' + hh3(x.ts)) });
+      }
+    }
+    L.sort((a, b) => b.sinais.length - a.sinais.length);
+    return res.status(200).json({ ok: true,
+      periodo: Js.rotulo,
+      suspeitos: L.length,
+      explicacao: 'aprovações datadas dentro do ciclo, mas com indício de que a data real é anterior',
+      L: L.map(x => x.nome.slice(0, 20) + ' ' + x.tel +
+        ' | aprovado ' + hh3(x.aprovadoEm) + ' | ' + x.fase +
+        ' | criado ' + String(x.criadoEm || '').slice(0, 10) +
+        '\n     🚩 ' + x.sinais.join(' · ') +
+        '\n     histórico: ' + x.historico.join(' → ')) });
+  }
+
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
