@@ -552,6 +552,28 @@ function check(nome, cond, extra) {
   }
 
   // ── 📅 cada etapa do funil precisa gravar a própria data na origem ──
+  // ── 📒 cada etapa do funil precisa registrar no livro-razão ──
+  console.log('▶ Cenário K2 — etapas registram no livro-razão do funil');
+  {
+    const fs8 = require('fs');
+    const exigido = [
+      ['api/frenteloja.js', "registrar('aprovado'", 'aprovação no balcão'],
+      ['api/frenteloja.js', "registrar('orcamento'", 'orçamento no balcão'],
+      ['api/pipe.js', "registrar('aprovado'", 'aprovação ADM'],
+      ['api/pipe.js', "registrar('orcamento'", 'orçamento ADM'],
+      ['api/tv-pipe.js', "registrar('aprovado'", 'aprovação TV'],
+      ['api/tv-pipe.js', "registrar('orcamento'", 'orçamento TV'],
+      ['api/logistica.js', "registrar('logistica'", 'logística ADM'],
+      ['api/tv-logistica.js', "registrar('logistica'", 'logística TV'],
+      ['api/fichas.js', "registrar('ficha'", 'ficha criada'],
+    ];
+    const faltando = exigido.filter(([arq, trecho]) =>
+      !fs8.existsSync(arq) || !fs8.readFileSync(arq, 'utf8').includes(trecho))
+      .map(([, , nome]) => nome);
+    check('funil: todas as etapas registram no livro-razão',
+      faltando.length === 0, 'sem registro: ' + faltando.join(', '));
+  }
+
   console.log('▶ Cenário K1 — etapas do KPI gravam data no banco');
   {
     const fs7 = require('fs');

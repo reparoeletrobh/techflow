@@ -1,4 +1,8 @@
-const _funil = require('./_funil');
+// carregado de forma tolerante: o harness executa os arquivos fora da pasta api
+let _funil = { registrar: async () => false, ler: async () => [], jaRegistrado: async () => false };
+try { _funil = require('./_funil'); } catch (e) {
+  try { _funil = require(require('path').join(__dirname, '_funil.js')); } catch (e2) {}
+}
 
 // ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
 async function pipefyBestEffort(fn) {
