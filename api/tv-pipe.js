@@ -532,6 +532,8 @@ export default async function handler(req, res) {
       if(nomeContato!==undefined) card.nomeContato=nomeContato;
       if(body.vencimento!==undefined) card.vencimento=body.vencimento||null;
       if(valor!==undefined)       card.valor=parseFloat(String(valor).replace(',','.'))||0;
+    // 📅 momento em que o orçamento passou a existir — sem isto o KPI não consegue datar a etapa
+    if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();}
       if(telefone!==undefined)    card.telefone=telefone;
       if(equipamento!==undefined) card.equipamento=equipamento;
       if(descricao!==undefined)   card.descricao=descricao;
@@ -1716,6 +1718,7 @@ export default async function handler(req, res) {
     var card = (db.cards || []).find(function(c) { return c.id === id; });
     if (!card) return res.status(404).json({ ok: false, error: 'nao encontrado' });
     card.valor = valor;
+      if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();}
     await dbSet(PIPE_KEY, db);
     return res.status(200).json({ ok: true, valor: valor });
   }
@@ -1767,6 +1770,7 @@ export default async function handler(req, res) {
 
       if (novoValor > 0) {
         card.valor = novoValor;
+      if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();}
         atualizados++;
       }
     }

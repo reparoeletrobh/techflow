@@ -551,6 +551,29 @@ function check(nome, cond, extra) {
       faltam.length === 0, 'faltam: ' + faltam.join(', '));
   }
 
+  // ── 📅 cada etapa do funil precisa gravar a própria data na origem ──
+  console.log('▶ Cenário K1 — etapas do KPI gravam data no banco');
+  {
+    const fs7 = require('fs');
+    const exigido = [
+      ['api/fichas.js', 'criadoEm', 'ficha criada'],
+      ['api/logistica.js', 'criadoEm', 'logística ADM'],
+      ['api/tv-logistica.js', 'criadoEm', 'logística TV'],
+      ['api/pipe.js', 'orcamentoEm', 'orçamento ADM'],
+      ['api/tv-pipe.js', 'orcamentoEm', 'orçamento TV'],
+      ['api/frenteloja.js', 'orcamentoEm', 'orçamento balcão'],
+      ['api/pipe.js', 'aprovadoEm', 'aprovação ADM'],
+      ['api/tv-pipe.js', 'aprovadoEm', 'aprovação TV'],
+      ['api/frenteloja.js', 'aprovadoEm', 'aprovação balcão'],
+    ];
+    const faltando = exigido.filter(([arq, campo]) => {
+      if (!fs7.existsSync(arq)) return true;
+      return !fs7.readFileSync(arq, 'utf8').includes(campo);
+    }).map(([, , nome]) => nome);
+    check('KPI: todas as etapas carimbam a data na origem',
+      faltando.length === 0, 'sem carimbo: ' + faltando.join(', '));
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
   await wabot(req({ action:'enviar', forcarJanela:'1', ...K }, { tel:'5531990007099',

@@ -129,6 +129,7 @@ async function registrarNoPipe(dados) {
       valor:           parseFloat(dados.valor || 0) || 0,
       origem:          'frenteloja',
       // 🕐 o card nasce já aprovado: leva a data em que o cliente aprovou no balcão
+      orcamentoEm:     dados.orcamentoEm || now,
       aprovadoEm:      dados.aprovadoEm || now,
       aprovadoPor:     dados.aprovadoPor || 'balcão',
       aprovadoNoBalcao: true,
@@ -294,6 +295,9 @@ export default async function handler(req,res){
     if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
     ficha.orcamento={valor:parseFloat(valor)||0,formaPagamento:formaPagamento||'pix',status:decisao};
+    // 📅 momento em que o orçamento foi apresentado ao cliente no balcão
+    if(!ficha.orcamentoEm) ficha.orcamentoEm=now;
+    ficha.valor=parseFloat(valor)||ficha.valor||0;
 
     // Reprovado: mantém no banco com phase='reprovado' para exibir coluna hoje
     if(decisao==='reprovado'){
