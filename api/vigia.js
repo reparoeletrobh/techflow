@@ -660,6 +660,99 @@ module.exports = async function handler(req, res) {
         : 'rode o exame-completo de novo para confirmar' });
   }
 
+  // ── 🔎 AUDITAR-RESOLVER: o que as correções realmente fizeram ──
+  if (action === 'auditar-resolver') {
+    const min = Math.min(720, Math.max(5, parseInt(req.query.minutos || '60', 10)));
+    const desde = Date.now() - min * 60000;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const achados = [], alertas = [];
+
+    // 1️⃣ fichas recriadas pelo recriar-perdidas
+    for (const k of ['fichas_adm', 'fichas_tv']) {
+      const b = await dbGet(k);
+      for (const f of (((b || {}).fichas) || [])) {
+        const q = new Date(f.criadoEm || 0).getTime();
+        if (!q || q < desde) continue;
+        const id = String(f.id || '');
+        if (!id.startsWith('fic_reag_') && !id.startsWith('rem_') && String(f.origem||'') !== 'remarcar') continue;
+        achados.push({ etapa: 'remarcar', banco: k, quem: (f.nome || '?') + ' ' + d8(f.telefone).slice(-4),
+          oQue: 'ficha devolvida ao atendimento', status: f.status, quando: hh(f.criadoEm) });
+      }
+    }
+    // 2️⃣ fichas destravadas
+    for (const k of ['fichas_adm', 'fichas_tv']) {
+      const b = await dbGet(k);
+      for (const f of (((b || {}).fichas) || [])) {
+        const q = new Date(f.destravadaEm || 0).getTime();
+        if (!q || q < desde) continue;
+        achados.push({ etapa: 'destravar', banco: k, quem: (f.nome || '?') + ' ' + d8(f.telefone).slice(-4),
+          oQue: 'movida de Ficha Criada para ' + f.status, quando: hh(f.destravadaEm) });
+      }
+    }
+    // 3️⃣ garantias que entraram na fila
+    try {
+      const fl = await dbGet('reparoeletro_garantia_fila');
+      for (const i of (((fl || {}).itens) || [])) {
+        const q = new Date(i.criadoEm || 0).getTime();
+        if (!q || q < desde) continue;
+        achados.push({ etapa: 'garantia', banco: 'fila', quem: (i.nome || '?') + ' ' + d8(i.telefone).slice(-4),
+          oQue: 'entrou na fila de tratamento (' + (i.origem || '?') + ')', quando: hh(i.criadoEm) });
+      }
+    } catch (e) {}
+    // 4️⃣ 📲 MENSAGENS ENVIADAS — a etapa de maior risco
+    let enviadas = [];
+    try {
+      const ev = await dbGet('wa_eventos');
+      const lista = Array.isArray(ev) ? ev : ((ev || {}).itens || (ev || {}).eventos || []);
+      enviadas = lista.filter(e => {
+        const q = new Date(e.ts || 0).getTime();
+        return q >= desde && e.dir === 'out' &&
+          ['pendente-despachada', 'template'].includes(String(e.tipo || ''));
+      }).map(e => ({ tel: String(e.tel || '').slice(-4), tipo: e.tipo,
+        texto: String(e.texto || '').slice(0, 90), quando: hh(e.ts) }));
+    } catch (e) {}
+    for (const m of enviadas) {
+      achados.push({ etapa: 'whatsapp', banco: '', quem: m.tel,
+        oQue: '📲 MENSAGEM ENVIADA (' + m.tipo + '): ' + m.texto, quando: m.quando });
+    }
+
+    // ⚠️ verificações de sanidade
+    const porTel = {};
+    for (const a of achados) { const t = String(a.quem).slice(-4); (porTel[t] = porTel[t] || []).push(a.etapa); }
+    for (const [t, ets] of Object.entries(porTel)) {
+      if (ets.length > 2) alertas.push('cliente ' + t + ' foi tocado por ' + ets.length +
+        ' etapas (' + [...new Set(ets)].join(', ') + ') — conferir se não duplicou');
+    }
+    if (enviadas.length > 20) alertas.push('🚨 ' + enviadas.length +
+      ' mensagens enviadas de uma vez — volume alto, conferir se foi intencional');
+    // ficha devolvida cujo cliente já está em operação
+    const emOperacao = new Set();
+    for (const k of ['reparoeletro_logistica', 'tv_logistica', 'reparoeletro_pipe', 'tv_pipe']) {
+      const b = await dbGet(k);
+      for (const L of ['fichas', 'cards']) for (const x of ((b || {})[L] || [])) emOperacao.add(d8(x.telefone));
+    }
+    for (const a of achados.filter(x => x.etapa === 'remarcar')) {
+      const t = String(a.quem).slice(-4);
+      if ([...emOperacao].some(e => e.endsWith(t))) {
+        alertas.push('⚠️ ' + a.quem + ' foi devolvido ao atendimento mas já tem ficha em operação — pode gerar contato duplicado');
+      }
+    }
+
+    const porEtapa = achados.reduce((o, a) => { o[a.etapa] = (o[a.etapa] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: alertas.length === 0,
+      janelaMinutos: min,
+      VEREDITO: alertas.length === 0
+        ? '✅ tudo dentro do esperado — nenhuma ação fora do previsto'
+        : '⚠️ ' + alertas.length + ' ponto(s) merecem conferência',
+      totalDeAcoes: achados.length,
+      POR_ETAPA: porEtapa,
+      MENSAGENS_ENVIADAS: enviadas.length,
+      ALERTAS: alertas,
+      DETALHE: achados.sort((a, b) => String(b.quando).localeCompare(String(a.quando)))
+        .map(a => a.quando + ' | ' + a.etapa.padEnd(10) + ' | ' +
+          String(a.quem).slice(0, 24).padEnd(24) + ' | ' + a.oQue) });
+  }
+
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──
   if (action === 'historico') {
     const h = (await dbGet('vigia_historico')) || { dias: {} };
