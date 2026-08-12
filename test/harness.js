@@ -476,6 +476,24 @@ function check(nome, cond, extra) {
       faltando.length === 0, 'faltam: ' + faltando.join(', '));
   }
 
+  // ── 🕐 os campos que a tela do motorista usa precisam vir do rota-fichas ──
+  console.log('▶ Cenário M2 — rota-fichas entrega os campos que a tela usa');
+  {
+    const fs3 = require('fs');
+    const tela = fs3.readFileSync('tv-rota.html', 'utf8');
+    const api = fs3.readFileSync('api/tv-logistica.js', 'utf8');
+    const i = api.indexOf("action === 'rota-fichas'");
+    const bloco = api.slice(i, i + 2200);
+    // campos que a tela lê de f.
+    const usados = [...new Set((tela.match(/\bf\.[a-zA-Z]+/g) || [])
+      .map(x => x.replace('f.', '')))]
+      .filter(c => ['agendadoPara','horarioColeta','agendadoObs','endereco','equipamento',
+                    'defeito','regiao','telefone','nome'].includes(c));
+    const faltando = usados.filter(c => !new RegExp('\\b' + c + '\\b').test(bloco));
+    check('motorista: rota-fichas entrega todos os campos usados pela tela',
+      faltando.length === 0, 'faltam: ' + faltando.join(', '));
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
   await wabot(req({ action:'enviar', forcarJanela:'1', ...K }, { tel:'5531990007099',

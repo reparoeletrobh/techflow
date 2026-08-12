@@ -1392,9 +1392,15 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(LOG_KEY) || defaultDB();
     const fichas = (db.fichas || [])
       .filter(f => f.phase === 'motorista_parceiro' && identifica(f.motoristaNome) === alvo)
+      // 🕐 o horário combinado precisa vir junto, senão a tela do motorista mostra
+      // a ficha sem relógio mesmo com o agendamento gravado
       .map(f => ({ id: f.id, nome: f.nome, telefone: f.telefone, endereco: f.endereco || '',
         equipamento: f.equipamento || 'TV', defeito: f.defeito || '', movedAt: f.movedAt || f.criadoEm,
         primeiroContatoEm: f.primeiroContatoEm || null, relatorioIniciadoEm: f.relatorioIniciadoEm || null,
+        agendadoPara: f.agendadoPara || f.horarioColeta || null,
+        horarioColeta: f.horarioColeta || f.agendadoPara || null,
+        agendadoObs: f.agendadoObs || '',
+        agendadoEm: f.agendadoEm || null,
         regiao: f.regiaoManual || regiaoDoEndereco(f.endereco) }));
     return res.status(200).json({ ok: true, fichas, regioes: REGIOES });
   }
