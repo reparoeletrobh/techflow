@@ -617,14 +617,22 @@ export default async function handler(req, res) {
     // do gatilho existir — usado uma única vez, quando o modelo for aprovado.
     const todos = String(req.query.todosCondenados || '') === '1';
     const pendentes = (bd.cards || []).filter(c => {
-      if (String(c.phaseId || '') !== 'aguardando_ret') return false;
+      const fase = String(c.phaseId || '');
+      // já avisado, não repete
       if (c.avisoCondenadoStatus === 'enviado' ||
           c.avisoCondenadoStatus === 'modelo enviado') return false;
-      if (c.avisoCondenadoStatus === 'pendente') return true;
+      // fluxo normal: marcado ao ir de Condenado para Aguardando Retirada
+      if (c.avisoCondenadoStatus === 'pendente' && fase === 'aguardando_ret') return true;
       if (!todos) return false;
-      // veio de Condenado em algum momento?
-      return (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'condenado') ||
-        String(c.faseAnteriorRegistrada || '') === 'condenado';
+      // 📋 com todosCondenados=1 alcança também quem ESTÁ na coluna Condenado
+      // agora, ou já passou por ela e foi para retirada — são os casos
+      // anteriores ao gatilho existir
+      if (fase === 'condenado') return true;
+      if (fase === 'aguardando_ret') {
+        return (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'condenado') ||
+          String(c.faseAnteriorRegistrada || '') === 'condenado';
+      }
+      return false;
     });
 
     const montar = (c) => {
@@ -652,7 +660,11 @@ export default async function handler(req, res) {
         aguardandoAviso: pendentes.length,
         L: pendentes.map(c => String(c.nomeContato || c.nome || '?').slice(0, 24) +
           ' ' + String(c.telefone || '').slice(-4) + ' | ' +
-          String(c.equipamento || c.descricao || '').slice(0, 26)),
+          String(c.equipamento || c.descricao || '').slice(0, 26) +
+          ' | coluna: ' + String(c.phaseId || '?') +
+          ' | há ' + (c.movedAt
+            ? Math.floor((Date.now() - new Date(c.movedAt).getTime()) / 86400000) + ' dia(s)'
+            : 'sem data')),
         MENSAGEM: pendentes[0] ? montar(pendentes[0]) : montar({ nomeContato: 'Cliente', equipamento: 'TV' }),
         dica: 'para enviar: &aplicar=1' });
     }
