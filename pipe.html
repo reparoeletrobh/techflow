@@ -2,6 +2,34 @@
 <html lang="pt-BR">
 <head>
 <script>
+// ── 🏷️ etiquetas de fase e disparo na coluna Aguardando Aprovação ──
+// Aplicadas DEPOIS da montagem dos cards, sem alterar como eles são criados.
+async function aplicarBadgesFase(){
+  var r = null;
+  try { r = await fetch('/api/wa-bot?action=badges-aguardando').then(function(x){return x.json();}); }
+  catch(e){ return; }
+  if(!r || !r.ok || !r.badges) return;
+  Object.keys(r.badges).forEach(function(id){
+    var b = r.badges[id];
+    var el = document.querySelector('[data-card-id="'+id+'"]') ||
+             document.getElementById('card-'+id);
+    if(!el) return;
+    var antiga = el.querySelector('.badge-fase');
+    if(antiga) antiga.remove();
+    var sp = document.createElement('span');
+    sp.className = 'badge-fase' + (b.semBot ? ' humano' : '');
+    sp.textContent = b.etiqueta;
+    sp.title = b.semBot
+      ? 'nenhuma mensagem do bot para este cliente'
+      : 'fase ' + b.fase + ' de 5 · ' + b.disparos + ' de 7 disparos · '
+        + b.respostasDoCliente + ' resposta(s) do cliente';
+    el.classList.toggle('sem-bot', !!b.semBot);
+    var alvo = el.querySelector('.c-nome') || el.querySelector('.card-nome')
+      || el.querySelector('b') || el.firstElementChild;
+    if(alvo) alvo.appendChild(sp); else el.insertBefore(sp, el.firstChild);
+  });
+}
+
 /* 🔐 TF-GUARD Fase 1 */
 (function(){
   if(location.pathname==='/login'||location.pathname==='/login.html')return;
@@ -184,6 +212,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .scroll-float:hover{color:#f5c800;border-color:#f5c800;background:rgba(17,17,17,.98);}
 .scroll-float.left{left:6px;}
 .scroll-float.right{right:6px;}
+
+/* 🏷️ etiqueta de fase da venda e disparo, na coluna Aguardando Aprovação */
+.badge-fase{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,monospace;
+  font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;letter-spacing:.02em;
+  background:rgba(96,165,250,.16);color:#60a5fa;border:1px solid rgba(96,165,250,.3);}
+.badge-fase.humano{background:rgba(248,113,113,.16);color:#f87171;border-color:rgba(248,113,113,.4);}
+.card.sem-bot{border-left:3px solid #f87171 !important;background:rgba(248,113,113,.05);}
 </style>
 </head>
 <body>
@@ -832,6 +867,8 @@ async function atualizarErp(){
 }
 
 load();
+setInterval(aplicarBadgesFase, 30000);
+setTimeout(aplicarBadgesFase, 1200);
 setInterval(function(){ if(!document.hidden) load(); }, 180000);
 atualizarErp();
 setInterval(function(){ if(!document.hidden) atualizarErp(); }, 120000);

@@ -417,6 +417,68 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 🏷️ BADGES-AGUARDANDO: fase da venda e disparo de cada card ──
+  // Só leitura, para as telas dos dois pipes desenharem a etiqueta.
+  if (action === 'badges-aguardando') {
+    const d8b = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const MARCAS_B = [
+      { n: 5, re: /interesse em nos vender|comprar (o )?seu equipamento|vender o seu/i },
+      { n: 4, re: /na troca|seminovo|trade|equipamento na troca/i },
+      { n: 3, re: /aqui na loja|trazendo (o|seu)|retirar o frete|balc[ãa]o/i },
+      { n: 2, re: /no pix|pelo pix|sendo no pix/i },
+      { n: 1, re: /or[çc]amento|ficou pronto|valor do conserto/i },
+    ];
+    let evts = [];
+    try {
+      const r = await fetch(`${U}/lrange/${EVT_LIST}/-8000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) { try { evts.push(JSON.parse(s)); } catch (e) {} }
+    } catch (e) {}
+    const porTel = {};
+    for (const e of evts) {
+      const d = d8b(e.tel); if (!d) continue;
+      (porTel[d] = porTel[d] || []).push(e);
+    }
+    let ctrl7 = {};
+    try { ctrl7 = ((await dbGet('reparoeletro_recuperacao7')) || {}).clientes || {}; } catch (e) {}
+
+    const saida = {};
+    for (const [banco, sis] of [['reparoeletro_pipe', 'adm'], ['tv_pipe', 'tv']]) {
+      let db = null;
+      try { db = await dbGet(banco); } catch (e) { continue; }
+      for (const c of (((db || {}).cards) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        if (fase !== 'aguardando_aprovacao') continue;
+        const d = d8b(c.telefone);
+        const meus = (porTel[d] || []).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+        const nossas = meus.filter(e => e.dir === 'out' && e.tipo !== 'template');
+        const delas = meus.filter(e => e.dir === 'in');
+        const rec = ctrl7[d];
+        // fase mais avançada que o bot ofereceu
+        let nf = 0;
+        for (const mk of MARCAS_B) {
+          if (nossas.some(e => mk.re.test(String(e.texto || '')))) { nf = mk.n; break; }
+        }
+        const disparos = rec ? (Number(rec.tentativas) || 0) : 0;
+        const semBot = nossas.length === 0;
+        saida[c.id] = {
+          id: c.id, sistema: sis,
+          semBot,
+          etiqueta: semBot ? 'atendimento humano'
+            : (nf ? nf + 'F' : '—') + (disparos ? ' · ' + disparos + 'D' : ''),
+          fase: nf, disparos,
+          respostasDoCliente: delas.length,
+          nossasMensagens: nossas.length,
+          ultimoContato: nossas.length ? nossas[nossas.length - 1].ts : null,
+          conflitoAberto: !!(rec && rec.conflitoAberto),
+        };
+      }
+    }
+    return res.status(200).json({ ok: true, total: Object.keys(saida).length,
+      legenda: 'ex.: 2F · 5D = segunda fase de venda, quinto disparo de recuperação',
+      badges: saida });
+  }
+
   // 🚦 CONTA BLOQUEADA: enquanto a Meta recusar por pagamento, não adianta insistir —
   // cada tentativa falha, engrossa a fila e arrisca a qualidade do número quando liberar.
   async function contaBloqueada() {
