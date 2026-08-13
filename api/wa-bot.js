@@ -421,12 +421,24 @@ export default async function handler(req, res) {
   if (action === 'modelos') {
     const cfgM = (await dbGet('wa_credenciais')) || {};
     const token = cfgM.token || process.env.WA_TOKEN;
-    const waba = cfgM.wabaId || process.env.WA_WABA_ID || cfgM.businessId;
     if (!token) return res.status(200).json({ ok: false, error: 'token ausente' });
+    let waba = String(req.query.waba || '') || cfgM.wabaId ||
+      process.env.WA_WABA_ID || cfgM.businessId || '';
+    // 🔎 sem o id da conta, descobre a partir do próprio número conectado
+    if (!waba) {
+      const phoneId = cfgM.phoneId || process.env.WA_PHONE_ID;
+      if (phoneId) {
+        try {
+          const rp = await fetch(`https://graph.facebook.com/v20.0/${phoneId}` +
+            `?fields=whatsapp_business_account&access_token=${token}`).then(x => x.json());
+          waba = (rp && rp.whatsapp_business_account && rp.whatsapp_business_account.id) || '';
+        } catch (e) {}
+      }
+    }
     if (!waba) return res.status(200).json({ ok: false,
-      error: 'id da conta de WhatsApp (WABA) não configurado',
-      dica: 'informe em &waba=SEU_ID' });
-    const id = String(req.query.waba || waba);
+      error: 'não consegui identificar a conta de WhatsApp a partir do número',
+      dica: 'informe manualmente em &waba=SEU_ID (está no WhatsApp Manager)' });
+    const id = String(waba);
     try {
       const r = await fetch(`https://graph.facebook.com/v20.0/${id}/message_templates` +
         `?fields=name,status,language,category,components&limit=100&access_token=${token}`)
@@ -437,7 +449,8 @@ export default async function handler(req, res) {
         String(t.name).padEnd(34) + ' | ' + t.language + ' | ' + t.status +
         ' | ' + (t.category || ''));
       const aprovados = (r.data || []).filter(t => t.status === 'APPROVED').map(t => t.name);
-      return res.status(200).json({ ok: true, total: (r.data || []).length,
+      return res.status(200).json({ ok: true, contaWhatsApp: id,
+        total: (r.data || []).length,
         APROVADOS: aprovados, TODOS: L.sort(),
         usadosNoCodigo: ['tv_sem_viabilidade_reparo', 'equipamento_pronto_retirada', 'orcamento_pronto'],
         conferir: ['tv_sem_viabilidade_reparo', 'equipamento_pronto_retirada']
