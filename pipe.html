@@ -9,11 +9,23 @@ async function aplicarBadgesFase(){
   try { r = await fetch('/api/wa-bot?action=badges-aguardando').then(function(x){return x.json();}); }
   catch(e){ return; }
   if(!r || !r.ok || !r.badges) return;
-  Object.keys(r.badges).forEach(function(id){
-    var b = r.badges[id];
-    var el = document.querySelector('[data-card-id="'+id+'"]') ||
-             document.getElementById('card-'+id);
+  var dados = r.badges;
+  // 🏷️ usa a lista de cards que a própria tela já tem: card sem histórico ficava
+  // sem etiqueta nenhuma, e a coluna parecia inconsistente. Todo card das fases
+  // de negociação recebe etiqueta — com dados ou como atendimento humano.
+  var FASES_BADGE = ['aguardando_aprovacao', 'ultima_chamada'];
+  var alvos = (typeof cards !== 'undefined' && Array.isArray(cards))
+    ? cards.filter(function(c){ return FASES_BADGE.indexOf(c.phase) > -1; })
+    : [];
+  if(!alvos.length){
+    // sem a lista em memória, cai para o que a consulta devolveu
+    alvos = Object.keys(dados).map(function(id){ return { id: id }; });
+  }
+  alvos.forEach(function(c){
+    var id = c.id;
+    var el = document.getElementById('card-' + id);
     if(!el) return;
+    var b = dados[id] || { semBot: true, disparos: 0, fase: 0, respostasDoCliente: 0 };
     var antiga = el.querySelector('.badge-fase');
     if(antiga) antiga.remove();
     var sp = document.createElement('span');
@@ -32,7 +44,7 @@ async function aplicarBadgesFase(){
         + ' · ' + b.respostasDoCliente + ' resposta(s) do cliente';
     el.classList.remove('sem-bot', 'bot-vivo', 'bot-esgotado');
     el.classList.add(b.semBot ? 'sem-bot' : (esgotou ? 'bot-esgotado' : 'bot-vivo'));
-    var alvo = el.querySelector('.c-nome') || el.querySelector('.card-nome')
+    var alvo = el.querySelector('.card-nome') || el.querySelector('.c-nome')
       || el.querySelector('b') || el.firstElementChild;
     if(alvo) alvo.appendChild(sp); else el.insertBefore(sp, el.firstChild);
   });
@@ -469,6 +481,7 @@ function render(){
       cardsHtml+
     '</div>';
   }).join('');
+  setTimeout(aplicarBadgesFase, 80);
 }
 
 function abrirCriarRotas(){

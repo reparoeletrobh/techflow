@@ -448,7 +448,9 @@ export default async function handler(req, res) {
       try { db = await dbGet(banco); } catch (e) { continue; }
       for (const c of (((db || {}).cards) || [])) {
         const fase = String(c.phaseId || c.phase || '');
-        if (fase !== 'aguardando_aprovacao') continue;
+        // 🎯 as duas colunas em que o bot negocia — última chamada é a continuação
+        // da mesma sequência, e os cards de lá também precisam da etiqueta
+        if (fase !== 'aguardando_aprovacao' && fase !== 'ultima_chamada') continue;
         const d = d8b(c.telefone);
         const meus = (porTel[d] || []).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
         const nossas = meus.filter(e => e.dir === 'out' && e.tipo !== 'template');
@@ -462,7 +464,8 @@ export default async function handler(req, res) {
         const disparos = rec ? (Number(rec.tentativas) || 0) : 0;
         const semBot = nossas.length === 0;
         saida[c.id] = {
-          id: c.id, sistema: sis,
+          id: c.id, sistema: sis, fase,
+          telefoneValido: d.length >= 8,
           semBot,
           etiqueta: semBot ? 'atendimento humano'
             : (nf ? nf + 'F' : '—') + (disparos ? ' · ' + disparos + 'D' : ''),
