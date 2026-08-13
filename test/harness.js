@@ -593,6 +593,24 @@ function check(nome, cond, extra) {
       problemas.length === 0, problemas.slice(0, 6).join(', '));
   }
 
+  // ── 📌 lead novo da planilha entra mesmo já conversando com o bot ──
+  console.log('▶ Cenário SY — sync cria ficha de quem não existe em banco nenhum');
+  {
+    const fich = carregarHandler('api/fichas.js');
+    KV['fichas_adm'] = { fichas: [] };
+    KV['fichas_tv'] = { fichas: [] };
+    LISTS['wa_evt_list'] = [JSON.stringify({ tel: '5531988776655', dir: 'in',
+      ts: new Date().toISOString(), texto: 'oi' })];
+    const rS = res();
+    await fich(req({ action: 'sync-completo', dias: '1', ...K }), rS);
+    const d = rS.dado || {};
+    // o cliente que conversa mas não tem ficha PRECISA ser criado
+    const bloqueou = JSON.stringify(d).includes('jaExistem') &&
+      (d.vaoSerCriadas === 0 && (d.jaExistem || 0) > 0);
+    check('sync: conversa ativa não bloqueia lead sem ficha',
+      !bloqueou, JSON.stringify(d).slice(0, 120));
+  }
+
   console.log('▶ Cenário RC — recriar-perdidas respeita devolução já feita');
   {
     const logi2 = carregarHandler('api/logistica.js');

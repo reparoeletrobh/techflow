@@ -857,13 +857,17 @@ export default async function handler(req, res) {
         ehTv: /\btv\b|televis/i.test(eq), quandoTexto: dt,
         dataPlanilha: quando ? new Date(quando).toISOString() : null };
       if (!ult) {
-        // 💬 cliente com conversa ativa no WhatsApp já está sendo atendido:
-        // criar ficha nova o coloca numa fila de abordagem que não faz sentido
-        if (conversaAtiva.has(t8)) { jaExistem.push(item); continue; }
+        // 📌 cliente sem NENHUM registro no sistema: a ficha tem de ser criada,
+        // mesmo que ele já esteja conversando com o bot. O filtro de conversa
+        // ativa vale só para não duplicar quem já tem ficha — aplicado aqui,
+        // ele bloqueava justamente o lead novo que chegou pelo anúncio.
+        if (conversaAtiva.has(t8)) item.jaConversando = true;
         criar.push(item); continue;
       }
       const diasDesde = (Date.now() - ult) / 86400000;
       if (diasDesde > REENTRADA_DIAS) {                // 🔁 voltou depois de 30 dias
+        // 💬 mas se está conversando agora, o atendimento já corre: não duplica
+        if (conversaAtiva.has(t8)) { jaExistem.push(item); continue; }
         item.reentrada = Math.round(diasDesde);
         criar.push(item); reentradas.push(item); continue;
       }
