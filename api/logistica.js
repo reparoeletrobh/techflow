@@ -853,7 +853,7 @@ module.exports = async function handler(req, res) {
 
   // ── 🏢 SEM-COMPLEMENTO: fichas de prédio sem apartamento/bloco ──
   if (action === 'sem-complemento') {
-    const db = (await dbGet(KEY)) || { fichas: [] };
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
     const ehPredio = e => /pr[ée]dio|condom[ií]nio|edif[ií]cio|residencial|\bcond\b|torre/i.test(String(e || ''));
     const temCompl = e => /\bap(to|t|artamento)?\.?\s*\d|\bbloco\b|\bbl\.?\s*[a-z0-9]|\btorre\s*\d|\bcasa\s*\d|\bqd\b|\bquadra\b|\blote\b/i.test(String(e || ''));
     const ATIVAS = ['liberado_coleta', 'horario_marcado', 'liberado_para_rota', 'motorista_parceiro', 'remarcar'];

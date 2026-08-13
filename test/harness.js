@@ -615,6 +615,41 @@ function check(nome, cond, extra) {
   // ── 🧭 função usada antes de ser declarada derruba a requisição ──
   // ── 📜 toda entrada em Entrar em Contato precisa ficar registrada ──
   // ── 📒 o livro-razão não pode perder nem duplicar fatos ──
+  // ── 🧪 toda ação de toda API precisa responder sem quebrar ──
+  // Verificação por EXECUÇÃO, não por leitura do código: encontra variável
+  // inexistente, função fora de escopo e trecho colado no lugar errado —
+  // defeitos que a inspeção textual não vê e que viram erro 500 em produção.
+  console.log('▶ Cenário EX — nenhuma ação quebra ao ser chamada');
+  {
+    const fsX = require('fs'), pathX = require('path');
+    const IGNORAR = ['backup.js', 'nfse.js', 'qz-sign.js'];  // módulos ES / dependência externa
+    const quebrou = [];
+    const arquivos = fsX.readdirSync('api')
+      .filter(f => f.endsWith('.js') && !f.startsWith('_') && !IGNORAR.includes(f));
+    for (const arq of arquivos) {
+      const caminho = 'api/' + arq;
+      let handler;
+      try { handler = carregarHandler(caminho); } catch (e) { continue; }
+      if (typeof handler !== 'function') continue;
+      const src = fsX.readFileSync(caminho, 'utf8');
+      const acoes = [...new Set([...src.matchAll(/action\s*===?\s*['"]([a-z0-9-]+)['"]/g)]
+        .map(m => m[1]))];
+      for (const a of acoes.slice(0, 40)) {
+        const r = res();
+        try {
+          await handler(req({ action: a, ...K }), r);
+        } catch (e) {
+          // erro de referência é sempre defeito; falha de rede externa não é
+          if (/is not defined|Cannot read prop/.test(e.message)) {
+            quebrou.push(arq + ':' + a + ' → ' + e.message.slice(0, 50));
+          }
+        }
+      }
+    }
+    check('nenhuma ação quebra por variável ou função inexistente',
+      quebrou.length === 0, quebrou.slice(0, 8).join(' | '));
+  }
+
   console.log('▶ Cenário LR — livro-razão distingue fatos diferentes');
   {
     const fsL = require('fs');
