@@ -296,14 +296,27 @@ module.exports = async function handler(req, res) {
     const frente = String(req.query.frente || '').toLowerCase();
     const ini = new Date(dia + 'T00:00:00-03:00').getTime();
     const fim = ini + 86400000 - 1;
-    const evs = (await _funil.ler(ini, fim))
+    const brutos = (await _funil.ler(ini, fim))
       .filter(e => e.etapa === 'aprovado' && (!frente || e.frente === frente))
       .sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+    // 🔁 mesmo cliente, mesmo valor, dentro de 10 minutos: é o mesmo fato
+    const vistos = [];
+    const evs = brutos.filter(e => {
+      const t = String(e.tel || '').slice(-8);
+      const q = new Date(e.ts || 0).getTime();
+      const rep = vistos.some(v => v.t === t && v.valor === Number(e.valor || 0) &&
+        Math.abs(v.q - q) < 600000);
+      if (rep) return false;
+      vistos.push({ t, valor: Number(e.valor || 0), q });
+      return true;
+    });
+    const duplicadas = brutos.length - evs.length;
     const hora = t => new Date(new Date(t).getTime() - 3 * 3600000).toISOString().slice(11, 16);
     const soma = evs.reduce((s, e) => s + (Number(e.valor) || 0), 0);
     return res.status(200).json({ ok: true,
       dia, frente: frente || 'todas',
       quantos: evs.length,
+      duplicadasIgnoradas: duplicadas,
       faturamento: +soma.toFixed(2),
       ticketMedio: evs.length ? +(soma / evs.length).toFixed(2) : 0,
       porCanal: evs.reduce((o, e) => { o[e.canal] = (o[e.canal] || 0) + 1; return o; }, {}),
@@ -664,7 +677,18 @@ module.exports = async function handler(req, res) {
   // 📒 o livro-razão é a fonte quando há registro no período. Ele guarda o fato
   // no instante em que acontece, então não muda quando o card avança ou é
   // arquivado — que era a origem das divergências. Sem registro, cai para os cards.
-  const evsLivro = await _funil.ler(J.ini, J.fim);
+  // 🔁 remove repetição do mesmo fato antes de contar
+  const evsBrutos = await _funil.ler(J.ini, J.fim);
+  const jaVi = [];
+  const evsLivro = evsBrutos.filter(e => {
+    const t = String(e.tel || '').slice(-8);
+    const q = new Date(e.ts || 0).getTime();
+    const rep = jaVi.some(v => v.et === e.etapa && v.t === t &&
+      v.valor === Number(e.valor || 0) && Math.abs(v.q - q) < 600000);
+    if (rep) return false;
+    jaVi.push({ et: e.etapa, t, valor: Number(e.valor || 0), q });
+    return true;
+  });
   const usaLivro = evsLivro.length > 0;
   const doLivro = (frente) => {
     const c = (etapa, f2) => evsLivro.filter(e => e.etapa === etapa && e.frente === frente &&

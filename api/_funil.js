@@ -7,8 +7,9 @@
 // dessas gerou divergência. Aqui o evento é gravado uma vez, com a data do
 // fato, e nunca mais é alterado.
 // ═══════════════════════════════════════════════════════════════════
-const U = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
-const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+// lidos a cada chamada: em teste as variáveis chegam depois do carregamento
+const url = () => (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+const tok = () => (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
 
 const LISTA = 'kpi_funil';   // lista append-only: nada é reescrito
 
@@ -19,9 +20,27 @@ const LISTA = 'kpi_funil';   // lista append-only: nada é reescrito
  *   frente: 'adm' | 'tv'
  *   canal:  'balcao' | 'online' | 'bot'
  */
+/**
+ * Registra um passo do funil.
+ * Ignora repetição do mesmo passo, para o mesmo cliente, com o mesmo valor,
+ * dentro de uma janela curta: dois cards do mesmo cliente ou um duplo clique
+ * gravavam duas linhas e inflavam a contagem do dia.
+ */
 async function registrar(etapa, dados = {}) {
   try {
-    if (!U || !T) return false;
+    if (!url() || !tok()) return false;
+    // 🔁 trava contra registro repetido: 10 minutos
+    const chaveT = String(dados.telefone || '').replace(/\D/g, '').slice(-8);
+    if (chaveT) {
+      const trava = 'funil_trava_' + etapa + '_' + chaveT + '_' +
+        Math.round(Number(dados.valor || 0));
+      try {
+        const r = await fetch(`${url()}/set/${trava}/1?NX=true&EX=600`,
+          { headers: { Authorization: `Bearer ${tok()}` } }).then(x => x.json());
+        // se a chave já existia, o banco não grava e devolve null: é repetição
+        if (!r || r.result === null) return false;
+      } catch (e) { /* sem a trava, segue e grava */ }
+    }
     const ev = {
       etapa: String(etapa),
       ts: new Date().toISOString(),
@@ -33,8 +52,8 @@ async function registrar(etapa, dados = {}) {
       quem: String(dados.quem || '').slice(0, 30),
       ref: String(dados.ref || '').slice(0, 40),
     };
-    await fetch(`${U}/rpush/${LISTA}/${encodeURIComponent(JSON.stringify(ev))}`,
-      { headers: { Authorization: `Bearer ${T}` } });
+    await fetch(`${url()}/rpush/${LISTA}/${encodeURIComponent(JSON.stringify(ev))}`,
+      { headers: { Authorization: `Bearer ${tok()}` } });
     return true;
   } catch (e) { return false; }
 }
@@ -42,8 +61,8 @@ async function registrar(etapa, dados = {}) {
 /** Lê os eventos de um intervalo. */
 async function ler(iniMs, fimMs) {
   try {
-    const r = await fetch(`${U}/lrange/${LISTA}/-20000/-1`,
-      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+    const r = await fetch(`${url()}/lrange/${LISTA}/-20000/-1`,
+      { headers: { Authorization: `Bearer ${tok()}` } }).then(x => x.json());
     const out = [];
     for (const s of (r.result || [])) {
       try {
