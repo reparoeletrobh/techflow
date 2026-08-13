@@ -97,6 +97,67 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── ⏩ DESTRAVAR-CRIADAS: ficha em Ficha Criada cujo cliente já teve contato ──
+  // O bot não aborda quem já abordou, então essas fichas ficavam paradas para
+  // sempre. Elas devem seguir o fluxo: Contato Feito e, sem retorno em uma hora
+  // de expediente, Entrar em Contato para a equipe ligar.
+  if (action === 'destravar-criadas') {
+    const d8t = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const abordados = ((await dbGet('wa_abordados')) || {}).tels || {};
+    const conversou = {};
+    try {
+      const r = await fetch(`${process.env.UPSTASH_URL}/lrange/wa_evt_list/-8000/-1`,
+        { headers: { Authorization: `Bearer ${process.env.UPSTASH_TOKEN}` } }).then(x => x.json());
+      for (const s of (r.result || [])) {
+        try {
+          const e = JSON.parse(s);
+          const d = d8t(e.tel); if (!d) continue;
+          const q = String(e.ts || '');
+          if (!conversou[d] || q > conversou[d]) conversou[d] = q;
+        } catch (x) {}
+      }
+    } catch (e) {}
+    const achados = [];
+    for (const chave of ['fichas_adm', 'fichas_tv']) {
+      const db = await dbGet(chave);
+      for (const f of (((db || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'criada') continue;
+        const t = d8t(f.telefone);
+        const quando = abordados[t] || conversou[t] || null;
+        if (!quando) continue;
+        achados.push({ chave, id: f.id, nome: f.nome, tel: t,
+          quando, via: abordados[t] ? 'abordado pelo bot' : 'cliente escreveu' });
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        travadas: achados.length,
+        L: achados.map(a => a.chave.replace('fichas_', '').toUpperCase() + ' | ' +
+          String(a.nome || '?').slice(0, 22) + ' ' + a.tel.slice(-4) + ' | ' + a.via +
+          ' em ' + String(a.quando).slice(5, 16).replace('T', ' ')),
+        oQueVaiAcontecer: 'vão para Contato Feito com o horário real do contato; sem retorno em 1h de expediente seguem para Entrar em Contato',
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    let n = 0;
+    for (const chave of ['fichas_adm', 'fichas_tv']) {
+      const meus = achados.filter(a => a.chave === chave);
+      if (!meus.length) continue;
+      const db = await dbGet(chave);
+      for (const a of meus) {
+        const f = (db.fichas || []).find(x => String(x.id) === String(a.id));
+        if (!f || f.status !== 'criada') continue;
+        f.status = 'contato_feito';
+        f.contatoFeitoEm = a.quando;
+        f.destravadaEm = new Date().toISOString();
+        f.abordadoPorBot = a.via === 'abordado pelo bot';
+        n++;
+      }
+      await dbSet(chave, db);
+    }
+    return res.status(200).json({ ok: true, destravadas: n,
+      observacao: 'a régua de 1 hora conta a partir do contato real, não de agora' });
+  }
+
   // ── 🩻 POR-QUE-NAO-ENTROU: confronta os dois caminhos, linha por linha ──
   // A conferência diz que faltam N fichas e o sync diz que não há nada a criar.
   // Os dois olham a mesma planilha com regras diferentes: aqui elas são exibidas
@@ -804,6 +865,9 @@ export default async function handler(req, res) {
         }
       } catch (e) {}
     }
+    // 📞 quem o bot já abordou, com a data da abordagem
+    let abordadosMapa = {};
+    try { abordadosMapa = ((await dbGet('wa_abordados')) || {}).tels || {}; } catch (e) {}
     // 💬 quem trocou mensagem nas últimas 48h está em atendimento
     const conversaAtiva = new Set();
     try {
@@ -894,11 +958,23 @@ export default async function handler(req, res) {
       db.fichas = db.fichas || [];
       _funil.registrar('ficha', { telefone: x.telefone, nome: x.nome,
         frente: x.ehTv ? 'tv' : 'adm', canal: 'planilha' }).catch(() => {});
+      // 📞 já houve contato com este cliente? então a ficha não nasce em Ficha
+      // Criada: ela já está um passo à frente. Nascer em 'criada' a deixava presa,
+      // porque o bot não aborda quem já abordou e nada mais a movia.
+      const t8n = d8f(x.telefone);
+      const jaAbordado = !!(abordadosMapa[t8n]);
+      const jaConversou = conversaAtiva.has(t8n);
+      const nasceEm = (jaAbordado || jaConversou) ? 'contato_feito' : 'criada';
+      const carimboContato = jaAbordado ? abordadosMapa[t8n] : new Date().toISOString();
       db.fichas.unshift({
         id: 'sc_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,
         defeito: x.defeito, endereco: x.endereco,
-        status: 'criada', origemPlanilha: true,
+        status: nasceEm, origemPlanilha: true,
+        // carimbo do contato real, para a régua de 1 hora contar do momento certo
+        contatoFeitoEm: nasceEm === 'contato_feito' ? carimboContato : null,
+        abordadoPorBot: jaAbordado || undefined,
+        jaConversando: jaConversou || undefined,
         reentrada: x.reentrada || null,
         // 📅 a data é a da PLANILHA — usar a data da recuperação inflava o contador do dia
         criadoEm: x.dataPlanilha || new Date().toISOString(),
