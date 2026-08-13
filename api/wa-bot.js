@@ -449,22 +449,48 @@ export default async function handler(req, res) {
         'Consegue passar esta semana? Se precisar de entrega, é só falar.',
     ];
 
-    const fila = [];
+    const diasMax = Math.min(90, Math.max(1, parseInt(req.query.diasMax || '30', 10)));
+    // 👥 um lembrete por CLIENTE, não por equipamento: quem deixou quatro
+    // aparelhos receberia quatro mensagens seguidas sobre a mesma retirada
+    const porCliente = {};
+    const antigos = [], semData = [];
     for (const f of prontos) {
       const ctrl = f.lembreteRetirada || { enviados: 0, ultimo: null };
-      if (String(ctrl.ultimo || '').slice(0, 10) === hoje) continue;   // já foi hoje
-      if (ctrl.enviados >= 10) continue;                                // limite de insistência
-      fila.push({ f, ctrl });
+      if (String(ctrl.ultimo || '').slice(0, 10) === hoje) continue;
+      if (ctrl.enviados >= 10) continue;
+      // 📅 pronto há quanto tempo? cobrar retirada de algo antigo costuma ser
+      // engano de lançamento, não esquecimento do cliente
+      const quando = f.consertoRealizadoEm || f.movedAt || f.aprovadoEm || null;
+      const dias = quando ? Math.floor((Date.now() - new Date(quando).getTime()) / 86400000) : null;
+      const dados = { f, ctrl, dias, quando };
+      if (dias === null) { semData.push(dados); continue; }
+      if (dias > diasMax) { antigos.push(dados); continue; }
+      const t = d8r(f.telefone);
+      if (!t) continue;
+      if (!porCliente[t]) porCliente[t] = { ...dados, equipamentos: [] };
+      porCliente[t].equipamentos.push(String(f.equipamento || '').slice(0, 30));
+      // o controle mais adiantado manda, para não reiniciar a contagem
+      if ((ctrl.enviados || 0) > (porCliente[t].ctrl.enviados || 0)) porCliente[t].ctrl = ctrl;
+      if (dias > porCliente[t].dias) porCliente[t].dias = dias;
     }
+    const fila = Object.values(porCliente);
 
     if (!aplicar) {
       return res.status(200).json({ ok: true, modo: 'prévia',
-        prontosSemRetirar: prontos.length,
-        receberiamHoje: fila.length,
+        equipamentosProntos: prontos.length,
+        clientesQueReceberiam: fila.length,
+        regra: 'um lembrete por cliente, no máximo ' + diasMax + ' dias após ficar pronto',
         L: fila.map(x => String(x.f.nomeContato || '?').slice(0, 24) +
           ' ' + String(x.f.telefone || '').slice(-4) +
-          ' | ' + String(x.f.equipamento || '').slice(0, 22) +
+          ' | ' + (x.equipamentos.length > 1
+            ? x.equipamentos.length + ' equipamentos' : x.equipamentos[0]) +
+          ' | pronto há ' + x.dias + ' dia(s)' +
           ' | lembrete nº ' + ((x.ctrl.enviados || 0) + 1)),
+        NAO_RECEBEM_POR_SEREM_ANTIGOS: antigos.map(x =>
+          String(x.f.nomeContato || '?').slice(0, 24) + ' | pronto há ' + x.dias +
+          ' dia(s) — conferir se já foi retirado sem lançar no ERP'),
+        NAO_RECEBEM_SEM_DATA: semData.map(x => String(x.f.nomeContato || '?').slice(0, 24) +
+          ' | sem data de conclusão'),
         EXEMPLOS: TEXTOS.map((t, i) => 'dia ' + (i + 1) + ': ' + t('João', 'micro-ondas')),
         dica: 'para enviar: &aplicar=1' });
     }
@@ -489,7 +515,9 @@ export default async function handler(req, res) {
       const tel = String(f.telefone || '').replace(/\D/g, '');
       if (tel.length < 12) { erros.push((f.nomeContato || '?') + ': telefone inválido'); continue; }
       const nome = String(f.nomeContato || '').split(' ')[0] || 'tudo bem';
-      const equip = String(f.equipamento || 'equipamento').slice(0, 30);
+      const eqs = (fila.find(x => x.f === f) || {}).equipamentos || [];
+      const equip = eqs.length > 1 ? 'seus ' + eqs.length + ' equipamentos'
+        : String(f.equipamento || 'equipamento').slice(0, 30);
       const idx = Math.min(ctrl.enviados || 0, TEXTOS.length - 1);
       const texto = TEXTOS[idx](nome, equip);
       const janelaAberta = ultimaEntrada[d8r(tel)] &&
@@ -516,9 +544,14 @@ export default async function handler(req, res) {
           if (r && r.messages) porTemplate.push((f.nomeContato || '?'));
         }
         if (r && r.messages && r.messages[0]) {
-          f.lembreteRetirada = { enviados: (ctrl.enviados || 0) + 1,
-            ultimo: new Date().toISOString() };
-          feitos.push((f.nomeContato || '?') + ' — lembrete ' + f.lembreteRetirada.enviados);
+          const marca = { enviados: (ctrl.enviados || 0) + 1, ultimo: new Date().toISOString() };
+          // marca TODOS os equipamentos deste cliente, senão o próximo ciclo
+          // dispararia de novo pelos que ficaram sem registro
+          const tCli = d8r(f.telefone);
+          for (const outro of prontos) {
+            if (d8r(outro.telefone) === tCli) outro.lembreteRetirada = marca;
+          }
+          feitos.push((f.nomeContato || '?') + ' — lembrete ' + marca.enviados);
           try { await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out',
             texto, tipo: 'retirada-loja' }); } catch (e) {}
         } else {
