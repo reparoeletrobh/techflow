@@ -1873,6 +1873,105 @@ module.exports = async function handler(req, res) {
         ' | ' + (l.botao || '?') + ' | ' + (l.numeroWhatsApp || l.link || 'destino pela Página')) });
   }
 
+  // ── 🩺 SAUDE-DO-CICLO: onde a verba está indo, e onde não está ──
+  if (action === 'saude-ciclo') {
+    const TK = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || '2026-08-08').slice(0, 10);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    // 1) situação atual de cada anúncio
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads`
+      + `?fields=id,name,status,effective_status,issues_info,`
+      + `adset{id,name,status,effective_status,daily_budget,lifetime_budget,end_time},`
+      + `campaign{id,name,status,effective_status,start_time,stop_time,daily_budget,lifetime_budget}`
+      + `&limit=400&access_token=${TK}`, 10);
+    // 2) gasto de hoje e do ciclo, por campanha
+    const gastos = async (de, ate) => {
+      const m = {};
+      let url = `${GRAPH}/act_${CONTA}/insights?level=campaign&fields=campaign_id,campaign_name,spend,impressions`
+        + `&time_range=${encodeURIComponent(JSON.stringify({ since: de, until: ate }))}`
+        + `&limit=400&access_token=${TK}`;
+      let p = 0;
+      while (url && p < 5) {
+        const r = await fetch(url).then(x => x.json());
+        if (!r || r.error) break;
+        for (const c of (r.data || [])) {
+          m[c.campaign_id] = { gasto: parseFloat(c.spend || 0) || 0,
+            impressoes: parseInt(c.impressions || 0, 10) || 0, nome: c.campaign_name };
+        }
+        url = (r.paging && r.paging.next) || null; p++;
+      }
+      return m;
+    };
+    const [gHoje, gCiclo] = await Promise.all([gastos(hoje, hoje), gastos(desde, hoje)]);
+
+    const porCampanha = {};
+    for (const a of (ads.data || [])) {
+      const c = a.campaign || {}, cj = a.adset || {};
+      if (String(c.start_time || '').slice(0, 10) < desde) continue;
+      const id = c.id;
+      porCampanha[id] = porCampanha[id] || { nome: c.name, id,
+        situacao: c.effective_status, statusProprio: c.status,
+        fim: (c.stop_time || cj.end_time || '').slice(0, 16).replace('T', ' '),
+        verba: (Number(cj.lifetime_budget || c.lifetime_budget || 0) / 100) ||
+               (Number(cj.daily_budget || c.daily_budget || 0) / 100),
+        tipoVerba: (cj.lifetime_budget || c.lifetime_budget) ? 'total' : 'diária',
+        anuncios: [], problemas: [] };
+      const p = porCampanha[id];
+      const probs = (a.issues_info || []).map(x => x.error_summary || x.error_message).filter(Boolean);
+      p.anuncios.push({ nome: a.name, status: a.status, efetivo: a.effective_status,
+        conjunto: cj.effective_status, problemas: probs });
+      for (const x of probs) if (!p.problemas.includes(x)) p.problemas.push(x);
+    }
+
+    const L = [], alertas = [];
+    let totHoje = 0, totCiclo = 0, verbaTotal = 0;
+    for (const [id, c] of Object.entries(porCampanha)) {
+      const gh = (gHoje[id] || {}).gasto || 0;
+      const gc = (gCiclo[id] || {}).gasto || 0;
+      const imp = (gHoje[id] || {}).impressoes || 0;
+      totHoje += gh; totCiclo += gc; verbaTotal += c.verba;
+      const ativa = c.situacao === 'ACTIVE';
+      const anunciosAtivos = c.anuncios.filter(a => a.efetivo === 'ACTIVE').length;
+      // 🚩 sinais de que a verba não está sendo consumida
+      if (ativa && gh === 0) alertas.push('🔴 ' + c.nome.slice(0, 40) + ' — ATIVA mas gastou R$ 0 hoje' +
+        (imp === 0 ? ' e sem impressões' : ''));
+      if (ativa && anunciosAtivos === 0) alertas.push('🔴 ' + c.nome.slice(0, 40) +
+        ' — campanha ativa com ZERO anúncio entregando');
+      if (c.problemas.length) alertas.push('🟠 ' + c.nome.slice(0, 40) + ' — ' + c.problemas[0].slice(0, 70));
+      const falta = c.verba - gc;
+      if (ativa && c.tipoVerba === 'total' && falta > c.verba * 0.5)
+        alertas.push('🟡 ' + c.nome.slice(0, 40) + ' — gastou só ' +
+          Math.round(gc / c.verba * 100) + '% da verba do ciclo');
+      L.push((ativa ? '🟢' : '⏸️') + ' ' + c.nome.slice(0, 38).padEnd(38) +
+        ' | verba ' + c.verba.toFixed(0).padStart(4) + ' (' + c.tipoVerba + ')' +
+        ' | hoje ' + gh.toFixed(2).padStart(7) +
+        ' | ciclo ' + gc.toFixed(2).padStart(8) +
+        ' | anúncios ' + anunciosAtivos + '/' + c.anuncios.length +
+        (c.fim ? ' | até ' + c.fim : '') +
+        (c.problemas.length ? ' | 🚩 ' + c.problemas[0].slice(0, 40) : ''));
+    }
+    // ritmo esperado
+    const diasCorridos = Math.max(1, Math.ceil((Date.now() - new Date(desde + 'T13:00:00-03:00').getTime()) / 86400000));
+    const esperadoAteAgora = verbaTotal * (diasCorridos / 7);
+    return res.status(200).json({ ok: alertas.length === 0,
+      ciclo: { desde, hoje, diaDoCiclo: diasCorridos + ' de 7' },
+      RESUMO: {
+        campanhas: L.length,
+        ativas: Object.values(porCampanha).filter(c => c.situacao === 'ACTIVE').length,
+        verbaTotalDoCiclo: +verbaTotal.toFixed(2),
+        gastoHoje: +totHoje.toFixed(2),
+        gastoNoCiclo: +totCiclo.toFixed(2),
+        esperadoAteAgora: +esperadoAteAgora.toFixed(2),
+        diferenca: +(totCiclo - esperadoAteAgora).toFixed(2),
+        mediaDiariaEsperada: +(verbaTotal / 7).toFixed(2),
+      },
+      VEREDITO: alertas.length
+        ? '🚨 ' + alertas.length + ' ponto(s) de atenção'
+        : '✅ todas as campanhas ativas estão gastando',
+      ALERTAS: alertas,
+      CAMPANHAS: L.sort() });
+  }
+
   // ── 📚 HISTORICO: todas as execuções, com o detalhe de cada anúncio ──
   if (action === 'historico') {
     const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '14', 10)));
