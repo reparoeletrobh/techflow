@@ -322,7 +322,10 @@ module.exports = async function handler(req, res) {
       porM[m2].fichas.push({
         id: f.id, nome: f.nome || '?', tel: String(f.telefone || '').slice(-4),
         equipamento: String(f.equipamento || '').slice(0, 26),
-        regiao: f.regiaoManual || f.regiao || '(sem região)',
+        // 📍 a região quase nunca está gravada: calcula pelo endereço, como a
+        // tela do motorista já faz. Sem ela, a distribuição manda tudo para um só.
+        regiao: f.regiaoManual || f.regiao || regiaoDoEndereco(f.endereco) || '(sem região)',
+        endereco: String(f.endereco || '').slice(0, 50),
         polegadas: (String(f.equipamento || '').match(/(\d{2,3})\s*(pol|")/i) || [])[1] || null,
         horario: f.horarioColeta || f.agendadoPara || null,
         desde: f.movedAt || f.criadoEm,
@@ -338,21 +341,27 @@ module.exports = async function handler(req, res) {
       Wilde: 'até 55 pol · BH Norte, Venda Nova, Santa Luzia, Vespasiano, Sabará, BH Leste, Neves',
       Eduardo: 'até 55 pol · BH Oeste, BH Sul, Contagem, Betim, Ibirité',
     };
-    const sugestoes = [];
+    const sugestoes = [], semRegiaoMasPequena = [];
     const sobrecarregado = nomes.find(n => porM[n].total > media * 1.4);
     if (sobrecarregado) {
       const folgados = nomes.filter(n => porM[n].total < media);
       for (const f of porM[sobrecarregado].fichas) {
         if (f.horario) continue;                   // já combinou hora: não mexe
         const pol = f.polegadas ? parseInt(f.polegadas, 10) : null;
-        if (sobrecarregado === 'Jhonatan' && (pol === null || pol > 55)) continue;
-        if (/nova lima/i.test(f.regiao)) continue;  // exclusividade de região
+        // acima de 55 polegadas é exclusividade do Jhonatan, e Nova Lima também
+        if (sobrecarregado === 'Jhonatan' && pol !== null && pol > 55) continue;
+        if (/nova lima/i.test(f.regiao + ' ' + (f.endereco || ''))) continue;
+        const txtRegiao = f.regiao + ' ' + (f.endereco || '');
         const destino = folgados.find(x => {
-          if (x === 'Wilde') return /norte|venda nova|santa luzia|vespasiano|sabar|leste|neves/i.test(f.regiao);
-          if (x === 'Eduardo') return /oeste|sul|contagem|betim|ibirit/i.test(f.regiao);
+          if (x === 'Wilde') return /norte|venda nova|santa luzia|vespasiano|sabar|leste|neves/i.test(txtRegiao);
+          if (x === 'Eduardo') return /oeste|sul|contagem|betim|ibirit|barreiro|gutierrez|buritis|est[oó]ril/i.test(txtRegiao);
           return false;
         });
-        if (destino) sugestoes.push({ ficha: f, de: sobrecarregado, para: destino });
+        if (destino) { sugestoes.push({ ficha: f, de: sobrecarregado, para: destino }); continue; }
+        // sem região identificável, mas é TV pequena: não deveria estar com ele
+        if (pol !== null && pol <= 55) {
+          semRegiaoMasPequena.push(f);
+        }
       }
     }
     return res.status(200).json({ ok: !sobrecarregado,
@@ -364,9 +373,16 @@ module.exports = async function handler(req, res) {
       CARGA: nomes.map(n => n.padEnd(16) + ' | ' + String(porM[n].total).padStart(3) +
         ' corrida(s) | ' + porM[n].comHorario + ' com horário combinado' +
         (REGRA[n] ? ' | regra: ' + REGRA[n] : '')),
+      CAUSA: (nomes.length && porM[nomes[0]].fichas.every(f => f.regiao === '(sem região)'))
+        ? '🔴 nenhuma ficha tem região definida — sem isso a distribuição não consegue ' +
+          'encaminhar para Wilde ou Eduardo e tudo fica com um motorista só'
+        : null,
       PODEM_SER_MOVIDAS: sugestoes.map(s => s.ficha.nome.slice(0, 20) + ' ' + s.ficha.tel +
         ' | ' + s.ficha.equipamento + ' | ' + s.ficha.regiao +
         ' | ' + s.de + ' → ' + s.para),
+      TV_PEQUENA_SEM_REGIAO: semRegiaoMasPequena.map(f => f.nome.slice(0, 20) + ' ' + f.tel +
+        ' | ' + f.polegadas + 'pol | ' + (f.endereco || 'sem endereço') +
+        ' — não é do porte dele, mas falta a região para decidir o destino'),
       NAO_MOVER: (porM[sobrecarregado] ? porM[sobrecarregado].fichas.filter(f => f.horario) : [])
         .map(f => f.nome.slice(0, 20) + ' ' + f.tel + ' — horário já combinado com o cliente'),
       DETALHE: nomes.flatMap(n => porM[n].fichas.map(f => n.padEnd(12) + ' | ' +
