@@ -417,6 +417,149 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 📺 TV-CONDENADA: avisa o cliente e oferece os caminhos possíveis ──
+  if (action === 'tv-condenada-avisar') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const bd = (await dbGet('tv_board')) || { cards: [] };
+    const pendentes = (bd.cards || []).filter(c =>
+      c.avisoCondenadoStatus === 'pendente' &&
+      String(c.phaseId || '') === 'aguardando_ret');
+
+    const montar = (c) => {
+      const nome = String(c.nomeContato || c.nome || '').split(' ')[0] || 'tudo bem';
+      const equip = String(c.equipamento || c.descricao || 'sua TV').slice(0, 40);
+      return 'Olá, ' + nome + '. Aqui é da Reparo Eletro.\n\n' +
+        'Terminamos o serviço na sua ' + equip + ' e preciso te dar uma notícia que ' +
+        'infelizmente não é a que a gente esperava.\n\n' +
+        'Trocamos o componente que estava com defeito e, nos testes finais, o aparelho ' +
+        'voltou a apresentar falha. O que encontramos foi um problema no display — ' +
+        'que é a tela em si.\n\n' +
+        'Nesse caso a troca não compensa: o valor de um display novo costuma passar do ' +
+        'preço de um aparelho equivalente, e não seria honesto da nossa parte te indicar ' +
+        'esse caminho.\n\n' +
+        'Não vamos cobrar nada pelo serviço. Agora é você quem decide o que prefere fazer:\n\n' +
+        '1️⃣ Retirar na loja, sem custo\n' +
+        '2️⃣ Receber em casa (com taxa de entrega)\n' +
+        '3️⃣ Vender o aparelho para nós como sucata\n' +
+        '4️⃣ Falar com alguém da equipe\n\n' +
+        'É só responder com o número da opção. Fico no aguardo.';
+    };
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        aguardandoAviso: pendentes.length,
+        L: pendentes.map(c => String(c.nomeContato || c.nome || '?').slice(0, 24) +
+          ' ' + String(c.telefone || '').slice(-4) + ' | ' +
+          String(c.equipamento || c.descricao || '').slice(0, 26)),
+        MENSAGEM: pendentes[0] ? montar(pendentes[0]) : montar({ nomeContato: 'Cliente', equipamento: 'TV' }),
+        dica: 'para enviar: &aplicar=1' });
+    }
+
+    const cfgW = (await dbGet('wa_credenciais')) || {};
+    const phoneId = cfgW.phoneId || process.env.WA_PHONE_ID;
+    const token = cfgW.token || process.env.WA_TOKEN;
+    if (!phoneId || !token) return res.status(200).json({ ok: false, error: 'credenciais do WhatsApp ausentes' });
+    const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // última mensagem recebida de cada cliente, para saber se a janela está aberta
+    const ultimaEntrada = {};
+    try {
+      const evsJ = await lerEvts();
+      for (const e of evsJ) {
+        if (e.dir !== 'in') continue;
+        const d = d8x(e.tel); if (!d) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (!ultimaEntrada[d] || q > ultimaEntrada[d]) ultimaEntrada[d] = q;
+      }
+    } catch (e) {}
+    const feitos = [], erros = [];
+    for (const c of pendentes) {
+      const tel = String(c.telefone || '').replace(/\D/g, '');
+      if (tel.length < 12) { erros.push((c.nomeContato || '?') + ': telefone inválido'); continue; }
+      try {
+        // 🔒 fora da janela de 24h o WhatsApp recusa texto livre: nesse caso a
+        // mensagem fica pendente e é enviada quando o cliente responder
+        const janelaAberta = ultimaEntrada[d8x(tel)] &&
+          (Date.now() - ultimaEntrada[d8x(tel)]) < 24 * 3600000;
+        if (!janelaAberta) {
+          const pend = (await dbGet('wa_pendentes_janela')) || { itens: [] };
+          pend.itens = (pend.itens || []).filter(x => String(x.tel || '') !== tel);
+          pend.itens.unshift({ tel, texto: montar(c), motivo: 'tv condenada',
+            criadoEm: new Date().toISOString() });
+          await dbSet('wa_pendentes_janela', pend);
+          c.avisoCondenadoStatus = 'aguardando janela';
+          erros.push((c.nomeContato || '?') + ': janela fechada — guardado para envio');
+          continue;
+        }
+        const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: tel,
+            type: 'text', text: { body: montar(c) } }),
+        }).then(x => x.json());
+        if (r && !r.error) {
+          c.avisoCondenadoStatus = 'enviado';
+          c.avisoCondenadoEnviadoEm = new Date().toISOString();
+          c.aguardandoEscolhaCondenado = true;   // 🎯 a próxima resposta é a escolha
+          feitos.push((c.nomeContato || '?') + ' ' + tel.slice(-4));
+        } else { erros.push((c.nomeContato || '?') + ': ' +
+          ((r && r.error && r.error.message) || 'falha no envio')); }
+      } catch (e) { erros.push((c.nomeContato || '?') + ': ' + e.message); }
+      await new Promise(s => setTimeout(s, 900));
+    }
+    if (feitos.length) await dbSet('tv_board', bd);
+    return res.status(200).json({ ok: erros.length === 0,
+      enviados: feitos.length, L: feitos, erros });
+  }
+
+  // ── 📺 TV-CONDENADA-RESPOSTAS: registra a escolha e abre o conflito ──
+  if (action === 'tv-condenada-respostas') {
+    const bd = (await dbGet('tv_board')) || { cards: [] };
+    const esperando = (bd.cards || []).filter(c => c.aguardandoEscolhaCondenado === true);
+    if (!esperando.length) return res.status(200).json({ ok: true, aguardando: 0 });
+    const evts = await lerEvts();
+    const d8c = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const OPCOES = {
+      '1': 'retirar na loja, sem custo',
+      '2': 'receber em casa, com taxa de entrega',
+      '3': 'vender o aparelho como sucata',
+      '4': 'falar com a equipe',
+    };
+    const tratados = [];
+    for (const c of esperando) {
+      const t = d8c(c.telefone);
+      const depois = new Date(c.avisoCondenadoEnviadoEm || 0).getTime();
+      const resposta = evts.filter(e => e.dir === 'in' && d8c(e.tel) === t &&
+        new Date(e.ts || 0).getTime() > depois).sort((a, b) => String(a.ts).localeCompare(String(b.ts)))[0];
+      if (!resposta) continue;
+      const txt = String(resposta.texto || '').trim();
+      const num = (txt.match(/[1-4]/) || [])[0] ||
+        (/loja|retirar|busc/i.test(txt) ? '1'
+          : /entrega|casa|receber/i.test(txt) ? '2'
+          : /sucata|vender/i.test(txt) ? '3'
+          : /falar|humano|atend|pessoa/i.test(txt) ? '4' : null);
+      const escolha = num ? OPCOES[num] : 'resposta não reconhecida: "' + txt.slice(0, 60) + '"';
+      c.escolhaCondenado = escolha;
+      c.escolhaCondenadoEm = new Date().toISOString();
+      c.aguardandoEscolhaCondenado = false;
+      // 🚨 abre o conflito para a equipe conduzir
+      try {
+        await fetch('https://reparoeletroadm.com/api/prospeccao?action=criar-conflito' +
+          '&k=' + ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telefone: c.telefone, nome: c.nomeContato || c.nome,
+            motivo: 'TV condenada — cliente escolheu: ' + escolha,
+            equipamento: c.equipamento || c.descricao || 'TV',
+            origem: 'tv_condenada', sistema: 'tv',
+          }) });
+      } catch (e) {}
+      tratados.push((c.nomeContato || '?') + ' → ' + escolha);
+    }
+    if (tratados.length) await dbSet('tv_board', bd);
+    return res.status(200).json({ ok: true,
+      aguardando: esperando.length, responderam: tratados.length, L: tratados });
+  }
+
   // ── 🏷️ BADGES-AGUARDANDO: fase da venda e disparo de cada card ──
   // Só leitura, para as telas dos dois pipes desenharem a etiqueta.
   if (action === 'badges-aguardando') {

@@ -40,6 +40,9 @@ module.exports = async function handler(req, res) {
     feitos.push(await chamar('régua de contato', 'fichas?action=load&sistema=adm'));
     feitos.push(await chamar('régua de contato TV', 'fichas?action=load&sistema=tv'));
     feitos.push(await chamar('destravar fichas abordadas', 'wa-bot?action=destravar-criadas&aplicar=1'));
+    // 📺 TV condenada: avisa quem foi para retirada e recolhe a escolha do cliente
+    feitos.push(await chamar('avisar TV condenada', 'wa-bot?action=tv-condenada-avisar&aplicar=1'));
+    feitos.push(await chamar('escolhas da TV condenada', 'wa-bot?action=tv-condenada-respostas'));
   }
 
   // ── 🕐 de hora em hora: rede de segurança ──

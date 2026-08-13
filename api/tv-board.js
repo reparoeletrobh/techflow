@@ -378,7 +378,14 @@ module.exports = async function handler(req, res) {
         return c.pipefyId === String(pipefyId) || c.id === String(pipefyId);
       });
       if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      const faseAnterior = String(card.phaseId || '');
       card.phaseId = phaseId;
+      // 📺 TV condenada indo para retirada: o cliente precisa saber que o
+      // conserto não foi viável e escolher o que fazer com o aparelho
+      if (phaseId === 'aguardando_ret' && faseAnterior === 'condenado' && !card.avisoCondenadoEm) {
+        card.avisoCondenadoEm = new Date().toISOString();
+        card.avisoCondenadoStatus = 'pendente';
+      }
       if (techName) card.techName = techName;
       // Salvar campos extras do barramento
       if (bd.polegadas    !== undefined) card.polegadas    = bd.polegadas;
