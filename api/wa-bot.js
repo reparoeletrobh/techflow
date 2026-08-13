@@ -417,6 +417,55 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 📋 MODELOS: quais existem na conta, com nome e situação ──
+  if (action === 'modelos') {
+    const cfgM = (await dbGet('wa_credenciais')) || {};
+    const token = cfgM.token || process.env.WA_TOKEN;
+    const waba = cfgM.wabaId || process.env.WA_WABA_ID || cfgM.businessId;
+    if (!token) return res.status(200).json({ ok: false, error: 'token ausente' });
+    if (!waba) return res.status(200).json({ ok: false,
+      error: 'id da conta de WhatsApp (WABA) não configurado',
+      dica: 'informe em &waba=SEU_ID' });
+    const id = String(req.query.waba || waba);
+    try {
+      const r = await fetch(`https://graph.facebook.com/v20.0/${id}/message_templates` +
+        `?fields=name,status,language,category,components&limit=100&access_token=${token}`)
+        .then(x => x.json());
+      if (!r || r.error) return res.status(200).json({ ok: false,
+        error: (r && r.error && r.error.message) || 'sem retorno' });
+      const L = (r.data || []).map(t => (t.status === 'APPROVED' ? '✅' : '⏳') + ' ' +
+        String(t.name).padEnd(34) + ' | ' + t.language + ' | ' + t.status +
+        ' | ' + (t.category || ''));
+      const aprovados = (r.data || []).filter(t => t.status === 'APPROVED').map(t => t.name);
+      return res.status(200).json({ ok: true, total: (r.data || []).length,
+        APROVADOS: aprovados, TODOS: L.sort(),
+        usadosNoCodigo: ['tv_sem_viabilidade_reparo', 'equipamento_pronto_retirada', 'orcamento_pronto'],
+        conferir: ['tv_sem_viabilidade_reparo', 'equipamento_pronto_retirada']
+          .filter(n => !aprovados.includes(n))
+          .map(n => '🚨 o código usa "' + n + '", que não está aprovado com esse nome') });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
+  // ── 📞 TELEFONES-INVALIDOS: quem não pode receber e por quê ──
+  if (action === 'telefones-invalidos') {
+    const bd = (await dbGet('tv_board')) || { cards: [] };
+    const L = [];
+    for (const c of (bd.cards || [])) {
+      if (String(c.phaseId || '') !== 'condenado' &&
+          String(c.phaseId || '') !== 'aguardando_ret') continue;
+      const bruto = String(c.telefone || '');
+      const dig = bruto.replace(/\D/g, '');
+      if (dig.length >= 12) continue;
+      const sugestao = dig.length === 11 ? '55' + dig
+        : dig.length === 10 ? '55' + dig.slice(0, 2) + '9' + dig.slice(2)
+        : null;
+      L.push(String(c.nomeContato || '?').slice(0, 24) + ' | "' + bruto + '" (' +
+        dig.length + ' dígitos)' + (sugestao ? ' → deveria ser ' + sugestao : ' — não dá para corrigir sozinho'));
+    }
+    return res.status(200).json({ ok: L.length === 0, quantos: L.length, L,
+      observacao: 'o WhatsApp exige o número com código do país, DDD e o nono dígito' });
+  }
+
   // ── 🏪 RETIRADA-LOJA: lembra o cliente de buscar o equipamento pronto ──
   // Vale para quem foi aprovado no controle de qualidade e ainda não chegou ao
   // ERP. Um lembrete por dia, com texto diferente a cada etapa, até a retirada.
