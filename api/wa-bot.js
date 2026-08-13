@@ -417,6 +417,122 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 🏪 RETIRADA-LOJA: lembra o cliente de buscar o equipamento pronto ──
+  // Vale para quem foi aprovado no controle de qualidade e ainda não chegou ao
+  // ERP. Um lembrete por dia, com texto diferente a cada etapa, até a retirada.
+  if (action === 'retirada-loja') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const FL = (await dbGet('reparoeletro_frenteloja')) || { fichas: [] };
+    const d8r = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    // pronto = passou pelo controle de qualidade; pendente = ainda não foi ao ERP
+    const prontos = (FL.fichas || []).filter(f => {
+      const fase = String(f.phase || '');
+      if (fase === 'erp' || fase === 'encerrado' || fase === 'reprovado') return false;
+      return fase === 'conserto_realizado' || f.viaControleQualidade === true;
+    });
+
+    const TEXTOS = [
+      (n, e) => 'Oi, ' + n + '! Aqui é da Reparo Eletro 😊\n\n' +
+        'Seu ' + e + ' já passou pela conferência final e está prontinho, ' +
+        'testado e aguardando você aqui na loja.\n\n' +
+        'Pode vir buscar quando quiser, no horário que for melhor pra você.',
+      (n, e) => 'Olá, ' + n + '! Passando pra lembrar que seu ' + e + ' continua aqui ' +
+        'na loja, pronto pra retirada.\n\nSe preferir, alguém pode buscar por você — ' +
+        'é só avisar o nome da pessoa.',
+      (n, e) => 'Oi, ' + n + '! Seu ' + e + ' ainda está com a gente, esperando retirada.\n\n' +
+        'Se estiver difícil vir até a loja, me avisa que a gente vê a opção de entrega.',
+      (n, e) => 'Olá, ' + n + '. Seu ' + e + ' está pronto há alguns dias e ainda não foi retirado.\n\n' +
+        'Tem algo que possa estar dificultando? Me conta que a gente dá um jeito.',
+      (n, e) => 'Oi, ' + n + '! Continuamos guardando seu ' + e + ' aqui.\n\n' +
+        'Consegue passar esta semana? Se precisar de entrega, é só falar.',
+    ];
+
+    const fila = [];
+    for (const f of prontos) {
+      const ctrl = f.lembreteRetirada || { enviados: 0, ultimo: null };
+      if (String(ctrl.ultimo || '').slice(0, 10) === hoje) continue;   // já foi hoje
+      if (ctrl.enviados >= 10) continue;                                // limite de insistência
+      fila.push({ f, ctrl });
+    }
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        prontosSemRetirar: prontos.length,
+        receberiamHoje: fila.length,
+        L: fila.map(x => String(x.f.nomeContato || '?').slice(0, 24) +
+          ' ' + String(x.f.telefone || '').slice(-4) +
+          ' | ' + String(x.f.equipamento || '').slice(0, 22) +
+          ' | lembrete nº ' + ((x.ctrl.enviados || 0) + 1)),
+        EXEMPLOS: TEXTOS.map((t, i) => 'dia ' + (i + 1) + ': ' + t('João', 'micro-ondas')),
+        dica: 'para enviar: &aplicar=1' });
+    }
+
+    const cfgW = (await dbGet('wa_credenciais')) || {};
+    const phoneId = cfgW.phoneId || process.env.WA_PHONE_ID;
+    const token = cfgW.token || process.env.WA_TOKEN;
+    if (!phoneId || !token) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+
+    const ultimaEntrada = {};
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'in') continue;
+        const d = d8r(e.tel); if (!d) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (!ultimaEntrada[d] || q > ultimaEntrada[d]) ultimaEntrada[d] = q;
+      }
+    } catch (e) {}
+
+    const feitos = [], porTemplate = [], erros = [];
+    for (const { f, ctrl } of fila) {
+      const tel = String(f.telefone || '').replace(/\D/g, '');
+      if (tel.length < 12) { erros.push((f.nomeContato || '?') + ': telefone inválido'); continue; }
+      const nome = String(f.nomeContato || '').split(' ')[0] || 'tudo bem';
+      const equip = String(f.equipamento || 'equipamento').slice(0, 30);
+      const idx = Math.min(ctrl.enviados || 0, TEXTOS.length - 1);
+      const texto = TEXTOS[idx](nome, equip);
+      const janelaAberta = ultimaEntrada[d8r(tel)] &&
+        (Date.now() - ultimaEntrada[d8r(tel)]) < 24 * 3600000;
+      try {
+        let r;
+        if (janelaAberta) {
+          r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: tel,
+              type: 'text', text: { body: texto } }),
+          }).then(x => x.json());
+        } else {
+          // fora da janela: só template aprovado passa
+          r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'template',
+              template: { name: 'equipamento_pronto_retirada', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [
+                  { type: 'text', text: nome }, { type: 'text', text: equip }] }] } }),
+          }).then(x => x.json());
+          if (r && r.messages) porTemplate.push((f.nomeContato || '?'));
+        }
+        if (r && r.messages && r.messages[0]) {
+          f.lembreteRetirada = { enviados: (ctrl.enviados || 0) + 1,
+            ultimo: new Date().toISOString() };
+          feitos.push((f.nomeContato || '?') + ' — lembrete ' + f.lembreteRetirada.enviados);
+          try { await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out',
+            texto, tipo: 'retirada-loja' }); } catch (e) {}
+        } else {
+          erros.push((f.nomeContato || '?') + ': ' +
+            ((r && r.error && r.error.message) || 'falha no envio'));
+        }
+      } catch (e) { erros.push((f.nomeContato || '?') + ': ' + e.message); }
+      await new Promise(s => setTimeout(s, 900));
+    }
+    if (feitos.length) await dbSet('reparoeletro_frenteloja', FL);
+    return res.status(200).json({ ok: erros.length === 0,
+      enviados: feitos.length, porTemplate: porTemplate.length, L: feitos, erros });
+  }
+
   // ── 📺 TV-CONDENADA: avisa o cliente e oferece os caminhos possíveis ──
   if (action === 'tv-condenada-avisar') {
     const aplicar = String(req.query.aplicar || '') === '1';
