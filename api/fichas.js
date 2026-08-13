@@ -76,6 +76,33 @@ function detectSistema(equip) {
   return 'adm';
 }
 
+// ── 🔀 CLIENTE COM OS DOIS TIPOS NA MESMA LINHA ──────────────────────────────
+// "TV 50 e micro-ondas" é um cliente só, mas dois atendimentos: a TV segue o
+// fluxo do sistema de televisores e o micro-ondas o da linha branca. Mandar a
+// ficha inteira para um lado fazia o outro equipamento desaparecer.
+const RX_TV = /\btvs?\b|televis[aã]o|televisor|monitor|smart\s*tv|\d{2}\s*(pol|")/i;
+const RX_ADM = /micro-?ondas|microondas|purificador|bebedouro|adega|forno|fog[aã]o|cooktop|lava|geladeira|freezer|climatiza|b\.?blend|liquidificador|air\s*fryer|fritadeira/i;
+
+function separarEquipamentos(equip) {
+  const texto = String(equip || '');
+  if (!texto.trim()) return null;
+  const temTv = RX_TV.test(texto);
+  const temAdm = RX_ADM.test(texto);
+  if (!temTv || !temAdm) return null;      // só um tipo: segue o caminho normal
+
+  // divide pelos separadores comuns e classifica cada pedaço
+  const partes = texto.split(/\s*(?:,|;|\se\s|\+|\/)\s*/i)
+    .map(p => p.trim()).filter(p => p.length > 2);
+  const tv = [], adm = [];
+  for (const p of partes) {
+    if (RX_TV.test(p)) tv.push(p);
+    else if (RX_ADM.test(p)) adm.push(p);
+  }
+  // se a divisão não separou direito, não arrisca: mantém junto
+  if (!tv.length || !adm.length) return null;
+  return { tv: tv.join(' e '), adm: adm.join(' e ') };
+}
+
 // ── Formatar número para wa.me ────────────────────────────────────────────────
 function waNum(tel) {
   const d = String(tel||'').replace(/\D/g,'');
@@ -1489,6 +1516,10 @@ export default async function handler(req, res) {
                              dbTv.fichas.some(f => f.sheetRow === rowNum);
         if (jaExisteSync) continue;
 
+        // 🔀 cliente com TV e linha branca na mesma linha vira duas fichas, uma
+        // em cada sistema, para que cada equipamento siga seu próprio fluxo e
+        // possa ser aprovado ou recusado de forma independente
+        const divisao = separarEquipamentos(equip);
         const sistema = detectSistema(equip);
         const id = `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`;
 
@@ -1505,12 +1536,29 @@ export default async function handler(req, res) {
         };
 
         if (resgate) ficha.resgatada = true;
-        // 📒 este é o caminho principal de entrada: sem registrar aqui, o livro
-        // ficava sabendo apenas das fichas recuperadas, não das que chegam no dia
-        _funil.registrar('ficha', { telefone: ficha.telefone, nome: ficha.nome,
-          frente: sistema === 'tv' ? 'tv' : 'adm', canal: 'planilha' }).catch(() => {});
-        if (sistema === 'tv') dbTv.fichas.unshift(ficha);
-        else                  dbAdm.fichas.unshift(ficha);
+        if (divisao) {
+          // duas fichas: cada uma com o seu equipamento e o seu sistema
+          const fichaTv = { ...ficha, id: id + '_tv', sistema: 'tv',
+            equipamento: divisao.tv, textoCopiar: TEXTO_TV,
+            fichaIrma: id + '_adm', clienteMultiplo: true };
+          const fichaAdm = { ...ficha, id: id + '_adm', sistema: 'adm',
+            equipamento: divisao.adm, textoCopiar: TEXTO_ADM,
+            fichaIrma: id + '_tv', clienteMultiplo: true };
+          _funil.registrar('ficha', { telefone: ficha.telefone, nome: ficha.nome,
+            equipamento: divisao.tv, frente: 'tv', canal: 'planilha' }).catch(() => {});
+          _funil.registrar('ficha', { telefone: ficha.telefone, nome: ficha.nome,
+            equipamento: divisao.adm, frente: 'adm', canal: 'planilha' }).catch(() => {});
+          dbTv.fichas.unshift(fichaTv);
+          dbAdm.fichas.unshift(fichaAdm);
+        } else {
+          // 📒 este é o caminho principal de entrada: sem registrar aqui, o livro
+          // ficava sabendo apenas das fichas recuperadas, não das que chegam no dia
+          _funil.registrar('ficha', { telefone: ficha.telefone, nome: ficha.nome,
+            equipamento: ficha.equipamento,
+            frente: sistema === 'tv' ? 'tv' : 'adm', canal: 'planilha' }).catch(() => {});
+          if (sistema === 'tv') dbTv.fichas.unshift(ficha);
+          else                  dbAdm.fichas.unshift(ficha);
+        }
         rowsExistentes.add(rowNum);
         assinaturas.add(assinar(tel, nome, equip));
         novas++;

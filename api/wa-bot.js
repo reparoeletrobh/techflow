@@ -5009,6 +5009,14 @@ export default async function handler(req, res) {
         });
         const j = await r.json();
         let okA = !!(j.messages && j.messages[0]);
+        // guarda a descrição dos dois equipamentos para o registro da conversa
+        if (f.fichaIrma && !f.equipamentoCompleto) {
+          try {
+            const dbO = await dbGet(f._sis === 'tv' ? 'fichas_adm' : 'fichas_tv');
+            const o = (((dbO || {}).fichas) || []).find(x => String(x.id) === String(f.fichaIrma));
+            if (o && o.equipamento) f.equipamentoCompleto = f.equipamento + ' e ' + o.equipamento;
+          } catch (e) {}
+        }
         let usouFallbackAdm = false;
         if (!okA && f._sis === 'tv') {
           // template TV ainda não aprovado → usa o template atual (decisão do dono: não parar a esteira; migra sozinho quando aprovar)
@@ -5029,6 +5037,23 @@ export default async function handler(req, res) {
             f.status = 'contato_feito';
             f.contatoFeitoEm = new Date().toISOString();
             f.abordadoPorBot = true;
+            // 🔀 cliente com TV e linha branca tem duas fichas, uma em cada
+            // sistema. O bot fala com ele uma vez só, então a ficha irmã precisa
+            // avançar junto — senão ficaria presa em Criada para sempre, já que
+            // o bot não aborda quem já abordou.
+            if (f.fichaIrma) {
+              const outroBanco = f._sis === 'tv' ? 'fichas_adm' : 'fichas_tv';
+              const dbIrma = await dbGet(outroBanco);
+              const irma = (((dbIrma || {}).fichas) || [])
+                .find(x => String(x.id) === String(f.fichaIrma));
+              if (irma && String(irma.status || '') === 'criada') {
+                irma.status = 'contato_feito';
+                irma.contatoFeitoEm = f.contatoFeitoEm;
+                irma.abordadoPorBot = true;
+                irma.abordadaJuntoCom = f.id;
+                await dbSet(outroBanco, dbIrma);
+              }
+            }
           } catch (e) {}
         }
         // 🚨 SÓ marca como abordado e SÓ registra no histórico se a Meta confirmou o envio.
@@ -5044,7 +5069,7 @@ export default async function handler(req, res) {
             texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Sou o Alessandro, responsável pela Logística da Reparo Eletro - TVs. Recebemos o seu cadastro para o conserto da sua TV.\n\nPodemos prosseguir com o atendimento?', tipo: 'template' });
         } else
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
-          texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Alessandro aqui, responsável pela logística da Reparo Eletro. Recebemos o seu cadastro para o conserto do seu ' + (f.equipamento || 'equipamento') + '!\n\nTEMOS 2 OPÇÕES: COLETA E ENTREGA / ATENDIMENTO NO BALCÃO\n\n*ATENÇÃO: Trazendo seu equipamento aqui na loja, o orçamento é gratuito e consertamos em 15 minutos! Estamos na Rua Ouro Preto, 663 - Barro Preto*\n\nCaso prefira a nossa coleta e entrega, podemos buscar hoje mesmo na sua casa!\n\nJá estamos prontos para te atender! Me fala qual opção você escolheu, por favor? 😊', tipo: 'template' });
+          texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Alessandro aqui, responsável pela logística da Reparo Eletro. Recebemos o seu cadastro para o conserto do seu ' + (f.equipamentoCompleto || f.equipamento || 'equipamento') + '!\n\nTEMOS 2 OPÇÕES: COLETA E ENTREGA / ATENDIMENTO NO BALCÃO\n\n*ATENÇÃO: Trazendo seu equipamento aqui na loja, o orçamento é gratuito e consertamos em 15 minutos! Estamos na Rua Ouro Preto, 663 - Barro Preto*\n\nCaso prefira a nossa coleta e entrega, podemos buscar hoje mesmo na sua casa!\n\nJá estamos prontos para te atender! Me fala qual opção você escolheu, por favor? 😊', tipo: 'template' });
         if (okA) await bumpStat('abordagens');
         disparadas.push({ nome: f.nome, ok: okA });
       } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
