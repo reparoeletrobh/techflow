@@ -230,8 +230,11 @@ function detalheConferencia(){
   var r = window._conf; if(!r) return;
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
   var ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;'
-    + 'align-items:center;justify-content:center;padding:18px;';
+  // 📱 no iPad e no celular a caixa encostava no rodapé e o botão ficava fora
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;-webkit-overflow-scrolling:touch;';
   var bloco = function(t,arr,c){
     if(!arr||!arr.length) return '';
     return '<div style="margin-top:11px;"><div style="font-size:11.5px;font-weight:900;color:'+c+';">'+t+' ('+arr.length+')</div>'
@@ -239,8 +242,11 @@ function detalheConferencia(){
       + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.85;max-height:200px;overflow-y:auto;">'
       + arr.map(function(x){return '• '+e2(x);}).join('<br>')+'</div></div>';
   };
-  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;border-radius:14px;padding:19px 21px;'
-    + 'max-width:520px;width:100%;max-height:84vh;overflow-y:auto;">'
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));'
+                : 'border-radius:14px;padding:19px 21px;')
+    + 'max-width:560px;width:100%;max-height:90vh;overflow-y:auto;'
+    + '-webkit-overflow-scrolling:touch;">'
     + '<div style="font-size:15px;font-weight:900;color:'+(r.ok?'#4ade80':'#fbbf24')+';">'+e2(r.VEREDITO)+'</div>'
     + '<div style="font-size:11.5px;color:#8b93a3;margin-top:7px;">Conferido em '+e2(r.conferidoEm)+' · dia '+e2(r.dia)+'</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;">'
@@ -256,11 +262,14 @@ function detalheConferencia(){
     + bloco('⚠️ No sistema e sem linha na planilha', r.SOBRAM_NO_SISTEMA, '#fbbf24')
     + (r.explicacao ? '<div style="font-size:11px;color:#8b93a3;margin-top:11px;line-height:1.6;">'
         + 'ℹ️ ' + e2(r.explicacao) + '<br>🔄 ' + e2(r.syncAutomatico||'') + '</div>' : '')
-    + '<div style="display:flex;gap:9px;margin-top:15px;">'
+    + '<div style="display:flex;gap:9px;margin-top:16px;'
+      + (estreito ? 'flex-direction:column;position:sticky;bottom:0;background:#0d1117;padding-top:10px;' : '') + '">'
       + (r.comoCorrigir ? '<button onclick="recuperarFaltantes()" style="flex:1;background:#15803d;border:none;'
-        + 'border-radius:9px;padding:10px;color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">🔄 Trazer as que faltam</button>' : '')
+        + 'border-radius:10px;padding:' + (estreito ? '15px' : '10px') + ';color:#fff;font-weight:800;'
+        + 'cursor:pointer;font-size:' + (estreito ? '15px' : '12.5px') + ';">🔄 Trazer as que faltam</button>' : '')
       + '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:#374151;border:none;'
-      + 'border-radius:9px;padding:10px 17px;color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">Fechar</button>'
+      + 'border-radius:10px;padding:' + (estreito ? '14px' : '10px 17px') + ';color:#fff;font-weight:800;'
+      + 'cursor:pointer;font-size:' + (estreito ? '14px' : '12.5px') + ';">Fechar</button>'
     + '</div>'
   + '</div>';
   document.body.appendChild(ov);
