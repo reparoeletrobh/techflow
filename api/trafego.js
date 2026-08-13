@@ -530,12 +530,27 @@ module.exports = async function handler(req, res) {
           motivo: a.conversas === 0 ? 'sem nenhuma conversa'
             : Math.round((a.razaoMeta - 1) * 100) + '% acima da meta' +
               (cpaSemana[a.id] ? ' (7 dias: ' + cpaSemana[a.id].cpa + ')' : '') }))
-        .sort((x, y) => (y.libera || 0) - (x.libera || 0));
+        // 📉 ordena do PIOR para o melhor: quem gasta mais por conversa sai primeiro.
+        // Antes ordenava por quanto liberava, o que priorizava a verba sobrando e
+        // não o desempenho, e chegou a pausar criativo melhor que outro mantido.
+        .sort((x, y) => {
+          const cx = x.cpa == null ? Infinity : x.cpa;
+          const cy = y.cpa == null ? Infinity : y.cpa;
+          if (cx !== cy) return cy - cx;
+          return (y.gasto || 0) - (x.gasto || 0);
+        });
       const libera = Number(cortar.reduce((s, c) => s + (c.libera || 0), 0).toFixed(2));
 
       // campeões da MESMA categoria recebem
       const idsCortar = new Set(cortar.map(c => c.id));
-      const campeoes = lista.filter(a => !idsCortar.has(a.id) && a.cpa != null && a.cpa <= meta && a.conversas >= 3);
+      // 🏆 só recebe reforço quem tem FOLGA na meta. Estar apenas dentro dela deixava
+      // criativos na fronteira receberem verba e serem cortados na execução seguinte,
+      // quando o desempenho oscilava — a verba ficava presa na campanha pausada.
+      const FOLGA = 0.85;
+      const campeoes = lista.filter(a => !idsCortar.has(a.id) && a.cpa != null &&
+        a.cpa <= meta * FOLGA && a.conversas >= 3 &&
+        // e precisa estar bem também na semana, quando houver esse dado
+        (!cpaSemana[a.id] || cpaSemana[a.id].conversas < 3 || cpaSemana[a.id].cpa <= meta));
       const peso = a => (meta / Math.max(0.2, a.cpa)) * Math.log10(10 + a.conversas);
       const soma = campeoes.reduce((s, a) => s + peso(a), 0) || 1;
       const reforcar = campeoes.map(a => {
@@ -801,7 +816,27 @@ module.exports = async function handler(req, res) {
     const orfaFeitos = [];
     try {
       const lg = (await dbGet('trafego_log')) || { movs: [] };
+      // 📝 registro completo da decisão: sem os números, não se consegue auditar
+      // depois por que uma campanha foi cortada ou reforçada
+      const pausadasAgora = (pausas || []).map(p => ({ nome: p.nome || p.id,
+        cpa: p.cpa != null ? p.cpa : null, conversas: p.conversas != null ? p.conversas : null,
+        gasto: p.gasto != null ? p.gasto : null, liberou: p.libera != null ? p.libera : null,
+        motivo: p.motivo || null }));
+      const verbasAgora = (orcamentos || []).map(o => ({ nome: o.nome || o.id,
+        de: o.valorAtual != null ? o.valorAtual : null,
+        para: o.valor != null ? o.valor : null,
+        recebeu: (o.valor != null && o.valorAtual != null)
+          ? +(o.valor - o.valorAtual).toFixed(2) : null,
+        cpa: o.cpa != null ? o.cpa : null }));
+      const totalLiberado = pausadasAgora.reduce((s, p) => s + (p.liberou || 0), 0);
+      const totalDistribuido = verbasAgora.reduce((s, v) => s + (v.recebeu || 0), 0);
       lg.movs.unshift({ ts: new Date().toISOString(),
+        RESUMO: pausadasAgora.length + ' pausada(s) · ' + verbasAgora.length + ' verba(s) ajustada(s)',
+        CONTA: { liberadoPelasPausas: +totalLiberado.toFixed(2),
+          distribuidoAsAtivas: +totalDistribuido.toFixed(2),
+          diferenca: +(totalLiberado - totalDistribuido).toFixed(2),
+          fechaSomaZero: Math.abs(totalLiberado - totalDistribuido) < 1 },
+        PAUSADAS: pausadasAgora, VERBAS: verbasAgora,
         feitos: feitos.concat(orfaFeitos.map(f => ({ ...f, acao: '[órfã] ' + f.acao }))), erros });
       lg.movs = lg.movs.slice(0, 200);
       await dbSet('trafego_log', lg);
@@ -1984,12 +2019,18 @@ module.exports = async function handler(req, res) {
     // 3) o histórico de aplicações do ciclo: quem pausou e quem recebeu verba
     let aplicacoes = [];
     try {
-      const lg = (await dbGet('trafego_log')) || { itens: [] };
-      aplicacoes = (lg.itens || []).filter(x => String(x.ts || '').slice(0, 10) >= desde)
+      const lg = (await dbGet('trafego_log')) || { movs: [] };
+      aplicacoes = (lg.movs || []).filter(x => String(x.ts || '').slice(0, 10) >= desde)
         .map(x => ({ quando: String(x.ts || '').slice(5, 16).replace('T', ' '),
-          pausados: (x.PAUSADOS || []).length,
+          pausados: (x.PAUSADAS || []).length,
           verbasAjustadas: (x.VERBAS || []).length,
-          detalhePausas: x.PAUSADOS || [], detalheVerbas: x.VERBAS || [] }));
+          conta: x.CONTA || null,
+          detalhePausas: (x.PAUSADAS || []).map(p => (p.nome || '?') +
+            (p.cpa != null ? ' | CPA ' + p.cpa : '') +
+            (p.liberou != null ? ' | liberou ' + p.liberou : '')),
+          detalheVerbas: (x.VERBAS || []).map(v => (v.nome || '?') +
+            (v.de != null ? ' | ' + v.de + ' → ' + v.para : '') +
+            (v.recebeu != null ? ' (+' + v.recebeu + ')' : '')) }));
     } catch (e) {}
 
     const ativas = Object.values(camp).filter(c => c.situacao === 'ACTIVE');
@@ -2026,7 +2067,11 @@ module.exports = async function handler(req, res) {
         verbaAtualDelas: vAt,
         aplicacoesNoCiclo: aplicacoes.length,
         HISTORICO: aplicacoes.map(a => a.quando + ' | ' + a.pausados + ' pausada(s) · ' +
-          a.verbasAjustadas + ' verba(s) ajustada(s)'),
+          a.verbasAjustadas + ' verba(s) ajustada(s)' +
+          (a.conta ? ' | liberou ' + a.conta.liberadoPelasPausas +
+            ' distribuiu ' + a.conta.distribuidoAsAtivas +
+            (a.conta.fechaSomaZero ? ' ✅' : ' 🔴 diferença ' + a.conta.diferenca) : '')),
+        DETALHE_PAUSAS: aplicacoes.flatMap(a => a.detalhePausas).slice(0, 40),
         DETALHE_VERBAS: aplicacoes.flatMap(a => a.detalheVerbas).slice(0, 60),
       },
       ETAPA_4_A_CONTA: {
