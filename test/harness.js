@@ -624,6 +624,32 @@ function check(nome, cond, extra) {
   // início da requisição, mas a gravação copiava campo a campo para outro
   // objeto — o que ficasse de fora nunca chegava ao banco, embora a resposta
   // dissesse que deu certo.
+  // ── ⚡ duas rotinas gravando ao mesmo tempo não podem se apagar ──
+  console.log('▶ Cenário CC — gravações simultâneas não se perdem');
+  {
+    for (const [arq, banco] of [['api/logistica.js', 'reparoeletro_logistica'],
+                                 ['api/tv-logistica.js', 'tv_logistica']]) {
+      const lg = carregarHandler(arq);
+      KV[banco] = { fichas: [
+        { id: 'CC-A', nome: 'Ana', telefone: '5531900000001', phase: 'liberado_coleta' },
+        { id: 'CC-B', nome: 'Bruno', telefone: '5531900000002', phase: 'liberado_coleta' },
+      ] };
+      await Promise.all([
+        lg(req({ action: 'mover', ...K }, { id: 'CC-A', phase: 'horario_marcado' }, 'POST'), res()),
+        lg(req({ action: 'mover', ...K }, { id: 'CC-B', phase: 'motorista_parceiro' }, 'POST'), res()),
+      ]);
+      await new Promise(s => setTimeout(s, 250));
+      const fs2 = (KV[banco].fichas || []);
+      const a = fs2.find(f => f.id === 'CC-A') || {};
+      const b = fs2.find(f => f.id === 'CC-B') || {};
+      const nome = arq.includes('tv-') ? 'TV' : 'ADM';
+      check('concorrência ' + nome + ': primeira gravação não se perdeu',
+        a.phase === 'horario_marcado', a.phase);
+      check('concorrência ' + nome + ': segunda gravação persistiu',
+        b.phase === 'motorista_parceiro', b.phase);
+    }
+  }
+
   console.log('▶ Cenário PS — alterações persistem de fato no banco');
   {
     const pipeH = carregarHandler('api/pipe.js');

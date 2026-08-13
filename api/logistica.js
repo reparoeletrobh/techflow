@@ -1002,7 +1002,30 @@ module.exports = async function handler(req, res) {
     }
     ficha.phase = phase;
     ficha.movedAt = new Date().toISOString();
-    await dbSet(LOG_KEY, db);
+    // 🔒 gravação segura: relê o banco e altera SÓ esta ficha. Gravar a versão
+    // lida no início da requisição apagava o que outra rotina tivesse feito nesse
+    // intervalo — duas fichas movidas ao mesmo tempo e uma voltava sozinha.
+    {
+      const _mov = { fase: phase, quando: ficha.movedAt,
+        motivo: ficha.motivoRemarcar, em: ficha.remarcadoEm, por: ficha.remarcadoPor };
+      const _r = await _gravar.alterar(LOG_KEY,
+        (atual) => {
+          const alvo = ((atual || {}).fichas || []).find(x => String(x.id) === String(id));
+          if (!alvo) return null;
+          alvo.phase = _mov.fase;
+          alvo.movedAt = _mov.quando;
+          if (_mov.motivo) { alvo.motivoRemarcar = _mov.motivo;
+            alvo.remarcadoEm = _mov.em; alvo.remarcadoPor = _mov.por; }
+          return atual;
+        },
+        (atual) => ((atual || {}).fichas || [])
+          .some(x => String(x.id) === String(id) && String(x.phase) === String(phase)),
+        { tentativas: 3, padrao: { fichas: [] } });
+      if (!_r.ok) {
+        return res.status(200).json({ ok: false,
+          error: 'não consegui gravar a mudança: ' + _r.motivo });
+      }
+    }
     registrarPassagem(phase, ficha).catch(() => {});
     if (phase === 'liberado_coleta') registrarFichaAtendimento(ficha).catch(() => {});
     // 📦 GATILHO DO ALMOXARIFADO: mover a ficha pelo QUADRO não criava a tarefa,

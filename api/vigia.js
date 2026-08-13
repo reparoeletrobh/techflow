@@ -854,9 +854,12 @@ module.exports = async function handler(req, res) {
       let mexeu = 0;
       for (const c of db.cards) {
         const p = String(c.phase || ''), pid = String(c.phaseId || '');
-        if (!p || !pid || p === pid) continue;
+        // card sem phaseId também é problema: as telas o leem e não o encontram
+        if (!p) continue;
+        if (p === pid) continue;
         achados.push(k + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 20) +
-          ' ' + String(c.telefone || '').slice(-4) + ' | phase="' + p + '" phaseId="' + pid + '"');
+          ' ' + String(c.telefone || '').slice(-4) + ' | phase="' + p + '" phaseId="' +
+          (pid || '(ausente)') + '"');
         if (String(req.query.aplicar || '') === '1') {
           // phase é o que a movimentação grava — vale como verdade
           c.phaseId = p; mexeu++;

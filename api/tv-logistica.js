@@ -1,3 +1,8 @@
+let _gravar = { alterar: async () => ({ ok: false, motivo: 'módulo indisponível' }),
+  acrescentar: async () => ({ ok: false, motivo: 'módulo indisponível' }) };
+try { _gravar = require('./_gravar'); } catch (e) {
+  try { _gravar = require(require('path').join(__dirname, '_gravar.js')); } catch (e2) {}
+}
 let _ec = { marcarEntrarContato: (f) => f, vezes: () => 0, resumo: () => 'sem registro' };
 try { _ec = require('./_entrar_contato'); } catch (e) {
   try { _ec = require(require('path').join(__dirname, '_entrar_contato.js')); } catch (e2) {}
@@ -851,7 +856,25 @@ module.exports = async function handler(req, res) {
     const faseAnt = ficha.phase;
     ficha.phase = phase;
     ficha.movedAt = new Date().toISOString();
-    await dbSet(LOG_KEY, db);
+    // 🔒 relê e altera só esta ficha: gravar a versão lida no início apagava
+    // alterações feitas por outra rotina no mesmo intervalo
+    {
+      const _q = ficha.movedAt;
+      const _r = await _gravar.alterar(LOG_KEY,
+        (atual) => {
+          const alvo = ((atual || {}).fichas || []).find(x => String(x.id) === String(id));
+          if (!alvo) return null;
+          alvo.phase = phase; alvo.movedAt = _q;
+          if (ficha.motivoRemarcar) { alvo.motivoRemarcar = ficha.motivoRemarcar;
+            alvo.remarcadoEm = ficha.remarcadoEm; alvo.remarcadoPor = ficha.remarcadoPor; }
+          return atual;
+        },
+        (atual) => ((atual || {}).fichas || [])
+          .some(x => String(x.id) === String(id) && String(x.phase) === String(phase)),
+        { tentativas: 3, padrao: { fichas: [] } });
+      if (!_r.ok) return res.status(200).json({ ok: false,
+        error: 'não consegui gravar a mudança: ' + _r.motivo });
+    }
     registrarPassagem(phase).catch(() => {});
     logMov(id, ficha.nome, faseAnt, phase, 'equipe/mover').catch(() => {});
 
