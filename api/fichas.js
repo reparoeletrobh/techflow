@@ -97,6 +97,107 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🩻 POR-QUE-NAO-ENTROU: confronta os dois caminhos, linha por linha ──
+  // A conferência diz que faltam N fichas e o sync diz que não há nada a criar.
+  // Os dois olham a mesma planilha com regras diferentes: aqui elas são exibidas
+  // lado a lado para cada linha, com o motivo exato da recusa.
+  if (action === 'por-que-nao-entrou') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // 1) linhas da planilha do dia
+    let linhas = [];
+    try {
+      const rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text()));
+      const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+      const iH = cab.findIndex(x => /hora|data/.test(x));
+      const iT = cab.findIndex(x => /numero|telefone|whats/.test(x));
+      const iN = cab.findIndex(x => /nome/.test(x));
+      const iE = cab.findIndex(x => /^equipamento$/.test(x));
+      const [dd, mm, aa] = [dia.slice(8, 10), dia.slice(5, 7), dia.slice(2, 4)];
+      rows.slice(1).forEach((r, ix) => {
+        const dt = String(r[iH] || '');
+        if (!dt.startsWith(dd + '/' + mm + '/' + aa)) return;
+        linhas.push({ linha: ix + 2, telBruto: String(r[iT] || ''), nome: String(r[iN] || '?').trim(),
+          equipamento: String(r[iE] || ''), quandoTexto: dt });
+      });
+    } catch (e) { return res.status(200).json({ ok: false, error: 'planilha: ' + e.message }); }
+
+    // 2) onde cada telefone aparece hoje, em qualquer banco
+    const BANCOS = [['fichas_adm', 'fichas'], ['fichas_tv', 'fichas'],
+      ['reparoeletro_logistica', 'fichas'], ['tv_logistica', 'fichas'],
+      ['prospeccao_adm', 'fichas'], ['reparoeletro_pipe', 'cards'], ['tv_pipe', 'cards'],
+      ['reparoeletro_arquivo', 'fichas'], ['reparoeletro_frenteloja', 'fichas'],
+      ['reparoeletro_board', 'cards']];
+    const onde = {};
+    for (const [k, L] of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        for (const x of ((b || {})[L] || [])) {
+          const t = d8x(x.telefone);
+          if (t.length < 8) continue;
+          const q = String(x.criadoEm || x.registradoEm || x.movedAt || '').slice(0, 10);
+          (onde[t] = onde[t] || []).push({ banco: k, quando: q,
+            status: String(x.status || x.phase || x.phaseId || '?') });
+        }
+      } catch (e) {}
+    }
+
+    const REENTRADA = 30;
+    const resultado = linhas.map(l => {
+      const dig = l.telBruto.replace(/\D/g, '');
+      let tel = dig;
+      if (tel.length === 10 || tel.length === 11) tel = '55' + tel;
+      const t8 = d8x(tel);
+      const locais = onde[t8] || [];
+      const maisRecente = locais.map(x => x.quando).filter(Boolean).sort().pop() || null;
+      const diasDesde = maisRecente
+        ? Math.round((Date.now() - new Date(maisRecente + 'T12:00:00-03:00').getTime()) / 86400000)
+        : null;
+      const temFichaHoje = locais.some(x =>
+        (x.banco === 'fichas_adm' || x.banco === 'fichas_tv') && x.quando === dia);
+      let veredito, oQueFazer = null;
+      if (tel.length < 12) {
+        veredito = '🚫 telefone incompleto (' + dig.length + ' dígitos) — não vira ficha';
+        oQueFazer = 'corrigir o número na planilha';
+      } else if (temFichaHoje) {
+        veredito = '✅ já tem ficha criada hoje';
+      } else if (locais.length && diasDesde != null && diasDesde < REENTRADA) {
+        veredito = '↩️ já está no sistema há ' + diasDesde + ' dia(s) — dentro dos ' + REENTRADA +
+          ' dias, o sync não duplica';
+        oQueFazer = 'é o comportamento correto; para forçar, use criar-mesmo-assim';
+      } else if (locais.length) {
+        veredito = '🔁 existe de ' + diasDesde + ' dias atrás — deveria entrar como reentrada';
+        oQueFazer = 'o sync deveria criar: se não criou, há falha';
+      } else {
+        veredito = '🚨 NÃO existe em banco nenhum — deveria ter sido criada';
+        oQueFazer = 'o sync deveria criar: há falha';
+      }
+      return { ...l, telNormalizado: tel, t8, veredito, oQueFazer,
+        locais: locais.map(x => x.banco.replace('reparoeletro_', '') + ':' + x.status + '@' + x.quando) };
+    });
+
+    const falhas = resultado.filter(r => String(r.oQueFazer || '').includes('há falha'));
+    return res.status(200).json({ ok: falhas.length === 0,
+      dia, linhasNaPlanilha: linhas.length,
+      RESUMO: {
+        jaTemFichaHoje: resultado.filter(r => r.veredito.startsWith('✅')).length,
+        conhecidoRecente: resultado.filter(r => r.veredito.startsWith('↩️')).length,
+        telefoneIncompleto: resultado.filter(r => r.veredito.startsWith('🚫')).length,
+        deveriamTerEntrado: falhas.length,
+      },
+      VEREDITO: falhas.length
+        ? '🚨 ' + falhas.length + ' linha(s) deveriam ter virado ficha e não viraram'
+        : '✅ toda linha tem explicação — nenhuma falha do sync',
+      DEVERIAM_TER_ENTRADO: falhas.map(r => 'linha ' + r.linha + ' | ' + r.quandoTexto +
+        ' | ' + String(r.nome).slice(0, 22) + ' ' + r.t8.slice(-4) +
+        ' | "' + r.telBruto + '" → ' + r.telNormalizado +
+        ' | ' + String(r.equipamento).slice(0, 20) +
+        (r.locais.length ? ' | está em: ' + r.locais.join(', ') : ' | em nenhum banco')),
+      TODAS: resultado.map(r => 'L' + String(r.linha).padStart(4) + ' | ' +
+        String(r.nome).slice(0, 20).padEnd(20) + ' ' + r.t8.slice(-4) + ' | ' + r.veredito) });
+  }
+
   // ── 🔎 DESTINO-PLANILHA: o que aconteceu com CADA linha do dia ──
   if (action === 'destino-planilha') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
