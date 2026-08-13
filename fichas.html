@@ -269,8 +269,22 @@ async function recuperarFaltantes(){
   if(!confirm('Trazer para o sistema as fichas que estão na planilha e não entraram?')) return;
   var r = null;
   try { r = await fetch('/api/fichas?action=sync-completo&dias=1&aplicar=1').then(function(x){return x.json();}); } catch(e){}
-  alert(r && r.ok ? '✅ '+((r.criadas&&(r.criadas.adm+r.criadas.tv))||0)+' ficha(s) criada(s)'
-                  : '🚨 '+((r&&r.error)||'não consegui'));
+  // 📊 criar fichas e ter linhas descartadas são coisas diferentes: o retorno
+  // trazia as duas juntas e qualquer descarte fazia o botão parecer que falhou
+  var criadas = (r && r.criadas) ? ((r.criadas.adm||0) + (r.criadas.tv||0)) : 0;
+  var msg;
+  if(!r){ msg = '🚨 não consegui falar com o servidor'; }
+  else if(r.error){ msg = '🚨 ' + r.error; }
+  else {
+    msg = criadas ? '✅ ' + criadas + ' ficha(s) criada(s)' : 'ℹ️ nenhuma ficha nova a criar';
+    if(r.reentradas) msg += '\n↩️ ' + r.reentradas + ' cliente(s) voltaram após 30 dias';
+    if(r.descartadas){
+      msg += '\n\n⚠️ ' + r.descartadas + ' linha(s) não puderam virar ficha:';
+      (r.DESCARTADAS||[]).slice(0,8).forEach(function(d){ msg += '\n  • ' + d; });
+      msg += '\n\nCorrija o telefone na planilha e tente de novo.';
+    }
+  }
+  alert(msg);
   document.querySelectorAll('div[style*=fixed]').forEach(function(x){ if(x.style.zIndex==='9999') x.remove(); });
   if(typeof load==='function') load();
   conferirPlanilha();

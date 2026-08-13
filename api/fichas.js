@@ -804,7 +804,8 @@ export default async function handler(req, res) {
       criadas[x.ehTv ? 'tv' : 'adm']++;
       await new Promise(s => setTimeout(s, 60));
     }
-    return res.status(200).json({ ok: descartadas.length === 0,
+    // ✅ criar fichas é sucesso; descarte é informação à parte, não falha
+    return res.status(200).json({ ok: true,
       criadas, total: criadas.adm + criadas.tv,
       reentradas: reentradas.length,
       descartadas: descartadas.length,
