@@ -2265,7 +2265,7 @@ export default async function handler(req, res) {
     var adb = (await dbGet(ALMOX_KEY)) || { rotas: [] };
     if (!Array.isArray(adb.rotas)) adb.rotas = [];
     var hojeStr = nowR.slice(0, 10);
-    var seqHoje = adb.rotas.filter(function (r) { return (r.criadaEm || '').slice(0, 10) === hojeStr; }).length + 1;
+    var seqHoje = adb.rotas.filter(function (r) { return new Date(new Date(r.criadaEm||0).getTime()-3*3600000).toISOString().slice(0,10) === hojeStr; }).length + 1;
     var rotaIdNovo = 'R-' + hojeStr.replace(/-/g, '') + '-' + seqHoje;
     var rotaLabelNovo = 'Rota ' + seqHoje + ' · ' + hojeStr.slice(8, 10) + '/' + hojeStr.slice(5, 7);
     var sel = [];

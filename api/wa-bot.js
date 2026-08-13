@@ -3828,7 +3828,7 @@ export default async function handler(req, res) {
   if (action === 'quem-recebeu-retroativa') {
     const evtsR = await lerEvts();
     const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-    const msgs = evtsR.filter(e => e.tipo === 'aprovacao-retroativa' && String(e.ts || '').slice(0, 10) === hoje);
+    const msgs = evtsR.filter(e => e.tipo === 'aprovacao-retroativa' && new Date(new Date(e.ts||0).getTime()-3*3600000).toISOString().slice(0,10) === hoje);
     const porTel = {};
     for (const m of msgs) {
       const d = String(m.tel || '').replace(/\D/g, '').slice(-8);
@@ -3853,9 +3853,9 @@ export default async function handler(req, res) {
     const kpi = (((st || {})[hoje]) || {}).aprovacoes || 0;
     // ações de aprovação registradas na conversa hoje
     const acoes = evtsC.filter(e => e.dir === 'acao' && e.texto === 'mover_aprovado' &&
-      String(e.ts || '').slice(0, 10) === hoje);
+      new Date(new Date(e.ts||0).getTime()-3*3600000).toISOString().slice(0,10) === hoje);
     // mensagens da aprovação retroativa que acabamos de disparar
-    const retro = evtsC.filter(e => e.tipo === 'aprovacao-retroativa' && String(e.ts || '').slice(0, 10) === hoje);
+    const retro = evtsC.filter(e => e.tipo === 'aprovacao-retroativa' && new Date(new Date(e.ts||0).getTime()-3*3600000).toISOString().slice(0,10) === hoje);
     // cards que entraram em aprovados hoje
     const entraram = [];
     for (const [b, s] of [[ppA, 'adm'], [ppT, 'tv']]) {

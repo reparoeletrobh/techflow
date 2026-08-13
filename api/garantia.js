@@ -354,7 +354,10 @@ module.exports = async function handler(req, res) {
     const diaSem = bras.getUTCDay();
     const seg = new Date(bras); seg.setUTCDate(bras.getUTCDate() - ((diaSem === 0) ? 6 : (diaSem - 1)));
     const iniSemana = seg.toISOString().slice(0, 10);
-    const dia = d => String(d || '').slice(0, 10);
+    // 📅 a data gravada está em UTC e o dia de referência é o de Brasília:
+    // comparar direto fazia todo registro feito depois das 21h cair no dia seguinte
+    const dia = d => { const t = new Date(d || 0).getTime();
+      return t ? new Date(t - 3 * 3600000).toISOString().slice(0, 10) : ''; };
     // a ficha marca conclusão no booleano concluida, além da fase
     const RESOLVIDAS = ['resolvida', 'finalizado', 'entregue', 'concluida', 'concluido'];
     const ehResolvida = f => f.concluida === true ||

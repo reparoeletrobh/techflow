@@ -829,7 +829,9 @@ export default async function handler(req,res){
     const abertos=(((dbS||{}).fichas)||[]).filter(f=>f.status==='conflitos_bot');
     const movs=((lg||{}).movs)||[];
     const hoje=new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
-    const doDia=movs.filter(m=>String(m.ts).slice(0,10)===hoje);
+    // 📅 converte para o fuso de Brasília antes de comparar o dia
+    const emBRT=t=>{const x=new Date(t||0).getTime();return x?new Date(x-3*3600000).toISOString().slice(0,10):'';};
+    const doDia=movs.filter(m=>emBRT(m.ts)===hoje);
     const cont=(arr,t)=>arr.filter(m=>m.tipo===t).length;
     return res.status(200).json({ok:true,
       abertosAgora:abertos.length,
@@ -871,7 +873,7 @@ export default async function handler(req,res){
       return {nome,
         total:hSem.reduce((a,b)=>a+(b.pontos||0),0),      // placar da SEMANA
         totalHistorico:p.total||0,
-        pontosHoje:h.filter(x=>String(x.ts).slice(0,10)===hoje).reduce((a,b)=>a+(b.pontos||0),0),
+        pontosHoje:h.filter(x=>new Date(new Date(x.ts||0).getTime()-3*3600000).toISOString().slice(0,10)===hoje).reduce((a,b)=>a+(b.pontos||0),0),
         pontosSemana:hSem.reduce((a,b)=>a+(b.pontos||0),0),
         recuperacoes:hSem.length,
         recuperacoesHistorico:h.length,
