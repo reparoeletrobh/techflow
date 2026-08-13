@@ -54,8 +54,10 @@ module.exports = async function handler(req, res) {
     feitos.push(await chamar('exame do sistema', 'vigia?action=exame-completo&horas=48'));
     // 🏪 lembrete de retirada: só às 10h, uma vez por dia (o limite de crons
     // da Vercel está esgotado, então a rotina de hora em hora faz o papel)
-    const horaBR = new Date(Date.now() - 3 * 3600000).getUTCHours();
-    if (horaBR === 10) {
+    const agoraBR2 = new Date(Date.now() - 3 * 3600000);
+    const horaBR = agoraBR2.getUTCHours(), diaSem = agoraBR2.getUTCDay();
+    // segunda a sábado, às 10h: no domingo a loja não atende
+    if (horaBR === 10 && diaSem >= 1 && diaSem <= 6) {
       feitos.push(await chamar('lembrete de retirada na loja',
         'wa-bot?action=retirada-loja&aplicar=1'));
     }

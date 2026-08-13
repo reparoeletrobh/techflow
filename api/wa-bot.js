@@ -480,13 +480,35 @@ export default async function handler(req, res) {
       if ((ctrl.enviados || 0) > (porCliente[t].ctrl.enviados || 0)) porCliente[t].ctrl = ctrl;
       if (dias > porCliente[t].dias) porCliente[t].dias = dias;
     }
-    const fila = Object.values(porCliente);
+    // 💬 quem respondeu depois do último lembrete já se manifestou: insistir
+    // no dia seguinte ignora o que a pessoa acabou de dizer
+    const respondeuDepois = {};
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'in') continue;
+        const d = d8r(e.tel); if (!d) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (!respondeuDepois[d] || q > respondeuDepois[d]) respondeuDepois[d] = q;
+      }
+    } catch (e) {}
+    const responderam = [];
+    const fila = Object.values(porCliente).filter(x => {
+      const t = d8r(x.f.telefone);
+      const ultimoLembrete = new Date(x.ctrl.ultimo || 0).getTime();
+      if (ultimoLembrete && respondeuDepois[t] && respondeuDepois[t] > ultimoLembrete) {
+        responderam.push(String(x.f.nomeContato || '?').slice(0, 24) +
+          ' — respondeu após o último lembrete');
+        return false;
+      }
+      return true;
+    });
 
     if (!aplicar) {
       return res.status(200).json({ ok: true, modo: 'prévia',
         equipamentosProntos: prontos.length,
         clientesQueReceberiam: fila.length,
         modo2: incluirAntigas ? 'incluindo fichas anteriores à régua' : 'apenas fichas novas',
+        NAO_RECEBEM_POR_TEREM_RESPONDIDO: responderam,
         regra: 'um lembrete por cliente, no máximo ' + diasMax + ' dias após ficar pronto',
         L: fila.map(x => String(x.f.nomeContato || '?').slice(0, 24) +
           ' ' + String(x.f.telefone || '').slice(-4) +
@@ -577,6 +599,18 @@ export default async function handler(req, res) {
   // ── 📺 TV-CONDENADA: avisa o cliente e oferece os caminhos possíveis ──
   if (action === 'tv-condenada-avisar') {
     const aplicar = String(req.query.aplicar || '') === '1';
+    // ⏰ é notícia delicada: não sai de madrugada nem no domingo. Fora do
+    // horário, aguarda o próximo expediente.
+    const agoraBR = new Date(Date.now() - 3 * 3600000);
+    const horaBR = agoraBR.getUTCHours(), diaBR = agoraBR.getUTCDay();
+    const noExpediente = (diaBR >= 1 && diaBR <= 5 && horaBR >= 8 && horaBR < 18) ||
+      (diaBR === 6 && horaBR >= 8 && horaBR < 12);
+    const forcar = String(req.query.forcarHorario || '') === '1';
+    if (aplicar && !noExpediente && !forcar) {
+      return res.status(200).json({ ok: true, adiado: true,
+        motivo: 'fora do expediente — o aviso sai no próximo horário comercial',
+        agora: agoraBR.toISOString().slice(0, 16).replace('T', ' ') + ' BRT' });
+    }
     const bd = (await dbGet('tv_board')) || { cards: [] };
     // 📋 por padrão só os marcados ao serem movidos. Com &todosCondenados=1
     // alcança quem já estava em Aguardando Retirada vindo de Condenado antes
@@ -703,7 +737,9 @@ export default async function handler(req, res) {
   // ── 📺 TV-CONDENADA-RESPOSTAS: registra a escolha e abre o conflito ──
   if (action === 'tv-condenada-respostas') {
     const bd = (await dbGet('tv_board')) || { cards: [] };
-    const esperando = (bd.cards || []).filter(c => c.aguardandoEscolhaCondenado === true);
+    const soTel = String(req.query.tel || '').replace(/\D/g, '').slice(-8);
+    const esperando = (bd.cards || []).filter(c => c.aguardandoEscolhaCondenado === true &&
+      (!soTel || String(c.telefone || '').replace(/\D/g, '').slice(-8) === soTel));
     if (!esperando.length) return res.status(200).json({ ok: true, aguardando: 0 });
     const evts = await lerEvts();
     const d8c = t => String(t || '').replace(/\D/g, '').slice(-8);
@@ -717,9 +753,30 @@ export default async function handler(req, res) {
     for (const c of esperando) {
       const t = d8c(c.telefone);
       const depois = new Date(c.avisoCondenadoEnviadoEm || 0).getTime();
-      const resposta = evts.filter(e => e.dir === 'in' && d8c(e.tel) === t &&
-        new Date(e.ts || 0).getTime() > depois).sort((a, b) => String(a.ts).localeCompare(String(b.ts)))[0];
-      if (!resposta) continue;
+      // ⏳ sem resposta em 5 dias, a equipe assume: fica registrado e vira conflito
+      const diasEsperando = depois ? (Date.now() - depois) / 86400000 : 0;
+      const respostas = evts.filter(e => e.dir === 'in' && d8c(e.tel) === t &&
+        new Date(e.ts || 0).getTime() > depois).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+      if (!respostas.length) {
+        if (diasEsperando >= 5) {
+          c.aguardandoEscolhaCondenado = false;
+          c.escolhaCondenado = 'sem resposta em 5 dias';
+          try {
+            await fetch('https://reparoeletroadm.com/api/prospeccao?action=criar-conflito' +
+              '&k=' + ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ telefone: c.telefone, nome: c.nomeContato || c.nome,
+                motivo: 'TV condenada — cliente não respondeu em 5 dias, precisa de ligação',
+                equipamento: c.equipamento || c.descricao || 'TV', origem: 'tv_condenada' }) });
+          } catch (e) {}
+          tratados.push((c.nomeContato || '?') + ' → sem resposta em 5 dias');
+        }
+        continue;
+      }
+      // 🔍 procura a escolha em QUALQUER resposta, não só na primeira: o cliente
+      // costuma reagir à notícia antes de decidir o que fazer
+      let resposta = respostas.find(r => /[1-4]|loja|retirar|busc|entrega|casa|receber|sucata|vender|falar|humano|atend/i
+        .test(String(r.texto || ''))) || respostas[respostas.length - 1];
       const txt = String(resposta.texto || '').trim();
       const num = (txt.match(/[1-4]/) || [])[0] ||
         (/loja|retirar|busc/i.test(txt) ? '1'
@@ -741,6 +798,27 @@ export default async function handler(req, res) {
             equipamento: c.equipamento || c.descricao || 'TV',
             origem: 'tv_condenada', sistema: 'tv',
           }) });
+      } catch (e) {}
+      // ✅ confirma ao cliente o que foi entendido, para ele não ficar no vácuo
+      try {
+        const cfgC = (await dbGet('wa_credenciais')) || {};
+        const pid = cfgC.phoneId || process.env.WA_PHONE_ID;
+        const tk = cfgC.token || process.env.WA_TOKEN;
+        const primeiro = String(c.nomeContato || c.nome || '').split(' ')[0] || '';
+        const conf = num
+          ? 'Perfeito' + (primeiro ? ', ' + primeiro : '') + '! Anotei aqui: ' + escolha + '.\n\n' +
+            'Nossa equipe entra em contato para acertar os detalhes com você. Obrigado pelo retorno.'
+          : 'Recebi sua mensagem' + (primeiro ? ', ' + primeiro : '') + '. Vou pedir para alguém ' +
+            'da equipe falar com você e explicar tudo com calma.';
+        if (pid && tk) {
+          await fetch(`https://graph.facebook.com/v20.0/${pid}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp',
+              to: String(c.telefone || '').replace(/\D/g, ''),
+              type: 'text', text: { body: conf } }),
+          });
+        }
       } catch (e) {}
       tratados.push((c.nomeContato || '?') + ' → ' + escolha);
     }

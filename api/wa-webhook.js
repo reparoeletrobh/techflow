@@ -161,7 +161,21 @@ export default async function handler(req, res) {
                   if (ultimo && ultimo.em > agoraLote) {
                     console.log('[lote] mensagem mais recente chegou — esta não responde');
                   } else {
-                    await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? telLimpo : ''}&k=${KW}`);
+                    // 📺 o cliente pode estar escolhendo o destino de uma TV
+                    // condenada. Nesse caso a escolha é registrada primeiro e o
+                    // cérebro não responde por cima, o que confundiria a conversa.
+                    let escolhaTv = false;
+                    try {
+                      const rE = await fetch('https://reparoeletroadm.com/api/wa-bot' +
+                        '?action=tv-condenada-respostas&tel=' + telLimpo + '&k=' + KW)
+                        .then(x => x.json());
+                      escolhaTv = !!(rE && rE.responderam);
+                    } catch (e) {}
+                    if (!escolhaTv) {
+                      await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? telLimpo : ''}&k=${KW}`);
+                    } else {
+                      console.log('[tv-condenada] escolha registrada — cérebro não responde');
+                    }
                   }
                 } catch (e) {
                   await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? String(tel).replace(/\D/g, '') : ''}&k=${KW}`);
