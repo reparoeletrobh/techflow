@@ -439,8 +439,10 @@ export default async function handler(req, res) {
       const d = d8b(e.tel); if (!d) continue;
       (porTel[d] = porTel[d] || []).push(e);
     }
+    // 📅 o controle da sequência de sete dias fica em wa_recuperacao_7d; o outro
+    // nome não existe, e por isso todos os disparos apareciam zerados
     let ctrl7 = {};
-    try { ctrl7 = ((await dbGet('reparoeletro_recuperacao7')) || {}).clientes || {}; } catch (e) {}
+    try { ctrl7 = ((await dbGet('wa_recuperacao_7d')) || {}).clientes || {}; } catch (e) {}
 
     const saida = {};
     for (const [banco, sis] of [['reparoeletro_pipe', 'adm'], ['tv_pipe', 'tv']]) {
@@ -455,7 +457,7 @@ export default async function handler(req, res) {
           const q = c.aprovadoEm || ((c.history || [])
             .filter(x => String(x.phase || x.phaseId || '') === 'aprovados')
             .map(x => x.ts).filter(Boolean).sort()[0]) || null;
-          saida[c.id] = { id: c.id, sistema: sis, fase, tipo: 'aprovado',
+          saida[c.id] = { id: c.id, sistema: sis, coluna: fase, tipo: 'aprovado',
             aprovadoEm: q,
             aprovadoPor: c.aprovadoPor || null,
             noBalcao: c.aprovadoNoBalcao === true || String(c.origem || '') === 'frenteloja' };
@@ -475,12 +477,15 @@ export default async function handler(req, res) {
         const disparos = rec ? (Number(rec.tentativas) || 0) : 0;
         const semBot = nossas.length === 0;
         saida[c.id] = {
-          id: c.id, sistema: sis, fase,
+          id: c.id, sistema: sis,
+          coluna: fase,               // nome da coluna (aguardando_aprovacao, etc.)
+          tipo: 'negociacao',
           telefoneValido: d.length >= 8,
           semBot,
           etiqueta: semBot ? 'atendimento humano'
             : (nf ? nf + 'F' : '—') + (disparos ? ' · ' + disparos + 'D' : ''),
-          fase: nf, disparos,
+          fase: nf,                   // número da etapa de venda, de 1 a 5
+          disparos,
           respostasDoCliente: delas.length,
           nossasMensagens: nossas.length,
           ultimoContato: nossas.length ? nossas[nossas.length - 1].ts : null,

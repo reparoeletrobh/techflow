@@ -27,12 +27,16 @@ function desenharBadges(){
     try{
       var id = el.id.replace(/^card-/, '');
       var b = dados[id];
+      // 🎯 a coluna vem do próprio card e, na falta dele, do campo COLUNA da
+      // resposta. Antes caía em 'fase', que nos cards em negociação é o número
+      // da etapa de venda — o valor 0 não batia com nenhuma coluna e a etiqueta
+      // era removida, deixando o card com a cor e sem indicação.
       var fase = null;
       if(typeof cards !== 'undefined' && Array.isArray(cards)){
         var c0 = cards.filter(function(x){ return String(x.id) === id; })[0];
         if(c0) fase = c0.phase;
       }
-      if(!fase && b) fase = b.fase;
+      if(!fase && b) fase = b.coluna;
       if(FASES_BADGE.indexOf(fase) < 0){
         el.classList.remove('sem-bot','bot-vivo','bot-esgotado');
         var vel = el.querySelector('.badge-fase'); if(vel) vel.remove();
