@@ -617,6 +617,12 @@ export default async function handler(req, res) {
           f.consertoRealizadoEm = agora;
           f.viaControleQualidade = true;
           f.inspecaoOs = insp.os || insp.id;
+          // 🏪 entra na régua de lembretes de retirada a partir de agora. As
+          // fichas anteriores a esta marcação ficam de fora, para não cobrar
+          // retirada de equipamento que provavelmente já foi buscado.
+          f.reguaRetirada = true;
+          f.reguaRetiradaDesde = agora;
+          f.lembreteRetirada = { enviados: 0, ultimo: null };
           f.history = (f.history || []).concat([{ phase: 'conserto_realizado', ts: agora,
             via: 'controle_qualidade', inspecao: insp.os || insp.id }]);
           return FL;

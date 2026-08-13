@@ -427,10 +427,17 @@ export default async function handler(req, res) {
     const d8r = t => String(t || '').replace(/\D/g, '').slice(-8);
 
     // pronto = passou pelo controle de qualidade; pendente = ainda não foi ao ERP
+    // 🎯 só entram na régua as fichas marcadas no momento da aprovação no
+    // controle de qualidade. As anteriores ficam de fora: cobrar retirada de
+    // equipamento pronto há semanas costuma significar lançamento pendente,
+    // não cliente ausente. Para incluí-las de propósito, use &incluirAntigas=1
+    const incluirAntigas = String(req.query.incluirAntigas || '') === '1';
     const prontos = (FL.fichas || []).filter(f => {
       const fase = String(f.phase || '');
       if (fase === 'erp' || fase === 'encerrado' || fase === 'reprovado') return false;
-      return fase === 'conserto_realizado' || f.viaControleQualidade === true;
+      const pronto = fase === 'conserto_realizado' || f.viaControleQualidade === true;
+      if (!pronto) return false;
+      return incluirAntigas ? true : f.reguaRetirada === true;
     });
 
     const TEXTOS = [
@@ -479,6 +486,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, modo: 'prévia',
         equipamentosProntos: prontos.length,
         clientesQueReceberiam: fila.length,
+        modo2: incluirAntigas ? 'incluindo fichas anteriores à régua' : 'apenas fichas novas',
         regra: 'um lembrete por cliente, no máximo ' + diasMax + ' dias após ficar pronto',
         L: fila.map(x => String(x.f.nomeContato || '?').slice(0, 24) +
           ' ' + String(x.f.telefone || '').slice(-4) +
@@ -570,9 +578,20 @@ export default async function handler(req, res) {
   if (action === 'tv-condenada-avisar') {
     const aplicar = String(req.query.aplicar || '') === '1';
     const bd = (await dbGet('tv_board')) || { cards: [] };
-    const pendentes = (bd.cards || []).filter(c =>
-      c.avisoCondenadoStatus === 'pendente' &&
-      String(c.phaseId || '') === 'aguardando_ret');
+    // 📋 por padrão só os marcados ao serem movidos. Com &todosCondenados=1
+    // alcança quem já estava em Aguardando Retirada vindo de Condenado antes
+    // do gatilho existir — usado uma única vez, quando o modelo for aprovado.
+    const todos = String(req.query.todosCondenados || '') === '1';
+    const pendentes = (bd.cards || []).filter(c => {
+      if (String(c.phaseId || '') !== 'aguardando_ret') return false;
+      if (c.avisoCondenadoStatus === 'enviado' ||
+          c.avisoCondenadoStatus === 'modelo enviado') return false;
+      if (c.avisoCondenadoStatus === 'pendente') return true;
+      if (!todos) return false;
+      // veio de Condenado em algum momento?
+      return (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'condenado') ||
+        String(c.faseAnteriorRegistrada || '') === 'condenado';
+    });
 
     const montar = (c) => {
       const nome = String(c.nomeContato || c.nome || '').split(' ')[0] || 'tudo bem';
@@ -630,13 +649,34 @@ export default async function handler(req, res) {
         const janelaAberta = ultimaEntrada[d8x(tel)] &&
           (Date.now() - ultimaEntrada[d8x(tel)]) < 24 * 3600000;
         if (!janelaAberta) {
-          const pend = (await dbGet('wa_pendentes_janela')) || { itens: [] };
-          pend.itens = (pend.itens || []).filter(x => String(x.tel || '') !== tel);
-          pend.itens.unshift({ tel, texto: montar(c), motivo: 'tv condenada',
-            criadoEm: new Date().toISOString() });
-          await dbSet('wa_pendentes_janela', pend);
-          c.avisoCondenadoStatus = 'aguardando janela';
-          erros.push((c.nomeContato || '?') + ': janela fechada — guardado para envio');
+          // 📨 janela fechada: abre com o modelo aprovado e guarda a explicação
+          // completa, que sai assim que o cliente responder
+          const nomeC = String(c.nomeContato || c.nome || '').split(' ')[0] || 'tudo bem';
+          const equipC = String(c.equipamento || c.descricao || 'TV').slice(0, 40);
+          const rt = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'template',
+              template: { name: 'tv_sem_viabilidade_reparo', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [
+                  { type: 'text', text: nomeC }, { type: 'text', text: equipC }] }] } }),
+          }).then(x => x.json()).catch(() => null);
+          if (rt && rt.messages && rt.messages[0]) {
+            const pend = (await dbGet('wa_pendentes_janela')) || { itens: [] };
+            pend.itens = (pend.itens || []).filter(x => String(x.tel || '') !== tel);
+            pend.itens.unshift({ tel, texto: montar(c), motivo: 'tv condenada',
+              criadoEm: new Date().toISOString() });
+            await dbSet('wa_pendentes_janela', pend);
+            c.avisoCondenadoStatus = 'modelo enviado';
+            c.avisoCondenadoEnviadoEm = new Date().toISOString();
+            c.aguardandoEscolhaCondenado = true;
+            feitos.push((c.nomeContato || '?') + ' ' + tel.slice(-4) + ' (modelo)');
+            try { await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out',
+              texto: '[modelo] tv_sem_viabilidade_reparo', tipo: 'template' }); } catch (e) {}
+          } else {
+            erros.push((c.nomeContato || '?') + ': modelo recusado — ' +
+              ((rt && rt.error && rt.error.message) || 'sem retorno'));
+          }
           continue;
         }
         const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {

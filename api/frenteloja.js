@@ -1009,6 +1009,10 @@ export default async function handler(req,res){
     ficha.pagoPor = formaPagamento || ficha.orcamento?.formaPagamento || 'pix';
     ficha.phase = 'pago';
     ficha.movedAt = now;
+    // 🛑 pagamento efetuado: o equipamento saiu, encerra os lembretes de retirada
+    ficha.reguaRetirada = false;
+    ficha.reguaEncerradaEm = now;
+    ficha.reguaEncerradaPor = 'pagamento';
     await dbSet(FL_KEY, db);
     // Criar/mover card no pipe ADM para ERP
     try {
