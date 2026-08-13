@@ -733,16 +733,68 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
   if (req.method === "POST" && action === "fila-resolver") {
-    const { id, destino } = req.body || {};
+    const { id, destino, tecnico } = req.body || {};
     if (!["video", "qc"].includes(destino)) return res.status(400).json({ ok: false, error: "destino: video|qc" });
+    // 🔬 mandar para o controle de qualidade exige saber quem executou o serviço,
+    // senão a produção da garantia não entra na conta de nenhum técnico
+    if (destino === "qc" && !String(tecnico || "").trim()) {
+      return res.status(400).json({ ok: false, error: "informe o técnico que fez a garantia" });
+    }
     const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
     const it = (fdb.itens || []).find(x => x.id === id);
     if (!it) return res.status(404).json({ ok: false });
     it.status = "resolvido";
     it.destino = destino;
+    it.tecnico = String(tecnico || "").trim() || null;
     it.resolvidoEm = new Date().toISOString();
     await dbSet(FILA_KEY, fdb);
-    return res.status(200).json({ ok: true });
+
+    // ── cria a inspeção no controle de qualidade ──
+    let inspecao = null;
+    if (destino === "qc") {
+      try {
+        const KQ = "reparoeletro_qualidade";
+        const q = (await dbGet(KQ)) || { inspecoes: [], config: { tecnicos: [], proximoNum: 1 } };
+        q.inspecoes = q.inspecoes || [];
+        q.config = q.config || { tecnicos: [], proximoNum: 1 };
+        const txt = String(it.equipamento || it.descricao || "").toLowerCase();
+        const tipo = /micro-?ondas|microondas|magnetron/.test(txt) ? "microondas"
+          : /purificador|bebedouro|filtro|agua|água/.test(txt) ? "purificador"
+          : /adega|climatizada/.test(txt) ? "adega"
+          : /forno|fogao|fogão/.test(txt) ? "forno"
+          : /\btv\b|televis/.test(txt) ? "tv" : "outro";
+        // não duplica se já existir inspeção desta garantia
+        const jaTem = q.inspecoes.some(x => String(x.garantiaId || "") === String(it.id));
+        if (!jaTem) {
+          const num = q.config.proximoNum || (q.inspecoes.length + 1);
+          const nova = {
+            id: "insp_gar_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            os: "GAR-" + String(num).padStart(4, "0"),
+            cardId: null, garantiaId: it.id,
+            cliente: it.nome || it.nomeContato || "—",
+            telefone: it.telefone || "",
+            equipamento: tipo,
+            equipamentoTexto: String(it.equipamento || it.descricao || "").slice(0, 120),
+            tecnico: String(tecnico).trim(),
+            origem: "garantia",           // 🏷️ fica FORA da meta de 25, como as demais garantias
+            obsTecnica: it.defeito || it.motivo || null,
+            valor: 0, status: "aguardando", checklist: {},
+            criadoEm: new Date().toISOString(),
+          };
+          q.inspecoes.unshift(nova);
+          q.config.proximoNum = num + 1;
+          await dbSet(KQ, q);
+          // confere que persistiu
+          const conf = (await dbGet(KQ)) || {};
+          const ok2 = ((conf.inspecoes) || []).some(x => x.id === nova.id);
+          inspecao = ok2 ? { os: nova.os, tecnico: nova.tecnico }
+                         : { erro: "a inspeção não persistiu — tente de novo" };
+        } else {
+          inspecao = { jaExistia: true };
+        }
+      } catch (e) { inspecao = { erro: e.message }; }
+    }
+    return res.status(200).json({ ok: true, destino, tecnico: it.tecnico, inspecao });
   }
   if (req.method === "POST" && action === "fila-reabrir") {
     const fdb = (await dbGet(FILA_KEY)) || { itens: [] };

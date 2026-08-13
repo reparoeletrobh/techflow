@@ -157,10 +157,56 @@ function render(){
     '</div>';
   }).join('');
 }
+// 🔬 mandar para o controle de qualidade pede o técnico que executou a garantia
 async function resolver(id,destino){
+  if(destino === 'qc'){ return escolherTecnicoQC(id); }
+  return enviarResolucao(id, destino, null);
+}
+async function escolherTecnicoQC(id){
+  var tecs = [];
+  try {
+    var eq = await fetch('/api/qualidade?action=equipe').then(function(x){return x.json();});
+    if(eq && eq.ok) tecs = eq.tecnicos || [];
+  } catch(e){}
+  if(!tecs.length) tecs = ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'];
+  var ov = document.createElement('div');
+  ov.id = 'ov-tec-qc';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;'
+    + 'align-items:center;justify-content:center;padding:18px;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;border-radius:15px;'
+    + 'padding:22px 24px;max-width:400px;width:100%;">'
+    + '<div style="font-size:16px;font-weight:900;color:#4ade80;">✅ Controle de Qualidade</div>'
+    + '<div style="font-size:12px;color:#8b93a3;margin-top:7px;line-height:1.6;">'
+      + 'Quem executou esta garantia? A inspeção entra no controle de qualidade'
+      + ' e conta para o técnico.</div>'
+    + '<div style="margin-top:15px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+      + tecs.map(function(t){
+          return '<button onclick="enviarResolucao(\''+id+'\',\'qc\',\''+String(t).replace(/'/g,"")+'\')" '
+            + 'style="background:#1a2030;border:1px solid #2a3140;border-radius:9px;padding:12px 10px;'
+            + 'color:#f0f2f5;font-weight:700;cursor:pointer;font-size:13px;">'+String(t).replace(/</g,'&lt;')+'</button>';
+        }).join('')
+    + '</div>'
+    + '<div id="qc-erro" style="font-size:12px;color:#f87171;margin-top:10px;"></div>'
+    + '<button onclick="document.getElementById(\'ov-tec-qc\').remove()" '
+      + 'style="width:100%;margin-top:14px;background:#374151;border:none;border-radius:9px;'
+      + 'padding:11px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">Cancelar</button>'
+  + '</div>';
+  document.body.appendChild(ov);
+}
+async function enviarResolucao(id,destino,tecnico){
   var r=await fetch('/api/garantia?action=fila-resolver',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:id,destino:destino})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(r.ok)load();else alert('Erro ao resolver');
+    body:JSON.stringify({id:id,destino:destino,tecnico:tecnico})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var ov = document.getElementById('ov-tec-qc');
+  if(!r || !r.ok){
+    var er = document.getElementById('qc-erro');
+    if(er) er.textContent = '🚨 ' + ((r && r.error) || 'não consegui resolver');
+    else alert('🚨 ' + ((r && r.error) || 'não consegui resolver'));
+    return;
+  }
+  if(ov) ov.remove();
+  if(r.inspecao && r.inspecao.erro){ alert('⚠️ garantia resolvida, mas a inspeção falhou: ' + r.inspecao.erro); }
+  else if(r.inspecao && r.inspecao.os){ alert('✅ ' + r.inspecao.os + ' criada para ' + r.inspecao.tecnico); }
+  load();
 }
 async function reabrir(id){
   await fetch('/api/garantia?action=fila-reabrir',{method:'POST',headers:{'Content-Type':'application/json'},
