@@ -17,13 +17,21 @@ async function aplicarBadgesFase(){
     var antiga = el.querySelector('.badge-fase');
     if(antiga) antiga.remove();
     var sp = document.createElement('span');
-    sp.className = 'badge-fase' + (b.semBot ? ' humano' : '');
-    sp.textContent = b.etiqueta;
+    // 🟢 dentro dos 7 disparos · 🔴 sequência esgotada ou sem bot
+    var esgotou = b.disparos >= 7;
+    var classe = b.semBot ? 'humano' : (esgotou ? 'esgotada' : 'viva');
+    sp.className = 'badge-fase ' + classe;
+    sp.innerHTML = b.semBot
+      ? '👤 atendimento humano'
+      : '<b>' + (b.fase || '—') + 'F</b> · <b>' + b.disparos + 'D</b>'
+        + (esgotou ? ' ⚠️' : '');
     sp.title = b.semBot
       ? 'nenhuma mensagem do bot para este cliente'
-      : 'fase ' + b.fase + ' de 5 · ' + b.disparos + ' de 7 disparos · '
-        + b.respostasDoCliente + ' resposta(s) do cliente';
-    el.classList.toggle('sem-bot', !!b.semBot);
+      : 'fase ' + b.fase + ' de 5 · disparo ' + b.disparos + ' de 7'
+        + (esgotou ? ' — sequência esgotada, o bot não insiste mais' : ' — sequência em andamento')
+        + ' · ' + b.respostasDoCliente + ' resposta(s) do cliente';
+    el.classList.remove('sem-bot', 'bot-vivo', 'bot-esgotado');
+    el.classList.add(b.semBot ? 'sem-bot' : (esgotou ? 'bot-esgotado' : 'bot-vivo'));
     var alvo = el.querySelector('.c-nome') || el.querySelector('.card-nome')
       || el.querySelector('b') || el.firstElementChild;
     if(alvo) alvo.appendChild(sp); else el.insertBefore(sp, el.firstChild);
@@ -213,12 +221,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .scroll-float.left{left:6px;}
 .scroll-float.right{right:6px;}
 
-/* 🏷️ etiqueta de fase da venda e disparo, na coluna Aguardando Aprovação */
-.badge-fase{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,monospace;
-  font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;letter-spacing:.02em;
-  background:rgba(96,165,250,.16);color:#60a5fa;border:1px solid rgba(96,165,250,.3);}
-.badge-fase.humano{background:rgba(248,113,113,.16);color:#f87171;border-color:rgba(248,113,113,.4);}
-.card.sem-bot{border-left:3px solid #f87171 !important;background:rgba(248,113,113,.05);}
+/* 🏷️ etiqueta de fase da venda e disparo, na coluna Aguardando Aprovação
+   verde = ainda dentro da sequência de 7 disparos · vermelho = esgotada ou sem bot */
+.badge-fase{display:inline-flex;align-items:center;gap:5px;font-family:ui-monospace,monospace;
+  font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:7px;margin-left:7px;
+  letter-spacing:.01em;line-height:1.3;white-space:nowrap;vertical-align:middle;}
+.badge-fase b{font-size:12.5px;font-weight:800;}
+.badge-fase.viva{background:rgba(52,211,153,.18);color:#34d399;border:1px solid rgba(52,211,153,.45);
+  box-shadow:0 0 10px -3px rgba(52,211,153,.5);}
+.badge-fase.esgotada{background:rgba(248,113,113,.18);color:#f87171;border:1px solid rgba(248,113,113,.5);
+  box-shadow:0 0 10px -3px rgba(248,113,113,.5);}
+.badge-fase.humano{background:rgba(248,113,113,.18);color:#f87171;border:1px solid rgba(248,113,113,.5);
+  font-size:10px;}
+/* o card inteiro acompanha a cor */
+.card.bot-vivo{border-left:4px solid #34d399 !important;}
+.card.bot-esgotado{border-left:4px solid #f87171 !important;background:rgba(248,113,113,.06);}
+.card.sem-bot{border-left:4px solid #f87171 !important;background:rgba(248,113,113,.06);}
 </style>
 </head>
 <body>
