@@ -302,6 +302,22 @@ module.exports = async function handler(req, res) {
 
   // ── 🚚 CARGA-MOTORISTAS: quantas corridas cada um tem, e o que dá para mover ──
   if (action === 'carga-motoristas') {
+    // 📍 leitura de região independente: a função geral do arquivo depende de
+    // tabelas declaradas mais abaixo, e usá-la aqui derrubava a chamada
+    const regiaoLocal = (end) => {
+      const e = ' ' + String(end || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') + ' ';
+      if (/nova lima/.test(e)) return 'Nova Lima';
+      if (/contagem|betim|ibirit|sarzedo|igarape/.test(e)) return 'BH Oeste/Contagem';
+      if (/vespasiano|santa luzia|sabara|ribeirao das neves|neves|justinopolis/.test(e)) return 'Região Norte';
+      if (/venda nova|piratininga|santa monica|serra verde|cea|copacabana|jardim leblon/.test(e)) return 'Venda Nova';
+      if (/barreiro|milionarios|diamante|independencia/.test(e)) return 'BH Barreiro';
+      if (/buritis|gutierrez|estoril|betania|nova suissa|salgado filho|prado|calafate/.test(e)) return 'BH Oeste';
+      if (/savassi|funcionarios|lourdes|centro|santo agostinho|serra|sion|mangabeiras|anchieta|cruzeiro|santo antonio|sao pedro|carmo/.test(e)) return 'BH Centro-Sul';
+      if (/pampulha|castelo|ouro preto|santa amelia|planalto|itapoa|jaragua|liberdade|sao luiz/.test(e)) return 'BH Pampulha';
+      if (/santa efigenia|floresta|sagrada familia|horto|esplanada|santa tereza|pompeia|colegio batista|silveira|concordia|renascenca|caicara|padre eustaquio|alipio|carlos prates|lagoinha|bonfim/.test(e)) return 'BH Leste';
+      return '(sem região)';
+    };
     const db = (await dbGet(LOG_KEY)) || { fichas: [] };
     const emRota = (db.fichas || []).filter(f =>
       ['motorista_parceiro', 'horario_marcado', 'em_rota', 'liberado_para_rota']
@@ -324,7 +340,7 @@ module.exports = async function handler(req, res) {
         equipamento: String(f.equipamento || '').slice(0, 26),
         // 📍 a região quase nunca está gravada: calcula pelo endereço, como a
         // tela do motorista já faz. Sem ela, a distribuição manda tudo para um só.
-        regiao: f.regiaoManual || f.regiao || regiaoDoEndereco(f.endereco) || '(sem região)',
+        regiao: f.regiaoManual || f.regiao || regiaoLocal(f.endereco),
         endereco: String(f.endereco || '').slice(0, 50),
         polegadas: (String(f.equipamento || '').match(/(\d{2,3})\s*(pol|")/i) || [])[1] || null,
         horario: f.horarioColeta || f.agendadoPara || null,
