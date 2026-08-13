@@ -97,6 +97,58 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🚨 DIAGNOSTICO-ENTRAR-CONTATO: por que cada ficha está nesta coluna ──
+  if (action === 'diagnostico-entrar-contato') {
+    const d8e = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const linhas = [], porTelefone = {};
+    for (const [k, sis] of [[KEY_ADM, 'ADM'], [KEY_TV, 'TV']]) {
+      const b = await dbGet(k);
+      for (const f of (((b || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'entrar_contato') continue;
+        const t = d8e(f.telefone);
+        const id = String(f.id || '');
+        const origem = id.startsWith('fic_reag_') || id.startsWith('rem_') ? 'devolvida do remarcar'
+          : id.startsWith('sc_') ? 'recuperada pelo sync'
+          : id.startsWith('rec_') ? 'recuperada'
+          : f.fichaRefeita ? 'cliente refez a ficha'
+          : f.destravadaEm ? 'destravada'
+          : 'fluxo normal';
+        const quando = f.entrarContatoEm || f.movedAt || f.contatoFeitoEm || f.criadoEm;
+        const item = { sis, id, nome: f.nome || '?', tel: t, origem,
+          criadoEm: f.criadoEm, contatoFeitoEm: f.contatoFeitoEm,
+          quando, abordadoPorBot: !!f.abordadoPorBot,
+          motivo: f.entrarContatoMotivo || f.motivoRemarcar || null };
+        linhas.push(item);
+        (porTelefone[t] = porTelefone[t] || []).push(item);
+      }
+    }
+    // 🔁 o mesmo cliente aparece mais de uma vez?
+    const duplicados = Object.entries(porTelefone).filter(([, v]) => v.length > 1);
+    // ⏱️ quantas entraram em cada hora — em lote ou aos poucos?
+    const porHora = {};
+    for (const l of linhas) {
+      const hq = hh(l.quando).slice(0, 13);
+      porHora[hq] = (porHora[hq] || 0) + 1;
+    }
+    const emLote = Object.entries(porHora).filter(([, n]) => n >= 5)
+      .sort((a, b) => b[1] - a[1]);
+    const porOrigem = linhas.reduce((o, l) => { o[l.origem] = (o[l.origem] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: duplicados.length === 0,
+      total: linhas.length,
+      POR_ORIGEM: porOrigem,
+      CLIENTES_DUPLICADOS: duplicados.length,
+      DUPLICADOS: duplicados.map(([t, v]) => v[0].nome.slice(0, 20) + ' ' + t.slice(-4) +
+        ' → ' + v.length + ' fichas | ' + v.map(x => x.origem).join(' + ')),
+      ENTRARAM_EM_LOTE: emLote.map(([h2, n]) => h2 + ' → ' + n + ' ficha(s) de uma vez'),
+      DETALHE: linhas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)))
+        .map(l => hh(l.quando) + ' | ' + l.sis + ' | ' + String(l.nome).slice(0, 20).padEnd(20) +
+          ' ' + l.tel.slice(-4) + ' | ' + l.origem +
+          (l.abordadoPorBot ? ' | bot abordou' : '') +
+          (l.motivo ? ' | ' + String(l.motivo).slice(0, 40) : '')) });
+  }
+
   // ── ⏩ DESTRAVAR-CRIADAS: ficha em Ficha Criada cujo cliente já teve contato ──
   // O bot não aborda quem já abordou, então essas fichas ficavam paradas para
   // sempre. Elas devem seguir o fluxo: Contato Feito e, sem retorno em uma hora
