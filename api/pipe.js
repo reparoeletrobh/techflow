@@ -2363,6 +2363,10 @@ export default async function handler(req, res) {
         const alvo = atual.cards.find(c => c.id === id);
         if (alvo) {
           alvo.phase = phase;
+          // 🔄 as telas leem phaseId: sem copiá-lo para o objeto que será gravado,
+          // a alteração ficava só na cópia descartada e o card permanecia
+          // visualmente na coluna anterior, exibindo a fase nova
+          alvo.phaseId = phase;
           alvo.movedAt = now;
           alvo.history = (alvo.history || []).concat([{ phase: faseAnterior, ts: now }]);
           if (card.aprovadoEm && !alvo.aprovadoEm) {

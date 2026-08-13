@@ -619,6 +619,37 @@ function check(nome, cond, extra) {
   // Verificação por EXECUÇÃO, não por leitura do código: encontra variável
   // inexistente, função fora de escopo e trecho colado no lugar errado —
   // defeitos que a inspeção textual não vê e que viram erro 500 em produção.
+  // ── 💾 o que a resposta afirma precisa estar GRAVADO ──
+  // Verificação de persistência real: a alteração acontecia no objeto lido no
+  // início da requisição, mas a gravação copiava campo a campo para outro
+  // objeto — o que ficasse de fora nunca chegava ao banco, embora a resposta
+  // dissesse que deu certo.
+  console.log('▶ Cenário PS — alterações persistem de fato no banco');
+  {
+    const pipeH = carregarHandler('api/pipe.js');
+    KV['reparoeletro_pipe'] = { cards: [{ id: 'PS1', nomeContato: 'Persistência',
+      telefone: '5531900001111', phase: 'aguardando_aprovacao',
+      phaseId: 'aguardando_aprovacao', valor: 300 }] };
+    const rP = res();
+    await pipeH(req({ action: 'mover', ...K }, { id: 'PS1', phase: 'aprovados' }, 'POST'), rP);
+    await new Promise(s => setTimeout(s, 200));
+    const cP = (KV['reparoeletro_pipe'].cards || [])[0] || {};
+    check('pipe ADM: fase persistiu', cP.phase === 'aprovados', cP.phase);
+    check('pipe ADM: phaseId persistiu', cP.phaseId === 'aprovados', cP.phaseId);
+    check('pipe ADM: carimbo de aprovação persistiu', !!cP.aprovadoEm);
+
+    const tvH = carregarHandler('api/tv-pipe.js');
+    KV['tv_pipe'] = { cards: [{ id: 'PS2', nomeContato: 'Persistência TV',
+      telefone: '5531900002222', phase: 'aguardando_aprovacao',
+      phaseId: 'aguardando_aprovacao', valor: 700 }] };
+    const rT = res();
+    await tvH(req({ action: 'mover', ...K }, { id: 'PS2', phase: 'aprovados' }, 'POST'), rT);
+    await new Promise(s => setTimeout(s, 200));
+    const cT = (KV['tv_pipe'].cards || [])[0] || {};
+    check('pipe TV: fase persistiu', cT.phase === 'aprovados', cT.phase);
+    check('pipe TV: phaseId persistiu', cT.phaseId === 'aprovados', cT.phaseId);
+  }
+
   console.log('▶ Cenário EX — nenhuma ação quebra ao ser chamada');
   {
     const fsX = require('fs'), pathX = require('path');
