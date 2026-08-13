@@ -614,6 +614,26 @@ function check(nome, cond, extra) {
   // ── 📺 avisos ao cliente respeitam horário, resposta e limite ──
   // ── 🧭 função usada antes de ser declarada derruba a requisição ──
   // ── 📜 toda entrada em Entrar em Contato precisa ficar registrada ──
+  // ── 📒 o livro-razão não pode perder nem duplicar fatos ──
+  console.log('▶ Cenário LR — livro-razão distingue fatos diferentes');
+  {
+    const fsL = require('fs');
+    const fun = fsL.readFileSync('api/_funil.js', 'utf8');
+    const kp = fsL.readFileSync('api/kpis.js', 'utf8');
+    check('livro: a trava considera o equipamento',
+      /const eq = String\(dados\.ref \|\| dados\.equipamento/.test(fun));
+    check('livro: a leitura considera o equipamento',
+      /v\.eq === eqE/.test(kp));
+    check('livro: a lista é podada para não crescer sem limite', /ltrim/.test(fun));
+    check('livro: o evento guarda o equipamento', /equipamento: String\(dados\.equipamento/.test(fun));
+    // todo caminho de criação de ficha registra
+    const fic = fsL.readFileSync('api/fichas.js', 'utf8');
+    const criacoes = (fic.match(/fichas\.unshift\(\{/g) || []).length;
+    const registros = (fic.match(/registrar\('ficha'/g) || []).length;
+    check('livro: os caminhos principais de ficha registram',
+      registros >= 3, registros + ' registro(s) para ' + criacoes + ' criação(ões)');
+  }
+
   console.log('▶ Cenário EC — passagem por Entrar em Contato é registrada');
   {
     const EC = require('../api/_entrar_contato.js');

@@ -538,7 +538,7 @@ export default async function handler(req, res) {
       if(body.vencimento!==undefined) card.vencimento=body.vencimento||null;
       if(valor!==undefined)       card.valor=parseFloat(String(valor).replace(',','.'))||0;
     // 📅 momento em que o orçamento passou a existir — sem isto o KPI não consegue datar a etapa
-    if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();_funil.registrar('orcamento',{telefone:card.telefone,nome:card.nomeContato||card.nome,valor:card.valor,frente:'tv',canal:'online',ref:card.id}).catch(()=>{});}
+    if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();_funil.registrar('orcamento',{telefone:card.telefone,nome:card.nomeContato||card.nome,valor:card.valor,equipamento:card.equipamento||card.descricao,frente:'tv',canal:'online',ref:card.id}).catch(()=>{});}
       if(telefone!==undefined)    card.telefone=telefone;
       if(equipamento!==undefined) card.equipamento=equipamento;
       if(descricao!==undefined)   card.descricao=descricao;
@@ -1723,7 +1723,7 @@ export default async function handler(req, res) {
     var card = (db.cards || []).find(function(c) { return c.id === id; });
     if (!card) return res.status(404).json({ ok: false, error: 'nao encontrado' });
     card.valor = valor;
-      if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();_funil.registrar('orcamento',{telefone:card.telefone,nome:card.nomeContato||card.nome,valor:card.valor,frente:'tv',canal:'online',ref:card.id}).catch(()=>{});}
+      if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();_funil.registrar('orcamento',{telefone:card.telefone,nome:card.nomeContato||card.nome,valor:card.valor,equipamento:card.equipamento||card.descricao,frente:'tv',canal:'online',ref:card.id}).catch(()=>{});}
     await dbSet(PIPE_KEY, db);
     return res.status(200).json({ ok: true, valor: valor });
   }
@@ -1775,7 +1775,7 @@ export default async function handler(req, res) {
 
       if (novoValor > 0) {
         card.valor = novoValor;
-      if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();_funil.registrar('orcamento',{telefone:card.telefone,nome:card.nomeContato||card.nome,valor:card.valor,frente:'tv',canal:'online',ref:card.id}).catch(()=>{});}
+      if(card.valor>0&&!card.orcamentoEm){card.orcamentoEm=new Date().toISOString();_funil.registrar('orcamento',{telefone:card.telefone,nome:card.nomeContato||card.nome,valor:card.valor,equipamento:card.equipamento||card.descricao,frente:'tv',canal:'online',ref:card.id}).catch(()=>{});}
         atualizados++;
       }
     }
@@ -1810,7 +1810,7 @@ export default async function handler(req, res) {
     // 📒 entrada em aprovados: registra no livro-razão no instante do fato
     if (phase === 'aprovados' && faseAnterior !== 'aprovados') {
       _funil.registrar('aprovado', { telefone: card.telefone,
-        nome: card.nomeContato || card.nome, valor: Number(card.valor || 0),
+        nome: card.nomeContato || card.nome, valor: Number(card.valor || 0), equipamento: card.equipamento || card.descricao,
         frente: 'tv',
         canal: String(card.origem || '') === 'frenteloja' ? 'balcao' : 'online',
         quem: (req.body && req.body.movedBy) || '', ref: card.id }).catch(() => {});

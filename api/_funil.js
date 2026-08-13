@@ -32,8 +32,13 @@ async function registrar(etapa, dados = {}) {
     // 🔁 trava contra registro repetido: 10 minutos
     const chaveT = String(dados.telefone || '').replace(/\D/g, '').slice(-8);
     if (chaveT) {
+      // 🔑 o equipamento entra na chave: cliente que deixa dois aparelhos gera
+      // dois registros legítimos, e sem isso o segundo era descartado como
+      // repetição. O que se quer evitar é o MESMO fato gravado duas vezes.
+      const eq = String(dados.ref || dados.equipamento || '')
+        .toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14);
       const trava = 'funil_trava_' + etapa + '_' + chaveT + '_' +
-        Math.round(Number(dados.valor || 0));
+        Math.round(Number(dados.valor || 0)) + (eq ? '_' + eq : '');
       try {
         const r = await fetch(`${url()}/set/${trava}/1?NX=true&EX=600`,
           { headers: { Authorization: `Bearer ${tok()}` } }).then(x => x.json());
@@ -51,9 +56,18 @@ async function registrar(etapa, dados = {}) {
       canal: String(dados.canal || 'online'),
       quem: String(dados.quem || '').slice(0, 30),
       ref: String(dados.ref || '').slice(0, 40),
+      equipamento: String(dados.equipamento || '').slice(0, 40),
     };
     await fetch(`${url()}/rpush/${LISTA}/${encodeURIComponent(JSON.stringify(ev))}`,
       { headers: { Authorization: `Bearer ${tok()}` } });
+    // ✂️ mantém os últimos 60 mil eventos: com o volume atual cobre meses, e
+    // impede que a lista cresça sem limite até comprometer o banco
+    try {
+      if (Math.random() < 0.02) {          // poda esporádica, não a cada gravação
+        await fetch(`${url()}/ltrim/${LISTA}/-60000/-1`,
+          { headers: { Authorization: `Bearer ${tok()}` } });
+      }
+    } catch (e) {}
     return true;
   } catch (e) { return false; }
 }
@@ -61,7 +75,7 @@ async function registrar(etapa, dados = {}) {
 /** Lê os eventos de um intervalo. */
 async function ler(iniMs, fimMs) {
   try {
-    const r = await fetch(`${url()}/lrange/${LISTA}/-20000/-1`,
+    const r = await fetch(`${url()}/lrange/${LISTA}/-60000/-1`,
       { headers: { Authorization: `Bearer ${tok()}` } }).then(x => x.json());
     const out = [];
     for (const s of (r.result || [])) {

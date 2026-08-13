@@ -1169,6 +1169,8 @@ export default async function handler(req, res) {
       const chave = x.ehTv ? KEY_TV : KEY_ADM;
       const db = (await dbGet(chave)) || { fichas: [] };
       db.fichas = db.fichas || [];
+      _funil.registrar('ficha', { telefone: x.telefone, nome: x.nome,
+        frente: x.ehTv ? 'tv' : 'adm', canal: 'planilha' }).catch(() => {});
       db.fichas.unshift({
         id: 'rec_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,
@@ -1503,6 +1505,10 @@ export default async function handler(req, res) {
         };
 
         if (resgate) ficha.resgatada = true;
+        // 📒 este é o caminho principal de entrada: sem registrar aqui, o livro
+        // ficava sabendo apenas das fichas recuperadas, não das que chegam no dia
+        _funil.registrar('ficha', { telefone: ficha.telefone, nome: ficha.nome,
+          frente: sistema === 'tv' ? 'tv' : 'adm', canal: 'planilha' }).catch(() => {});
         if (sistema === 'tv') dbTv.fichas.unshift(ficha);
         else                  dbAdm.fichas.unshift(ficha);
         rowsExistentes.add(rowNum);
@@ -1621,6 +1627,9 @@ export default async function handler(req, res) {
       const horaInicio = faixaHorario.split(' - ')[0] || '08:00';
       horarioColeta = `${dataAgendada}T${horaInicio}`;
     }
+    _funil.registrar('logistica', { telefone: (ficha || {}).telefone,
+      nome: (ficha || {}).nome, frente: sistema === 'tv' ? 'tv' : 'adm',
+      canal: 'manual' }).catch(() => {});
     logDb.fichas.unshift({
       id:           'log_' + Date.now().toString(36),
       observacao:   obsLog,

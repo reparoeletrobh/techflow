@@ -304,6 +304,7 @@ export default async function handler(req,res){
     if(!ficha.orcamentoEm){
       ficha.orcamentoEm=now;
       _funil.registrar('orcamento', { telefone: ficha.telefone, nome: ficha.nomeContato,
+        equipamento: ficha.equipamento,
         valor: parseFloat(valor)||0, frente: 'adm', canal: 'balcao', ref: ficha.id }).catch(()=>{});
     }
     ficha.valor=parseFloat(valor)||ficha.valor||0;
@@ -327,6 +328,7 @@ export default async function handler(req,res){
       ficha.aprovadoPor=String(req.body?.usuario||req.body?.atendente||'balcão').slice(0,30);
       // 📒 registra no livro-razão do funil, no instante do fato
       _funil.registrar('aprovado', { telefone: ficha.telefone, nome: ficha.nomeContato,
+        equipamento: ficha.equipamento,
         valor: parseFloat(valor)||0, frente: 'adm', canal: 'balcao',
         quem: ficha.aprovadoPor, ref: ficha.id }).catch(()=>{});
       ficha.history=(ficha.history||[]).concat([

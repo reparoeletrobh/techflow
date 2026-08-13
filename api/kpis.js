@@ -304,10 +304,11 @@ module.exports = async function handler(req, res) {
     const evs = brutos.filter(e => {
       const t = String(e.tel || '').slice(-8);
       const q = new Date(e.ts || 0).getTime();
-      const rep = vistos.some(v => v.t === t && v.valor === Number(e.valor || 0) &&
-        Math.abs(v.q - q) < 600000);
+      const eqE = String(e.equipamento || e.ref || '').toLowerCase().slice(0, 14);
+      const rep = vistos.some(v => v.t === t && v.eq === eqE &&
+        v.valor === Number(e.valor || 0) && Math.abs(v.q - q) < 600000);
       if (rep) return false;
-      vistos.push({ t, valor: Number(e.valor || 0), q });
+      vistos.push({ t, eq: eqE, valor: Number(e.valor || 0), q });
       return true;
     });
     const duplicadas = brutos.length - evs.length;
@@ -683,10 +684,13 @@ module.exports = async function handler(req, res) {
   const evsLivro = evsBrutos.filter(e => {
     const t = String(e.tel || '').slice(-8);
     const q = new Date(e.ts || 0).getTime();
-    const rep = jaVi.some(v => v.et === e.etapa && v.t === t &&
+    // 🔑 o equipamento entra na comparação: dois aparelhos do mesmo cliente são
+    // dois fatos distintos, e ignorá-lo descartava o segundo como repetição
+    const eqE = String(e.equipamento || e.ref || '').toLowerCase().slice(0, 14);
+    const rep = jaVi.some(v => v.et === e.etapa && v.t === t && v.eq === eqE &&
       v.valor === Number(e.valor || 0) && Math.abs(v.q - q) < 600000);
     if (rep) return false;
-    jaVi.push({ et: e.etapa, t, valor: Number(e.valor || 0), q });
+    jaVi.push({ et: e.etapa, t, eq: eqE, valor: Number(e.valor || 0), q });
     return true;
   });
   const usaLivro = evsLivro.length > 0;
