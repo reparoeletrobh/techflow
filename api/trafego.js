@@ -1873,6 +1873,80 @@ module.exports = async function handler(req, res) {
         ' | ' + (l.botao || '?') + ' | ' + (l.numeroWhatsApp || l.link || 'destino pela Página')) });
   }
 
+  // ── 🏆 DESEMPENHO-CICLO: quem merecia verba e quem merecia corte ──
+  if (action === 'desempenho-ciclo') {
+    const TK = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || '2026-08-08').slice(0, 10);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const CONV = ['onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.total_messaging_connection'];
+    // situação e verba
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads`
+      + `?fields=id,effective_status,adset{lifetime_budget,daily_budget},`
+      + `campaign{id,name,effective_status,start_time,lifetime_budget,daily_budget}`
+      + `&limit=400&access_token=${TK}`, 10);
+    const camp = {};
+    for (const a of (ads.data || [])) {
+      const c = a.campaign || {}, cj = a.adset || {};
+      if (!c.id || String(c.start_time || '').slice(0, 10) < desde) continue;
+      camp[c.id] = camp[c.id] || { nome: c.name, situacao: c.effective_status,
+        verba: (Number(cj.lifetime_budget || c.lifetime_budget || 0) / 100) ||
+               (Number(cj.daily_budget || c.daily_budget || 0) / 100) };
+    }
+    // desempenho no ciclo
+    let url = `${GRAPH}/act_${CONTA}/insights?level=campaign`
+      + `&fields=campaign_id,spend,impressions,actions`
+      + `&time_range=${encodeURIComponent(JSON.stringify({ since: desde, until: hoje }))}`
+      + `&limit=400&access_token=${TK}`;
+    let p = 0;
+    while (url && p < 5) {
+      const r = await fetch(url).then(x => x.json());
+      if (!r || r.error) break;
+      for (const c of (r.data || [])) {
+        if (!camp[c.campaign_id]) continue;
+        let conv = 0;
+        for (const a of (c.actions || [])) {
+          if (CONV.includes(String(a.action_type))) { conv += parseInt(a.value || 0, 10) || 0; break; }
+        }
+        camp[c.campaign_id].gasto = parseFloat(c.spend || 0) || 0;
+        camp[c.campaign_id].conversas = conv;
+        camp[c.campaign_id].impressoes = parseInt(c.impressions || 0, 10) || 0;
+      }
+      url = (r.paging && r.paging.next) || null; p++;
+    }
+    const lista = Object.values(camp).map(c => ({ ...c,
+      gasto: c.gasto || 0, conversas: c.conversas || 0,
+      custo: (c.conversas || 0) ? +((c.gasto || 0) / c.conversas).toFixed(2) : null,
+      recebeuVerba: c.verba > 70 && c.verba < 170,   // acima da base de 69, fora do padrão TV
+      pausada: c.situacao !== 'ACTIVE' }));
+    const comConv = lista.filter(c => c.custo != null);
+    const mediaCusto = comConv.length
+      ? +(comConv.reduce((s, c) => s + c.custo, 0) / comConv.length).toFixed(2) : 0;
+    const fmt = c => (c.pausada ? '⏸️' : '🟢') + (c.recebeuVerba ? '💰' : '  ') + ' ' +
+      String(c.nome).slice(0, 38).padEnd(38) +
+      ' verba ' + c.verba.toFixed(2).padStart(7) +
+      ' gasto ' + c.gasto.toFixed(2).padStart(7) +
+      ' conversas ' + String(c.conversas).padStart(3) +
+      ' custo ' + (c.custo != null ? ('R$ ' + c.custo.toFixed(2)).padStart(9) : '   sem conv');
+    // as que receberam reforço E foram pausadas
+    const contraditorias = lista.filter(c => c.pausada && c.recebeuVerba);
+    return res.status(200).json({ ok: contraditorias.length === 0,
+      ciclo: { de: desde, ate: hoje },
+      custoMedioPorConversa: mediaCusto,
+      CONTRADITORIAS: {
+        quantas: contraditorias.length,
+        explicacao: 'receberam reforço de verba e depois foram pausadas no mesmo ciclo',
+        L: contraditorias.map(c => fmt(c) +
+          (c.custo != null
+            ? (c.custo <= mediaCusto ? '  ← estava ABAIXO da média: corte questionável'
+                                     : '  ← acima da média: corte coerente')
+            : '  ← sem conversa alguma: corte coerente')),
+      },
+      PAUSADAS: lista.filter(c => c.pausada).sort((a, b) => (b.custo || 9999) - (a.custo || 9999)).map(fmt),
+      ATIVAS: lista.filter(c => !c.pausada).sort((a, b) => (a.custo || 9999) - (b.custo || 9999)).map(fmt),
+      legenda: '💰 = recebeu verba acima da base · custo = gasto ÷ conversas iniciadas' });
+  }
+
   // ── 📐 AUDITORIA-VERBA: a linha do tempo da verba no ciclo ──
   if (action === 'auditoria-verba') {
     const TK = String(req.query.token || '').trim() || TOKEN;
