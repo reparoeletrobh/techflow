@@ -417,6 +417,57 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 📺 PAINEL-CONDENADOS: em que pé está cada aviso ──
+  if (action === 'painel-condenados') {
+    const bd = (await dbGet('tv_board')) || { cards: [] };
+    const hh2 = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const grupos = { naoAvisados: [], aguardandoResposta: [], responderam: [],
+      semResposta: [], semTelefone: [] };
+    for (const c of (bd.cards || [])) {
+      const fase = String(c.phaseId || '');
+      if (fase !== 'condenado' && fase !== 'aguardando_ret') continue;
+      let tel = String(c.telefone || '').replace(/\D/g, '');
+      if (tel.length === 11 || tel.length === 10) tel = '55' + tel;
+      const linha = String(c.nomeContato || c.nome || '?').slice(0, 22) +
+        ' ' + tel.slice(-4) + ' | ' + String(c.equipamento || '').slice(0, 24) +
+        ' | ' + fase;
+      if (tel.length < 12) { grupos.semTelefone.push(linha + ' | "' + c.telefone + '"'); continue; }
+      if (c.escolhaCondenado) {
+        const g = /sem resposta/.test(c.escolhaCondenado) ? 'semResposta' : 'responderam';
+        grupos[g].push(linha + ' | ' + c.escolhaCondenado + ' | ' + hh2(c.escolhaCondenadoEm));
+        continue;
+      }
+      if (c.aguardandoEscolhaCondenado) {
+        const dias = c.avisoCondenadoEnviadoEm
+          ? Math.floor((Date.now() - new Date(c.avisoCondenadoEnviadoEm).getTime()) / 86400000) : 0;
+        grupos.aguardandoResposta.push(linha + ' | avisado ' +
+          hh2(c.avisoCondenadoEnviadoEm) + ' | há ' + dias + ' dia(s)');
+        continue;
+      }
+      grupos.naoAvisados.push(linha +
+        (c.avisoCondenadoStatus ? ' | ' + c.avisoCondenadoStatus : ' | nunca avisado'));
+    }
+    return res.status(200).json({ ok: true,
+      RESUMO: {
+        aindaNaoAvisados: grupos.naoAvisados.length,
+        aguardandoResposta: grupos.aguardandoResposta.length,
+        jaEscolheram: grupos.responderam.length,
+        semRespostaEm5Dias: grupos.semResposta.length,
+        semTelefoneUtil: grupos.semTelefone.length,
+      },
+      NAO_AVISADOS: grupos.naoAvisados,
+      AGUARDANDO_RESPOSTA: grupos.aguardandoResposta,
+      JA_ESCOLHERAM: grupos.responderam,
+      SEM_RESPOSTA: grupos.semResposta,
+      SEM_TELEFONE: grupos.semTelefone,
+      proximosPassos: [
+        grupos.naoAvisados.length ? 'avisar: &action=tv-condenada-avisar&todosCondenados=1&aplicar=1' : null,
+        grupos.aguardandoResposta.length ? 'conferir respostas: &action=tv-condenada-respostas' : null,
+        grupos.semTelefone.length ? 'corrigir o telefone no cadastro dessas fichas' : null,
+      ].filter(Boolean) });
+  }
+
   // ── 📋 MODELOS: quais existem na conta, com nome e situação ──
   if (action === 'modelos') {
     const cfgM = (await dbGet('wa_credenciais')) || {};
@@ -634,8 +685,12 @@ export default async function handler(req, res) {
 
     const feitos = [], porTemplate = [], erros = [];
     for (const { f, ctrl } of fila) {
-      const tel = String(f.telefone || '').replace(/\D/g, '');
-      if (tel.length < 12) { erros.push((f.nomeContato || '?') + ': telefone inválido'); continue; }
+      let tel = String(f.telefone || '').replace(/\D/g, '');
+      if (tel.length === 11 || tel.length === 10) tel = '55' + tel;
+      if (tel.length < 12 || tel.length > 13) {
+        erros.push((f.nomeContato || '?') + ': número não utilizável — "' +
+          String(f.telefone || '') + '"'); continue;
+      }
       const nome = String(f.nomeContato || '').split(' ')[0] || 'tudo bem';
       const eqs = (fila.find(x => x.f === f) || {}).equipamentos || [];
       const equip = eqs.length > 1 ? 'seus ' + eqs.length + ' equipamentos'
@@ -779,8 +834,15 @@ export default async function handler(req, res) {
     } catch (e) {}
     const feitos = [], erros = [];
     for (const c of pendentes) {
-      const tel = String(c.telefone || '').replace(/\D/g, '');
-      if (tel.length < 12) { erros.push((c.nomeContato || '?') + ': telefone inválido'); continue; }
+      // 📞 o cadastro guarda o número sem o código do país: normaliza em vez de
+      // recusar, que era o que impedia esses clientes de serem avisados
+      let tel = String(c.telefone || '').replace(/\D/g, '');
+      if (tel.length === 11 || tel.length === 10) tel = '55' + tel;
+      if (tel.length === 12 && !tel.startsWith('55')) tel = '55' + tel.slice(-10);
+      if (tel.length < 12 || tel.length > 13) {
+        erros.push((c.nomeContato || '?') + ': número não utilizável — "' +
+          String(c.telefone || '') + '"'); continue;
+      }
       try {
         // 🔒 fora da janela de 24h o WhatsApp recusa texto livre: nesse caso a
         // mensagem fica pendente e é enviada quando o cliente responder
