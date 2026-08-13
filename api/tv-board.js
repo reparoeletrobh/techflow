@@ -380,9 +380,11 @@ module.exports = async function handler(req, res) {
       if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
       const faseAnterior = String(card.phaseId || '');
       card.phaseId = phaseId;
-      // 📺 TV condenada indo para retirada: o cliente precisa saber que o
-      // conserto não foi viável e escolher o que fazer com o aparelho
-      if (phaseId === 'aguardando_ret' && faseAnterior === 'condenado' && !card.avisoCondenadoEm) {
+      // 📺 a equipe move para Condenado: é esse o momento em que o cliente
+      // precisa saber que o conserto não foi viável. O aviso é enviado e, em
+      // seguida, a ficha segue para Aguardando Retirada — o aparelho passa a
+      // esperar a decisão dele.
+      if (phaseId === 'condenado' && faseAnterior !== 'condenado' && !card.avisoCondenadoEm) {
         card.avisoCondenadoEm = new Date().toISOString();
         card.avisoCondenadoStatus = 'pendente';
       }

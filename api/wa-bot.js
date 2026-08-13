@@ -417,6 +417,42 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── ➡️ MOVER-AVISADOS: leva para Aguardando Retirada quem já foi avisado ──
+  if (action === 'condenados-mover-avisados') {
+    const bd = (await dbGet('tv_board')) || { cards: [] };
+    const alvo = (bd.cards || []).filter(c =>
+      String(c.phaseId || '') === 'condenado' &&
+      (c.avisoCondenadoStatus === 'enviado' || c.avisoCondenadoStatus === 'modelo enviado'));
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSerMovidas: alvo.length,
+        L: alvo.map(c => String(c.nomeContato || c.nome || '?').slice(0, 24) + ' ' +
+          String(c.telefone || '').slice(-4) + ' | ' +
+          String(c.equipamento || '').slice(0, 24) + ' | ' + c.avisoCondenadoStatus),
+        oQueVaiAcontecer: 'Condenado → Aguardando Retirada, pois o cliente já foi avisado ' +
+          'de que o aparelho está disponível',
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    let n = 0;
+    for (const c of alvo) {
+      c.phaseId = 'aguardando_ret';
+      c.movedAt = new Date().toISOString();
+      c.movidoPorAvisoCondenado = true;
+      c.history = (c.history || []).concat([{ phase: 'aguardando_ret',
+        ts: c.movedAt, via: 'aviso de inviabilidade' }]);
+      n++;
+    }
+    if (n) {
+      await dbSet('tv_board', bd);
+      const conf = await dbGet('tv_board');
+      const ok2 = alvo.every(a => ((conf || {}).cards || [])
+        .some(x => String(x.id) === String(a.id) && String(x.phaseId) === 'aguardando_ret'));
+      if (!ok2) return res.status(200).json({ ok: false,
+        error: 'a gravação não persistiu — tente de novo' });
+    }
+    return res.status(200).json({ ok: true, movidas: n });
+  }
+
   // ── 📺 PAINEL-CONDENADOS: em que pé está cada aviso ──
   if (action === 'painel-condenados') {
     const bd = (await dbGet('tv_board')) || { cards: [] };
@@ -783,8 +819,8 @@ export default async function handler(req, res) {
       // já avisado, não repete
       if (c.avisoCondenadoStatus === 'enviado' ||
           c.avisoCondenadoStatus === 'modelo enviado') return false;
-      // fluxo normal: marcado ao ir de Condenado para Aguardando Retirada
-      if (c.avisoCondenadoStatus === 'pendente' && fase === 'aguardando_ret') return true;
+      // fluxo normal: marcado ao ENTRAR em Condenado
+      if (c.avisoCondenadoStatus === 'pendente' && fase === 'condenado') return true;
       if (!todos) return false;
       // 📋 com todosCondenados=1 alcança também quem ESTÁ na coluna Condenado
       // agora, ou já passou por ela e foi para retirada — são os casos
@@ -838,6 +874,16 @@ export default async function handler(req, res) {
     const token = cfgW.token || process.env.WA_TOKEN;
     if (!phoneId || !token) return res.status(200).json({ ok: false, error: 'credenciais do WhatsApp ausentes' });
     const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // ➡️ depois de avisado, o aparelho sai de Condenado e passa a aguardar
+    // retirada: é o que o cliente acabou de ser informado
+    const moverParaRetirada = (card) => {
+      if (String(card.phaseId || '') !== 'condenado') return;
+      card.phaseId = 'aguardando_ret';
+      card.movedAt = new Date().toISOString();
+      card.movidoPorAvisoCondenado = true;
+      card.history = (card.history || []).concat([{ phase: 'aguardando_ret',
+        ts: card.movedAt, via: 'aviso de inviabilidade' }]);
+    };
     // última mensagem recebida de cada cliente, para saber se a janela está aberta
     const ultimaEntrada = {};
     try {
@@ -887,6 +933,7 @@ export default async function handler(req, res) {
             c.avisoCondenadoStatus = 'modelo enviado';
             c.avisoCondenadoEnviadoEm = new Date().toISOString();
             c.aguardandoEscolhaCondenado = true;
+            moverParaRetirada(c);
             feitos.push((c.nomeContato || '?') + ' ' + tel.slice(-4) + ' (modelo)');
             try { await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out',
               texto: '[modelo] tv_sem_viabilidade_reparo', tipo: 'template' }); } catch (e) {}
@@ -906,6 +953,8 @@ export default async function handler(req, res) {
           c.avisoCondenadoStatus = 'enviado';
           c.avisoCondenadoEnviadoEm = new Date().toISOString();
           c.aguardandoEscolhaCondenado = true;   // 🎯 a próxima resposta é a escolha
+          // ➡️ avisado o cliente, o aparelho passa a aguardar a retirada
+          moverParaRetirada(c);
           feitos.push((c.nomeContato || '?') + ' ' + tel.slice(-4));
         } else { erros.push((c.nomeContato || '?') + ': ' +
           ((r && r.error && r.error.message) || 'falha no envio')); }
