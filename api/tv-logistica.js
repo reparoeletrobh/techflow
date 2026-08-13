@@ -342,7 +342,15 @@ module.exports = async function handler(req, res) {
         // tela do motorista já faz. Sem ela, a distribuição manda tudo para um só.
         regiao: f.regiaoManual || f.regiao || regiaoLocal(f.endereco),
         endereco: String(f.endereco || '').slice(0, 50),
-        polegadas: (String(f.equipamento || '').match(/(\d{2,3})\s*(pol|")/i) || [])[1] || null,
+        // 📏 pega TODOS os tamanhos citados e usa o maior: "TV 55 e TV 47" tem
+        // dois aparelhos, e "RS - TV 70" não traz a palavra polegada nenhuma
+        polegadas: (() => {
+          const txt = String(f.equipamento || '');
+          const nums = (txt.match(/\b(2[0-9]|[3-9][0-9]|1[0-9]{2})\b/g) || [])
+            .map(Number).filter(n => n >= 20 && n <= 120);
+          return nums.length ? Math.max(...nums) : null;
+        })(),
+        varios: /\be\b.*\btv\b|\d+\s*(un|unidades)|,\s*tv/i.test(String(f.equipamento || '')),
         horario: f.horarioColeta || f.agendadoPara || null,
         desde: f.movedAt || f.criadoEm,
       });
@@ -368,9 +376,11 @@ module.exports = async function handler(req, res) {
         if (sobrecarregado === 'Jhonatan' && pol !== null && pol > 55) continue;
         if (/nova lima/i.test(f.regiao + ' ' + (f.endereco || ''))) continue;
         const txtRegiao = f.regiao + ' ' + (f.endereco || '');
+        // 🚫 mais de um aparelho: a decisão é da equipe, pode ser carga grande
+        if (f.varios) continue;
         const destino = folgados.find(x => {
-          if (x === 'Wilde') return /norte|venda nova|santa luzia|vespasiano|sabar|leste|neves/i.test(txtRegiao);
-          if (x === 'Eduardo') return /oeste|sul|contagem|betim|ibirit|barreiro|gutierrez|buritis|est[oó]ril/i.test(txtRegiao);
+          if (x === 'Wilde') return /venda nova|regi[ãa]o norte|santa luzia|vespasiano|sabar|neves|bh leste/i.test(txtRegiao);
+          if (x === 'Eduardo') return /oeste|contagem|betim|ibirit|barreiro/i.test(txtRegiao);
           return false;
         });
         if (destino) { sugestoes.push({ ficha: f, de: sobrecarregado, para: destino }); continue; }
@@ -407,6 +417,67 @@ module.exports = async function handler(req, res) {
         (f.horario ? ' | ⏰ combinado' : ''))),
       comoAplicar: sugestoes.length
         ? '/api/tv-logistica?action=redistribuir&aplicar=1 (confira a lista antes)' : null });
+  }
+
+  // ── 🔄 REDISTRIBUIR: aplica as transferências sugeridas ──
+  // Só mexe em ficha sem horário combinado e dentro das regras de porte e região.
+  if (action === 'redistribuir') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    // reaproveita o cálculo do relatório, para não haver duas regras diferentes
+    const K2 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    let rel = null;
+    try {
+      rel = await fetch('https://reparoeletroadm.com/api/tv-logistica' +
+        '?action=carga-motoristas&k=' + K2).then(x => x.json());
+    } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui ler a carga' }); }
+    const linhas = (rel && rel.PODEM_SER_MOVIDAS) || [];
+    if (!linhas.length) {
+      return res.status(200).json({ ok: true, nada: 'não há transferência a fazer',
+        VEREDITO: (rel || {}).VEREDITO });
+    }
+    // só transfere quem o próprio relatório apontou
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
+    const alvos = [];
+    for (const l of linhas) {
+      const m = String(l).match(/^(.+?)\s(\d{4})\s\|.*\|\s(\w+)\s→\s(\w+)$/);
+      if (!m) continue;
+      const tel4 = m[2], para = m[4];
+      const f = (db.fichas || []).find(x =>
+        String(x.telefone || '').replace(/\D/g, '').slice(-4) === tel4 &&
+        ['motorista_parceiro', 'liberado_para_rota'].includes(String(x.phase || '')) &&
+        !x.horarioColeta && !x.agendadoPara);
+      if (f) alvos.push({ f, para, de: f.motoristaNome || '?' });
+    }
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSerTransferidas: alvos.length,
+        L: alvos.map(a => String(a.f.nome || '?').slice(0, 22) + ' ' +
+          String(a.f.telefone || '').slice(-4) + ' | ' +
+          String(a.f.equipamento || '').slice(0, 24) + ' | ' + a.de + ' → ' + a.para),
+        observacao: 'ficha com horário combinado nunca é transferida',
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    const feitos = [];
+    for (const a of alvos) {
+      a.f.motoristaNome = a.para;
+      a.f.redistribuidoEm = new Date().toISOString();
+      a.f.redistribuidoDe = a.de;
+      a.f.history = (a.f.history || []).concat([{ phase: a.f.phase,
+        ts: new Date().toISOString(), via: 'redistribuição', de: a.de, para: a.para }]);
+      feitos.push(String(a.f.nome || '?').slice(0, 22) + ' | ' + a.de + ' → ' + a.para);
+    }
+    if (feitos.length) {
+      await dbSet(LOG_KEY, db);
+      // confirma que persistiu
+      const conf = await dbGet(LOG_KEY);
+      const ok2 = alvos.every(a => {
+        const c2 = ((conf || {}).fichas || []).find(x => String(x.id) === String(a.f.id));
+        return c2 && c2.motoristaNome === a.para;
+      });
+      if (!ok2) return res.status(200).json({ ok: false,
+        error: 'a gravação não persistiu — confira e tente de novo' });
+    }
+    return res.status(200).json({ ok: true, transferidas: feitos.length, L: feitos });
   }
 
   // ── 📜 LOG-DEVOLUCOES: histórico com desfecho de cada devolução ──
