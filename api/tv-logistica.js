@@ -300,6 +300,83 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action;
 
+  // ── 🚚 CARGA-MOTORISTAS: quantas corridas cada um tem, e o que dá para mover ──
+  if (action === 'carga-motoristas') {
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
+    const emRota = (db.fichas || []).filter(f =>
+      ['motorista_parceiro', 'horario_marcado', 'em_rota', 'liberado_para_rota']
+        .includes(String(f.phase || '')));
+    const norm = n => {
+      const x = String(n || '').toLowerCase().trim();
+      if (/^j.{0,2}nat|jonat|jhonat|jonath/.test(x)) return 'Jhonatan';
+      if (/^wil|wyld|wild/.test(x)) return 'Wilde';
+      if (/eduard/.test(x)) return 'Eduardo';
+      return n ? String(n) : '(sem motorista)';
+    };
+    const porM = {};
+    for (const f of emRota) {
+      const m2 = norm(f.motoristaNome);
+      porM[m2] = porM[m2] || { total: 0, comHorario: 0, fichas: [] };
+      porM[m2].total++;
+      if (f.horarioColeta || f.agendadoPara) porM[m2].comHorario++;
+      porM[m2].fichas.push({
+        id: f.id, nome: f.nome || '?', tel: String(f.telefone || '').slice(-4),
+        equipamento: String(f.equipamento || '').slice(0, 26),
+        regiao: f.regiaoManual || f.regiao || '(sem região)',
+        polegadas: (String(f.equipamento || '').match(/(\d{2,3})\s*(pol|")/i) || [])[1] || null,
+        horario: f.horarioColeta || f.agendadoPara || null,
+        desde: f.movedAt || f.criadoEm,
+      });
+    }
+    const nomes = Object.keys(porM).sort((a, b) => porM[b].total - porM[a].total);
+    const total = emRota.length;
+    const media = nomes.length ? Math.round(total / nomes.length) : 0;
+
+    // 📍 o que dá para mover: sem horário combinado e fora da regra de exclusividade
+    const REGRA = {
+      Jhonatan: 'acima de 55 polegadas e Nova Lima',
+      Wilde: 'até 55 pol · BH Norte, Venda Nova, Santa Luzia, Vespasiano, Sabará, BH Leste, Neves',
+      Eduardo: 'até 55 pol · BH Oeste, BH Sul, Contagem, Betim, Ibirité',
+    };
+    const sugestoes = [];
+    const sobrecarregado = nomes.find(n => porM[n].total > media * 1.4);
+    if (sobrecarregado) {
+      const folgados = nomes.filter(n => porM[n].total < media);
+      for (const f of porM[sobrecarregado].fichas) {
+        if (f.horario) continue;                   // já combinou hora: não mexe
+        const pol = f.polegadas ? parseInt(f.polegadas, 10) : null;
+        if (sobrecarregado === 'Jhonatan' && (pol === null || pol > 55)) continue;
+        if (/nova lima/i.test(f.regiao)) continue;  // exclusividade de região
+        const destino = folgados.find(x => {
+          if (x === 'Wilde') return /norte|venda nova|santa luzia|vespasiano|sabar|leste|neves/i.test(f.regiao);
+          if (x === 'Eduardo') return /oeste|sul|contagem|betim|ibirit/i.test(f.regiao);
+          return false;
+        });
+        if (destino) sugestoes.push({ ficha: f, de: sobrecarregado, para: destino });
+      }
+    }
+    return res.status(200).json({ ok: !sobrecarregado,
+      totalEmRota: total, motoristas: nomes.length, mediaPorMotorista: media,
+      VEREDITO: sobrecarregado
+        ? '⚠️ ' + sobrecarregado + ' está com ' + porM[sobrecarregado].total +
+          ' corridas, média é ' + media
+        : '✅ carga equilibrada',
+      CARGA: nomes.map(n => n.padEnd(16) + ' | ' + String(porM[n].total).padStart(3) +
+        ' corrida(s) | ' + porM[n].comHorario + ' com horário combinado' +
+        (REGRA[n] ? ' | regra: ' + REGRA[n] : '')),
+      PODEM_SER_MOVIDAS: sugestoes.map(s => s.ficha.nome.slice(0, 20) + ' ' + s.ficha.tel +
+        ' | ' + s.ficha.equipamento + ' | ' + s.ficha.regiao +
+        ' | ' + s.de + ' → ' + s.para),
+      NAO_MOVER: (porM[sobrecarregado] ? porM[sobrecarregado].fichas.filter(f => f.horario) : [])
+        .map(f => f.nome.slice(0, 20) + ' ' + f.tel + ' — horário já combinado com o cliente'),
+      DETALHE: nomes.flatMap(n => porM[n].fichas.map(f => n.padEnd(12) + ' | ' +
+        f.nome.slice(0, 20).padEnd(20) + ' ' + f.tel + ' | ' + f.regiao +
+        (f.polegadas ? ' | ' + f.polegadas + 'pol' : '') +
+        (f.horario ? ' | ⏰ combinado' : ''))),
+      comoAplicar: sugestoes.length
+        ? '/api/tv-logistica?action=redistribuir&aplicar=1 (confira a lista antes)' : null });
+  }
+
   // ── 📜 LOG-DEVOLUCOES: histórico com desfecho de cada devolução ──
   if (action === 'log-devolucoes') {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
