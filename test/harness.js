@@ -611,6 +611,38 @@ function check(nome, cond, extra) {
       !bloqueou, JSON.stringify(d).slice(0, 120));
   }
 
+  // ── 📺 avisos ao cliente respeitam horário, resposta e limite ──
+  // ── 🧭 função usada antes de ser declarada derruba a requisição ──
+  console.log('▶ Cenário OD — funções auxiliares definidas antes do uso');
+  {
+    const fsO = require('fs');
+    const arq = fsO.readFileSync('api/tv-logistica.js', 'utf8');
+    const decl = arq.indexOf('const regiaoLocal =');
+    const usos = [];
+    let p = arq.indexOf('regiaoLocal(');
+    while (p > -1) { if (p !== decl + 6) usos.push(p); p = arq.indexOf('regiaoLocal(', p + 1); }
+    const antes = usos.filter(u => u < decl && u !== arq.indexOf('const regiaoLocal ='));
+    check('regiaoLocal é declarada antes de todo uso', antes.length === 0,
+      'usos antes da declaração: ' + antes.length);
+  }
+
+  console.log('▶ Cenário AV — regras dos avisos automáticos');
+  {
+    const fsA = require('fs');
+    const bot = fsA.readFileSync('api/wa-bot.js', 'utf8');
+    const rot = fsA.readFileSync('api/rotina.js', 'utf8');
+    const web = fsA.readFileSync('api/wa-webhook.js', 'utf8');
+    check('TV condenada: não envia fora do expediente',
+      /noExpediente/.test(bot) && /adiado: true/.test(bot));
+    check('retirada: não insiste com quem respondeu',
+      /respondeuDepois/.test(bot) && /NAO_RECEBEM_POR_TEREM_RESPONDIDO/.test(bot));
+    check('retirada: só de segunda a sábado', /diaSem >= 1 && diaSem <= 6/.test(rot));
+    check('escolha pendente expira em 5 dias', /diasEsperando >= 5/.test(bot));
+    check('cérebro não responde por cima da escolha',
+      /tv-condenada-respostas/.test(web) && /escolhaTv/.test(web));
+    check('cliente recebe confirmação da escolha', /Anotei aqui/.test(bot));
+  }
+
   console.log('▶ Cenário RC — recriar-perdidas respeita devolução já feita');
   {
     const logi2 = carregarHandler('api/logistica.js');

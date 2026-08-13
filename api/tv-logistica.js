@@ -281,6 +281,24 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
 }
 
 module.exports = async function handler(req, res) {
+  // 📍 leitura de região usada em todo o arquivo. Fica aqui no topo porque a
+  // versão completa depende de tabelas declaradas mais abaixo, e chamá-la antes
+  // derruba a requisição inteira.
+  const regiaoLocal = (end) => {
+    const e = ' ' + String(end || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') + ' ';
+    if (/nova lima/.test(e)) return 'Nova Lima';
+    if (/contagem|betim|ibirit|sarzedo|igarape/.test(e)) return 'BH Oeste/Contagem';
+    if (/vespasiano|santa luzia|sabara|ribeirao das neves|neves|justinopolis/.test(e)) return 'Região Norte';
+    if (/venda nova|piratininga|santa monica|serra verde|copacabana|jardim leblon|guanabara/.test(e)) return 'Venda Nova';
+    if (/barreiro|milionarios|diamante|independencia/.test(e)) return 'BH Barreiro';
+    if (/buritis|gutierrez|estoril|betania|nova suissa|salgado filho|prado|calafate|teresa cristina/.test(e)) return 'BH Oeste';
+    if (/savassi|funcionarios|lourdes|centro|santo agostinho|sion|mangabeiras|anchieta|cruzeiro|santo antonio|sao pedro|carmo/.test(e)) return 'BH Centro-Sul';
+    if (/pampulha|castelo|ouro preto|santa amelia|planalto|itapoa|jaragua|liberdade|sao luiz/.test(e)) return 'BH Pampulha';
+    if (/santa efigenia|floresta|sagrada familia|horto|esplanada|santa tereza|pompeia|colegio batista|silveira|concordia|renascenca|caicara|padre eustaquio|alipio|carlos prates|lagoinha|bonfim/.test(e)) return 'BH Leste';
+    return '(sem região)';
+  };
+
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
   // 🚚 ações da tela do motorista: ele acessa por link, sem login, então elas
@@ -302,22 +320,6 @@ module.exports = async function handler(req, res) {
 
   // ── 🚚 CARGA-MOTORISTAS: quantas corridas cada um tem, e o que dá para mover ──
   if (action === 'carga-motoristas') {
-    // 📍 leitura de região independente: a função geral do arquivo depende de
-    // tabelas declaradas mais abaixo, e usá-la aqui derrubava a chamada
-    const regiaoLocal = (end) => {
-      const e = ' ' + String(end || '').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') + ' ';
-      if (/nova lima/.test(e)) return 'Nova Lima';
-      if (/contagem|betim|ibirit|sarzedo|igarape/.test(e)) return 'BH Oeste/Contagem';
-      if (/vespasiano|santa luzia|sabara|ribeirao das neves|neves|justinopolis/.test(e)) return 'Região Norte';
-      if (/venda nova|piratininga|santa monica|serra verde|cea|copacabana|jardim leblon/.test(e)) return 'Venda Nova';
-      if (/barreiro|milionarios|diamante|independencia/.test(e)) return 'BH Barreiro';
-      if (/buritis|gutierrez|estoril|betania|nova suissa|salgado filho|prado|calafate/.test(e)) return 'BH Oeste';
-      if (/savassi|funcionarios|lourdes|centro|santo agostinho|serra|sion|mangabeiras|anchieta|cruzeiro|santo antonio|sao pedro|carmo/.test(e)) return 'BH Centro-Sul';
-      if (/pampulha|castelo|ouro preto|santa amelia|planalto|itapoa|jaragua|liberdade|sao luiz/.test(e)) return 'BH Pampulha';
-      if (/santa efigenia|floresta|sagrada familia|horto|esplanada|santa tereza|pompeia|colegio batista|silveira|concordia|renascenca|caicara|padre eustaquio|alipio|carlos prates|lagoinha|bonfim/.test(e)) return 'BH Leste';
-      return '(sem região)';
-    };
     const db = (await dbGet(LOG_KEY)) || { fichas: [] };
     const emRota = (db.fichas || []).filter(f =>
       ['motorista_parceiro', 'horario_marcado', 'em_rota', 'liberado_para_rota']
@@ -813,6 +815,13 @@ module.exports = async function handler(req, res) {
       movedAt: new Date().toISOString(),
       diagnostico: null,
     };
+    // 📍 grava a região logo na entrada. Sem ela, a distribuição decide sem
+    // informação e concentra tudo num motorista só, como aconteceu.
+    try {
+      const r = regiaoLocal(endereco);
+      if (r && r !== '(sem região)') ficha.regiao = r;
+      else ficha.regiaoPendente = true;   // fica visível para a equipe classificar
+    } catch (e) { ficha.regiaoPendente = true; }
     db.fichas.unshift(ficha);
     db.nextId = (db.nextId || 1) + 1;
     await dbSet(LOG_KEY, db);
