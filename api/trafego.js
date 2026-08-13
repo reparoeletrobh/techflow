@@ -1873,6 +1873,108 @@ module.exports = async function handler(req, res) {
         ' | ' + (l.botao || '?') + ' | ' + (l.numeroWhatsApp || l.link || 'destino pela Página')) });
   }
 
+  // ── 📐 AUDITORIA-VERBA: a linha do tempo da verba no ciclo ──
+  if (action === 'auditoria-verba') {
+    const TK = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || '2026-08-08').slice(0, 10);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+    // 1) o que a Meta diz hoje: verba e situação de cada campanha do ciclo
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads`
+      + `?fields=id,name,effective_status,adset{id,name,effective_status,daily_budget,lifetime_budget},`
+      + `campaign{id,name,effective_status,start_time,daily_budget,lifetime_budget}`
+      + `&limit=400&access_token=${TK}`, 10);
+    const camp = {};
+    for (const a of (ads.data || [])) {
+      const c = a.campaign || {}, cj = a.adset || {};
+      if (!c.id || String(c.start_time || '').slice(0, 10) < desde) continue;
+      if (!camp[c.id]) camp[c.id] = { id: c.id, nome: c.name,
+        situacao: c.effective_status,
+        verba: (Number(cj.lifetime_budget || c.lifetime_budget || 0) / 100) ||
+               (Number(cj.daily_budget || c.daily_budget || 0) / 100),
+        ehTv: /\btv\b|televis|tela|led|barramento|apagad|imagem/i.test(String(c.name || '')) };
+    }
+    // 2) gasto de cada uma no ciclo
+    let url = `${GRAPH}/act_${CONTA}/insights?level=campaign&fields=campaign_id,spend`
+      + `&time_range=${encodeURIComponent(JSON.stringify({ since: desde, until: hoje }))}`
+      + `&limit=400&access_token=${TK}`;
+    let p = 0;
+    while (url && p < 5) {
+      const r = await fetch(url).then(x => x.json());
+      if (!r || r.error) break;
+      for (const c of (r.data || [])) if (camp[c.campaign_id]) camp[c.campaign_id].gasto = parseFloat(c.spend || 0) || 0;
+      url = (r.paging && r.paging.next) || null; p++;
+    }
+    for (const c of Object.values(camp)) c.gasto = c.gasto || 0;
+
+    // 3) o histórico de aplicações do ciclo: quem pausou e quem recebeu verba
+    let aplicacoes = [];
+    try {
+      const lg = (await dbGet('trafego_log')) || { itens: [] };
+      aplicacoes = (lg.itens || []).filter(x => String(x.ts || '').slice(0, 10) >= desde)
+        .map(x => ({ quando: String(x.ts || '').slice(5, 16).replace('T', ' '),
+          pausados: (x.PAUSADOS || []).length,
+          verbasAjustadas: (x.VERBAS || []).length,
+          detalhePausas: x.PAUSADOS || [], detalheVerbas: x.VERBAS || [] }));
+    } catch (e) {}
+
+    const ativas = Object.values(camp).filter(c => c.situacao === 'ACTIVE');
+    const pausadas = Object.values(camp).filter(c => c.situacao !== 'ACTIVE');
+    const soma = (arr, campo) => +arr.reduce((s, c) => s + (c[campo] || 0), 0).toFixed(2);
+    const vAt = soma(ativas, 'verba'), gAt = soma(ativas, 'gasto');
+    const vPa = soma(pausadas, 'verba'), gPa = soma(pausadas, 'gasto');
+    // teto informado (ou o padrão do projeto)
+    const tetoAdm = Number(req.query.tetoAdm || 2484);
+    const tetoTv = Number(req.query.tetoTv || 870);
+    const teto = tetoAdm + tetoTv;
+    const naoGastoNasPausadas = +(vPa - gPa).toFixed(2);
+    const previsaoFinal = +(gPa + vAt).toFixed(2);
+
+    return res.status(200).json({ ok: true,
+      ciclo: { de: desde, ate: hoje },
+      ETAPA_1_INICIO_DO_CICLO: {
+        campanhas: Object.keys(camp).length,
+        tetoPrevisto: teto,
+        observacao: 'teto informado: ADM ' + tetoAdm + ' + TV ' + tetoTv,
+      },
+      ETAPA_2_O_CORTE: {
+        campanhasPausadas: pausadas.length,
+        verbaQueTinham: vPa,
+        jaHaviamGastado: gPa,
+        faltavamGastar: naoGastoNasPausadas,
+        L: pausadas.map(c => c.nome.slice(0, 40).padEnd(40) +
+          ' verba ' + c.verba.toFixed(2).padStart(8) +
+          ' gasto ' + c.gasto.toFixed(2).padStart(8) +
+          ' sobrou ' + (c.verba - c.gasto).toFixed(2).padStart(8)),
+      },
+      ETAPA_3_A_REDISTRIBUICAO: {
+        campanhasAtivas: ativas.length,
+        verbaAtualDelas: vAt,
+        aplicacoesNoCiclo: aplicacoes.length,
+        HISTORICO: aplicacoes.map(a => a.quando + ' | ' + a.pausados + ' pausada(s) · ' +
+          a.verbasAjustadas + ' verba(s) ajustada(s)'),
+        DETALHE_VERBAS: aplicacoes.flatMap(a => a.detalheVerbas).slice(0, 60),
+      },
+      ETAPA_4_A_CONTA: {
+        verbaSomadaHoje: +(vAt + vPa).toFixed(2),
+        tetoPrevisto: teto,
+        diferencaSobreOTeto: +((vAt + vPa) - teto).toFixed(2),
+        gastoAteAgora: +(gAt + gPa).toFixed(2),
+        faltaGastarNasAtivas: +(vAt - gAt).toFixed(2),
+        previsaoDeFechamento: previsaoFinal,
+        ficaraSemUso: +(teto - previsaoFinal).toFixed(2),
+      },
+      COMO_DEVERIA_SER: {
+        regra: 'a verba da pausada NÃO se mexe. O que ela deixou de gastar deve aumentar a verba das ativas, para o total investido no fim do ciclo igualar o teto',
+        contaCorreta: 'ativas deveriam ter: teto (' + teto + ') − gasto das pausadas (' + gPa + ') = ' + (+(teto - gPa).toFixed(2)),
+        verbaRealDasAtivas: vAt,
+        faltouDistribuir: +((teto - gPa) - vAt).toFixed(2),
+      },
+      ATIVAS: ativas.map(c => c.nome.slice(0, 40).padEnd(40) +
+        ' verba ' + c.verba.toFixed(2).padStart(8) + ' gasto ' + c.gasto.toFixed(2).padStart(8)),
+    });
+  }
+
   // ── 🩺 SAUDE-DO-CICLO: onde a verba está indo, e onde não está ──
   if (action === 'saude-ciclo') {
     const TK = String(req.query.token || '').trim() || TOKEN;
