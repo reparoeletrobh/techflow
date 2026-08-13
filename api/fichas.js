@@ -123,10 +123,14 @@ export default async function handler(req, res) {
       for (const f of (((db || {}).fichas) || [])) {
         if (String(f.status || '') !== 'criada') continue;
         const t = d8t(f.telefone);
-        const quando = abordados[t] || conversou[t] || null;
+        // 🎯 só destrava quem NÓS abordamos: essa ficha está num beco, porque o
+        // bot não repete abordagem. Quem apenas escreveu ainda deve ser abordado
+        // normalmente — movê-la aqui a tirava da fila e ela nunca seria contatada.
+        const quando = abordados[t] || null;
         if (!quando) continue;
         achados.push({ chave, id: f.id, nome: f.nome, tel: t,
-          quando, via: abordados[t] ? 'abordado pelo bot' : 'cliente escreveu' });
+          quando, via: 'abordado pelo bot',
+          tambemEscreveu: !!conversou[t] });
       }
     }
     if (String(req.query.aplicar || '') !== '1') {
@@ -134,7 +138,9 @@ export default async function handler(req, res) {
         travadas: achados.length,
         L: achados.map(a => a.chave.replace('fichas_', '').toUpperCase() + ' | ' +
           String(a.nome || '?').slice(0, 22) + ' ' + a.tel.slice(-4) + ' | ' + a.via +
-          ' em ' + String(a.quando).slice(5, 16).replace('T', ' ')),
+          ' em ' + String(a.quando).slice(5, 16).replace('T', ' ') +
+          (a.tambemEscreveu ? ' | cliente respondeu' : ' | sem resposta')),
+        observacao: 'quem apenas escreveu sem ter sido abordado NÃO entra aqui — continua na fila de abordagem',
         oQueVaiAcontecer: 'vão para Contato Feito com o horário real do contato; sem retorno em 1h de expediente seguem para Entrar em Contato',
         dica: 'para aplicar: &aplicar=1' });
     }
@@ -964,7 +970,9 @@ export default async function handler(req, res) {
       const t8n = d8f(x.telefone);
       const jaAbordado = !!(abordadosMapa[t8n]);
       const jaConversou = conversaAtiva.has(t8n);
-      const nasceEm = (jaAbordado || jaConversou) ? 'contato_feito' : 'criada';
+      // 🎯 só quem NÓS abordamos nasce adiantado. Quem apenas escreveu ainda
+      // precisa da abordagem, que é o que apresenta as opções de loja ou coleta.
+      const nasceEm = jaAbordado ? 'contato_feito' : 'criada';
       const carimboContato = jaAbordado ? abordadosMapa[t8n] : new Date().toISOString();
       db.fichas.unshift({
         id: 'sc_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
