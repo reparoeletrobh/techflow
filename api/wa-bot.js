@@ -450,6 +450,17 @@ export default async function handler(req, res) {
         const fase = String(c.phaseId || c.phase || '');
         // 🎯 as duas colunas em que o bot negocia — última chamada é a continuação
         // da mesma sequência, e os cards de lá também precisam da etiqueta
+        // 🕐 os aprovados recebem etiqueta com a data e a hora da aprovação
+        if (fase === 'aprovados') {
+          const q = c.aprovadoEm || ((c.history || [])
+            .filter(x => String(x.phase || x.phaseId || '') === 'aprovados')
+            .map(x => x.ts).filter(Boolean).sort()[0]) || null;
+          saida[c.id] = { id: c.id, sistema: sis, fase, tipo: 'aprovado',
+            aprovadoEm: q,
+            aprovadoPor: c.aprovadoPor || null,
+            noBalcao: c.aprovadoNoBalcao === true || String(c.origem || '') === 'frenteloja' };
+          continue;
+        }
         if (fase !== 'aguardando_aprovacao' && fase !== 'ultima_chamada') continue;
         const d = d8b(c.telefone);
         const meus = (porTel[d] || []).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));

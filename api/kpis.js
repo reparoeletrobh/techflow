@@ -290,6 +290,32 @@ module.exports = async function handler(req, res) {
       observacao: 'apenas datas obtidas do histórico real — nada foi estimado' });
   }
 
+  // ── 📜 QUEM-APROVOU: a lista nominal de um dia, direto do livro-razão ──
+  if ((req.query || {}).action === 'quem-aprovou') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const frente = String(req.query.frente || '').toLowerCase();
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000 - 1;
+    const evs = (await _funil.ler(ini, fim))
+      .filter(e => e.etapa === 'aprovado' && (!frente || e.frente === frente))
+      .sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+    const hora = t => new Date(new Date(t).getTime() - 3 * 3600000).toISOString().slice(11, 16);
+    const soma = evs.reduce((s, e) => s + (Number(e.valor) || 0), 0);
+    return res.status(200).json({ ok: true,
+      dia, frente: frente || 'todas',
+      quantos: evs.length,
+      faturamento: +soma.toFixed(2),
+      ticketMedio: evs.length ? +(soma / evs.length).toFixed(2) : 0,
+      porCanal: evs.reduce((o, e) => { o[e.canal] = (o[e.canal] || 0) + 1; return o; }, {}),
+      LISTA: evs.map((e, i) => String(i + 1).padStart(2) + '. ' + hora(e.ts) +
+        ' | ' + String(e.nome || '?').slice(0, 26).padEnd(26) +
+        ' ' + String(e.tel || '').slice(-4) +
+        ' | ' + e.canal.padEnd(7) +
+        ' | R$ ' + (Number(e.valor) || 0).toFixed(2).padStart(8) +
+        (e.quem ? ' | ' + e.quem : '')),
+      observacao: 'lido do livro-razão: cada linha foi gravada no instante da aprovação' });
+  }
+
   // ── 🔍 CONFERIR-APROVADOS: lista nominal, para bater com a contagem manual ──
   if ((req.query || {}).action === 'conferir-aprovados') {
     const Jc = janela(req.query || {});

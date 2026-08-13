@@ -13,7 +13,7 @@ async function aplicarBadgesFase(){
   // 🏷️ usa a lista de cards que a própria tela já tem: card sem histórico ficava
   // sem etiqueta nenhuma, e a coluna parecia inconsistente. Todo card das fases
   // de negociação recebe etiqueta — com dados ou como atendimento humano.
-  var FASES_BADGE = ['aguardando_aprovacao', 'ultima_chamada'];
+  var FASES_BADGE = ['aguardando_aprovacao', 'ultima_chamada', 'aprovados'];
   var alvos = (typeof cards !== 'undefined' && Array.isArray(cards))
     ? cards.filter(function(c){ return FASES_BADGE.indexOf(c.phase) > -1; })
     : [];
@@ -26,6 +26,28 @@ async function aplicarBadgesFase(){
     var el = document.getElementById('card-' + id);
     if(!el) return;
     var b = dados[id] || { semBot: true, disparos: 0, fase: 0, respostasDoCliente: 0 };
+    // 🕐 na coluna Aprovados a etiqueta mostra quando a aprovação aconteceu
+    if(b.tipo === 'aprovado'){
+      var ant = el.querySelector('.badge-fase'); if(ant) ant.remove();
+      var sp2 = document.createElement('span');
+      sp2.className = 'badge-fase aprovado';
+      if(b.aprovadoEm){
+        var dt = new Date(b.aprovadoEm);
+        var dd = dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'});
+        var hh = dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+        sp2.innerHTML = (b.noBalcao ? '🏪 ' : '✅ ') + '<b>' + dd + '</b> ' + hh;
+        sp2.title = 'aprovado em ' + dd + ' às ' + hh
+          + (b.noBalcao ? ' — no balcão' : ' — online')
+          + (b.aprovadoPor ? ' por ' + b.aprovadoPor : '');
+      } else {
+        sp2.className = 'badge-fase sem-data';
+        sp2.innerHTML = '✅ sem data';
+        sp2.title = 'aprovação sem carimbo de data — não entra nos relatórios por período';
+      }
+      var alvo2 = el.querySelector('.card-nome') || el.querySelector('.c-nome') || el.firstElementChild;
+      if(alvo2) alvo2.appendChild(sp2);
+      return;
+    }
     var antiga = el.querySelector('.badge-fase');
     if(antiga) antiga.remove();
     var sp = document.createElement('span');
@@ -244,6 +266,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .badge-fase.esgotada{background:rgba(248,113,113,.18);color:#f87171;border:1px solid rgba(248,113,113,.5);
   box-shadow:0 0 10px -3px rgba(248,113,113,.5);}
 .badge-fase.humano{background:rgba(248,113,113,.18);color:#f87171;border:1px solid rgba(248,113,113,.5);
+  font-size:10px;}
+.badge-fase.aprovado{background:rgba(52,211,153,.14);color:#34d399;border:1px solid rgba(52,211,153,.35);
+  font-size:10.5px;}
+.badge-fase.sem-data{background:rgba(251,191,36,.16);color:#fbbf24;border:1px solid rgba(251,191,36,.4);
   font-size:10px;}
 /* o card inteiro acompanha a cor */
 .card.bot-vivo{border-left:4px solid #34d399 !important;}
