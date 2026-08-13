@@ -423,10 +423,17 @@ export default async function handler(req, res) {
     const hh2 = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
       .toISOString().slice(5, 16).replace('T', ' ') : '—';
     const grupos = { naoAvisados: [], aguardandoResposta: [], responderam: [],
-      semResposta: [], semTelefone: [] };
+      semResposta: [], semTelefone: [], naoSaoCondenados: [] };
     for (const c of (bd.cards || [])) {
       const fase = String(c.phaseId || '');
       if (fase !== 'condenado' && fase !== 'aguardando_ret') continue;
+      // ⚠️ Aguardando Retirada recebe TAMBÉM as TVs consertadas com sucesso.
+      // Sem separar, o aviso de inviabilidade iria para quem teve o aparelho
+      // resolvido — por isso só entra quem comprovadamente passou por Condenado.
+      const veioDeCondenado = fase === 'condenado' ||
+        (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'condenado') ||
+        c.avisoCondenadoStatus || c.escolhaCondenado ||
+        String(c.faseAnteriorRegistrada || '') === 'condenado';
       let tel = String(c.telefone || '').replace(/\D/g, '');
       if (tel.length === 11 || tel.length === 10) tel = '55' + tel;
       const linha = String(c.nomeContato || c.nome || '?').slice(0, 22) +
@@ -445,6 +452,7 @@ export default async function handler(req, res) {
           hh2(c.avisoCondenadoEnviadoEm) + ' | há ' + dias + ' dia(s)');
         continue;
       }
+      if (!veioDeCondenado) { grupos.naoSaoCondenados.push(linha); continue; }
       grupos.naoAvisados.push(linha +
         (c.avisoCondenadoStatus ? ' | ' + c.avisoCondenadoStatus : ' | nunca avisado'));
     }
@@ -455,7 +463,14 @@ export default async function handler(req, res) {
         jaEscolheram: grupos.responderam.length,
         semRespostaEm5Dias: grupos.semResposta.length,
         semTelefoneUtil: grupos.semTelefone.length,
+        emRetiradaMasNaoCondenados: grupos.naoSaoCondenados.length,
       },
+      ATENCAO: grupos.naoSaoCondenados.length
+        ? '⚠️ ' + grupos.naoSaoCondenados.length + ' ficha(s) estão em Aguardando ' +
+          'Retirada sem terem passado por Condenado — são TVs consertadas e NÃO ' +
+          'devem receber o aviso de inviabilidade'
+        : null,
+      EM_RETIRADA_NAO_CONDENADOS: grupos.naoSaoCondenados.slice(0, 60),
       NAO_AVISADOS: grupos.naoAvisados,
       AGUARDANDO_RESPOSTA: grupos.aguardandoResposta,
       JA_ESCOLHERAM: grupos.responderam,
@@ -774,10 +789,12 @@ export default async function handler(req, res) {
       // 📋 com todosCondenados=1 alcança também quem ESTÁ na coluna Condenado
       // agora, ou já passou por ela e foi para retirada — são os casos
       // anteriores ao gatilho existir
+      // 🔒 só quem está em Condenado agora, ou tem prova no histórico de ter
+      // passado por lá. Aguardando Retirada sozinha não basta: essa coluna
+      // recebe também as TVs consertadas com sucesso.
       if (fase === 'condenado') return true;
       if (fase === 'aguardando_ret') {
-        return (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'condenado') ||
-          String(c.faseAnteriorRegistrada || '') === 'condenado';
+        return (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'condenado');
       }
       return false;
     });
