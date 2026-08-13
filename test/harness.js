@@ -613,6 +613,34 @@ function check(nome, cond, extra) {
 
   // ── 📺 avisos ao cliente respeitam horário, resposta e limite ──
   // ── 🧭 função usada antes de ser declarada derruba a requisição ──
+  // ── 📜 toda entrada em Entrar em Contato precisa ficar registrada ──
+  console.log('▶ Cenário EC — passagem por Entrar em Contato é registrada');
+  {
+    const EC = require('../api/_entrar_contato.js');
+    const f = { status: 'contato_feito', nome: 'Teste' };
+    EC.marcarEntrarContato(f, 'régua', 'sem resposta');
+    check('registro: status mudou', f.status === 'entrar_contato');
+    check('registro: guardou a passagem', (f.passagensEntrarContato || []).length === 1);
+    check('registro: guardou a origem', f.passagensEntrarContato[0].origem === 'régua');
+    check('registro: guardou de onde veio', f.passagensEntrarContato[0].veioDe === 'contato_feito');
+    EC.marcarEntrarContato(f, 'remarcar', 'voltou');
+    check('registro: segunda passagem soma', EC.vezes(f) === 2);
+    // nenhum arquivo pode mudar o status sem registrar
+    const fs11 = require('fs');
+    const semRegistro = [];
+    for (const arq of ['api/fichas.js', 'api/wa-bot.js']) {
+      const c = fs11.readFileSync(arq, 'utf8');
+      const linhas = c.split('\n');
+      linhas.forEach((l, i) => {
+        if (!/\.status = 'entrar_contato'/.test(l)) return;
+        const ctx = linhas.slice(Math.max(0, i - 3), i + 2).join(' ');
+        if (!/marcarEntrarContato|_ec\./.test(ctx)) semRegistro.push(arq + ':' + (i + 1));
+      });
+    }
+    check('nenhum ponto muda o status sem registrar',
+      semRegistro.length === 0, semRegistro.join(', '));
+  }
+
   console.log('▶ Cenário OD — funções auxiliares definidas antes do uso');
   {
     const fsO = require('fs');

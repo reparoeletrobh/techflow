@@ -1,3 +1,7 @@
+let _ec = { marcarEntrarContato: (f) => f, vezes: () => 0, resumo: () => 'sem registro' };
+try { _ec = require('./_entrar_contato'); } catch (e) {
+  try { _ec = require(require('path').join(__dirname, '_entrar_contato.js')); } catch (e2) {}
+}
 let _gravar = { alterar: async () => ({ ok: false, motivo: 'módulo indisponível' }),
   acrescentar: async () => ({ ok: false, motivo: 'módulo indisponível' }) };
 try { _gravar = require('./_gravar'); } catch (e) {
@@ -241,6 +245,9 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
       defeito: ficha.defeito || '',
       endereco: ficha.endereco || '',
       status: 'entrar_contato',
+      passagensEntrarContato: [{ em: new Date().toISOString(),
+        origem: 'devolução do remarcar', veioDe: '(nova)', motivo: 'ficha criada já nesta coluna' }],
+      vezesEmEntrarContato: 1,
       reagendarColeta: true,               // 🏷️ é o que acende a badge na prospecção
       origemLogistica: true,
       logisticaFichaId: ficha.id,
@@ -914,6 +921,9 @@ module.exports = async function handler(req, res) {
       endereco: ficha.endereco || '',
       waNum: String(ficha.telefone||'').replace(/\D/g,''),
       status: 'entrar_contato',
+      passagensEntrarContato: [{ em: new Date().toISOString(),
+        origem: 'devolução do remarcar', veioDe: '(nova)', motivo: 'ficha criada já nesta coluna' }],
+      vezesEmEntrarContato: 1,
       reagendarColeta: true,
       origemLogistica: true, logisticaFichaId: ficha.id,
       criadoEm: now, contatoFeitoEm: null,

@@ -4942,7 +4942,7 @@ export default async function handler(req, res) {
         const temOutraAvancada = todasFichas.some(o => o.id !== f.id &&
           String(o.telefone || '').replace(/\D/g, '').slice(-8) === d8c && AVANCADOS.includes(o.status));
         if (temOutraAvancada || emOperacao.has(d8c)) {
-          f.status = 'entrar_contato';
+          _ec.marcarEntrarContato(f, 'bot', 'sem resposta após abordagem');
           f.entrarContatoMotivo = 'cliente refez a ficha (já abordado/em atendimento) — ligar para tirar dúvidas';
           f.fichaRefeita = true; curou = true;
         } else if (abordados.tels[d8c]) {
@@ -6588,7 +6588,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const fdbE = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaE = (fdbE.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
           if (fichaE) {
-            fichaE.status = 'entrar_contato';
+            _ec.marcarEntrarContato(fichaE, 'bot', 'régua do bot');
             fichaE.entrarContatoMotivo = String(acaoMotivo || 'bot: retomar por telefone').slice(0, 200);
             await dbSet('fichas_adm', fdbE);
             await bumpStat('entrar_contato');
@@ -6596,7 +6596,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const ftvE = (await dbGet('fichas_tv')) || { fichas: [] };
           const fichaTvE = (ftvE.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
           if (fichaTvE) {
-            fichaTvE.status = 'entrar_contato';
+            _ec.marcarEntrarContato(fichaTvE, 'bot', 'régua do bot');
             fichaTvE.entrarContatoMotivo = String(acaoMotivo || 'bot: retomar por telefone').slice(0, 200);
             await dbSet('fichas_tv', ftvE);
             if (!fichaE) await bumpStat('entrar_contato');

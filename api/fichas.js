@@ -1,3 +1,8 @@
+let _ec = { marcarEntrarContato: (f, o, m) => { if (f) { f.status = 'entrar_contato'; } return f; },
+  vezes: () => 0, resumo: () => 'sem registro' };
+try { _ec = require('./_entrar_contato'); } catch (e) {
+  try { _ec = require(require('path').join(__dirname, '_entrar_contato.js')); } catch (e2) {}
+}
 // carregado de forma tolerante: o harness executa os arquivos fora da pasta api
 let _funil = { registrar: async () => false, ler: async () => [], jaRegistrado: async () => false };
 try { _funil = require('./_funil'); } catch (e) {
@@ -117,6 +122,7 @@ export default async function handler(req, res) {
           : 'fluxo normal';
         const quando = f.entrarContatoEm || f.movedAt || f.contatoFeitoEm || f.criadoEm;
         const item = { sis, id, nome: f.nome || '?', tel: t, origem,
+          registro: f.passagensEntrarContato || [],
           criadoEm: f.criadoEm, contatoFeitoEm: f.contatoFeitoEm,
           quando, abordadoPorBot: !!f.abordadoPorBot,
           motivo: f.entrarContatoMotivo || f.motivoRemarcar || null };
@@ -140,10 +146,15 @@ export default async function handler(req, res) {
       }
     } catch (e) {}
     for (const l of linhas) {
-      const ps = (passagens[l.id] || []).sort();
+      // 📜 o registro na própria ficha é a fonte principal; a lista de eventos
+      // serve de complemento para o que foi gravado antes desta mudança
+      const naFicha = l.registro || [];
+      const ps = naFicha.length ? naFicha.map(p => p.em).sort()
+        : (passagens[l.id] || []).sort();
       l.passagens = ps.length;
       l.primeiraPassagem = ps[0] || null;
       l.repetiu = ps.length > 1;
+      l.origens = naFicha.map(p => p.origem).join(' → ') || null;
     }
     const repetiram = linhas.filter(l => l.repetiu);
     const primeiraVez = linhas.filter(l => l.passagens <= 1);
@@ -169,7 +180,8 @@ export default async function handler(req, res) {
           'ficha sem registro pode ter entrado antes disso',
       },
       JA_PASSARAM_ANTES: repetiram.map(l => String(l.nome).slice(0, 20) + ' ' + l.tel.slice(-4) +
-        ' → ' + l.passagens + ' entradas | primeira em ' + hh(l.primeiraPassagem)),
+        ' → ' + l.passagens + ' entradas | primeira em ' + hh(l.primeiraPassagem) +
+        (l.origens ? ' | origens: ' + l.origens : '')),
       POR_ORIGEM: porOrigem,
       CLIENTES_DUPLICADOS: duplicados.length,
       DUPLICADOS: duplicados.map(([t, v]) => v[0].nome.slice(0, 20) + ' ' + t.slice(-4) +
@@ -1541,7 +1553,8 @@ export default async function handler(req, res) {
         // Bot abordou → 1 hora para cadastrar na logística; contato manual → 24 horas
         const limiteMs = f.abordadoPorBot ? 60*60*1000 : 24*60*60*1000;
         if (agora - new Date(f.contatoFeitoEm).getTime() > limiteMs) {
-          f.status = 'entrar_contato';
+          _ec.marcarEntrarContato(f, 'régua de contato',
+            f.abordadoPorBot ? 'abordado pelo bot, sem resposta em 1h' : 'contato manual sem retorno em 24h');
           mudou = true;
           novosEntrar.push(f);
         }
@@ -2419,7 +2432,7 @@ export default async function handler(req, res) {
             removivel: acao.startsWith('eliminar') });
           if (acao.startsWith('eliminar')) remover[key].push(d.id);
           if (acao.startsWith('entrar_contato')) {
-            d.status = 'entrar_contato';
+            _ec.marcarEntrarContato(d, 'ficha refeita', 'cliente refez a ficha');
             d.entrarContatoMotivo = 'cliente refez a ficha — equipamento já em atendimento; ligar para tirar dúvidas';
             d.fichaRefeita = true;
             (mover[key] = mover[key] || []).push(d.id);
@@ -2437,7 +2450,7 @@ export default async function handler(req, res) {
         db.fichas = db.fichas.filter(f => !remover[key].includes(f.id));
         total += antes - db.fichas.length;
         for (const f of db.fichas) if (paraMover.includes(f.id)) {
-          f.status = 'entrar_contato';
+          _ec.marcarEntrarContato(f, 'ficha refeita', 'cliente refez a ficha');
           f.entrarContatoMotivo = 'cliente refez a ficha — equipamento já em atendimento; ligar para tirar dúvidas';
           f.fichaRefeita = true; movidas++;
         }
