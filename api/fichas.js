@@ -124,6 +124,30 @@ export default async function handler(req, res) {
         (porTelefone[t] = porTelefone[t] || []).push(item);
       }
     }
+    // 📜 já passaram por esta coluna antes? o registro de eventos da prospecção
+    // guarda cada entrada, então dá para ver se é a primeira vez ou repetição
+    const passagens = {};
+    try {
+      const r = await fetch(`${U}/lrange/prospeccao_evt_list/-20000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) {
+        try {
+          const e = JSON.parse(s);
+          if (String(e.tipo || '') !== 'entrar_contato') continue;
+          const idE = String(e.id || '');
+          (passagens[idE] = passagens[idE] || []).push(e.ts);
+        } catch (x) {}
+      }
+    } catch (e) {}
+    for (const l of linhas) {
+      const ps = (passagens[l.id] || []).sort();
+      l.passagens = ps.length;
+      l.primeiraPassagem = ps[0] || null;
+      l.repetiu = ps.length > 1;
+    }
+    const repetiram = linhas.filter(l => l.repetiu);
+    const primeiraVez = linhas.filter(l => l.passagens <= 1);
+    const semRegistro = linhas.filter(l => l.passagens === 0);
     // 🔁 o mesmo cliente aparece mais de uma vez?
     const duplicados = Object.entries(porTelefone).filter(([, v]) => v.length > 1);
     // ⏱️ quantas entraram em cada hora — em lote ou aos poucos?
@@ -135,8 +159,17 @@ export default async function handler(req, res) {
     const emLote = Object.entries(porHora).filter(([, n]) => n >= 5)
       .sort((a, b) => b[1] - a[1]);
     const porOrigem = linhas.reduce((o, l) => { o[l.origem] = (o[l.origem] || 0) + 1; return o; }, {});
-    return res.status(200).json({ ok: duplicados.length === 0,
+    return res.status(200).json({ ok: duplicados.length === 0 && repetiram.length === 0,
       total: linhas.length,
+      PASSAGEM_PELA_COLUNA: {
+        primeiraVez: primeiraVez.length,
+        jaPassaramAntes: repetiram.length,
+        semRegistroDeEntrada: semRegistro.length,
+        observacao: 'o registro de entradas começou a ser guardado junto com a régua; ' +
+          'ficha sem registro pode ter entrado antes disso',
+      },
+      JA_PASSARAM_ANTES: repetiram.map(l => String(l.nome).slice(0, 20) + ' ' + l.tel.slice(-4) +
+        ' → ' + l.passagens + ' entradas | primeira em ' + hh(l.primeiraPassagem)),
       POR_ORIGEM: porOrigem,
       CLIENTES_DUPLICADOS: duplicados.length,
       DUPLICADOS: duplicados.map(([t, v]) => v[0].nome.slice(0, 20) + ' ' + t.slice(-4) +
@@ -146,6 +179,8 @@ export default async function handler(req, res) {
         .map(l => hh(l.quando) + ' | ' + l.sis + ' | ' + String(l.nome).slice(0, 20).padEnd(20) +
           ' ' + l.tel.slice(-4) + ' | ' + l.origem +
           (l.abordadoPorBot ? ' | bot abordou' : '') +
+          ' | ' + (l.passagens > 1 ? '🔁 ' + l.passagens + 'ª entrada'
+            : l.passagens === 1 ? '1ª entrada' : 'sem registro') +
           (l.motivo ? ' | ' + String(l.motivo).slice(0, 40) : '')) });
   }
 
