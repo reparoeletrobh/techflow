@@ -425,19 +425,49 @@ export default async function handler(req, res) {
     let waba = String(req.query.waba || '') || cfgM.wabaId ||
       process.env.WA_WABA_ID || cfgM.businessId || '';
     // 🔎 sem o id da conta, descobre a partir do próprio número conectado
+    const tentativas = [];
     if (!waba) {
       const phoneId = cfgM.phoneId || process.env.WA_PHONE_ID;
+      // 1) pelo próprio número
       if (phoneId) {
         try {
           const rp = await fetch(`https://graph.facebook.com/v20.0/${phoneId}` +
             `?fields=whatsapp_business_account&access_token=${token}`).then(x => x.json());
           waba = (rp && rp.whatsapp_business_account && rp.whatsapp_business_account.id) || '';
-        } catch (e) {}
+          tentativas.push('pelo número: ' + (waba || ((rp && rp.error && rp.error.message) || 'sem campo')));
+        } catch (e) { tentativas.push('pelo número: ' + e.message); }
+      }
+      // 2) pelas permissões do token — costuma trazer o id mesmo sem outros acessos
+      if (!waba) {
+        try {
+          const rd = await fetch(`https://graph.facebook.com/v20.0/debug_token` +
+            `?input_token=${token}&access_token=${token}`).then(x => x.json());
+          const esc = ((rd.data || {}).granular_scopes || [])
+            .find(s => String(s.scope || '').includes('whatsapp_business'));
+          waba = (esc && esc.target_ids && esc.target_ids[0]) || '';
+          tentativas.push('pelas permissões: ' + (waba || 'não encontrado'));
+        } catch (e) { tentativas.push('pelas permissões: ' + e.message); }
+      }
+      // 3) pelos negócios ligados ao token
+      if (!waba) {
+        try {
+          const rb = await fetch(`https://graph.facebook.com/v20.0/me/businesses` +
+            `?access_token=${token}`).then(x => x.json());
+          const bid = ((rb.data || [])[0] || {}).id;
+          if (bid) {
+            const rw = await fetch(`https://graph.facebook.com/v20.0/${bid}` +
+              `/owned_whatsapp_business_accounts?access_token=${token}`).then(x => x.json());
+            waba = (((rw.data || [])[0] || {}).id) || '';
+          }
+          tentativas.push('pelos negócios: ' + (waba || 'não encontrado'));
+        } catch (e) { tentativas.push('pelos negócios: ' + e.message); }
       }
     }
     if (!waba) return res.status(200).json({ ok: false,
-      error: 'não consegui identificar a conta de WhatsApp a partir do número',
-      dica: 'informe manualmente em &waba=SEU_ID (está no WhatsApp Manager)' });
+      error: 'não consegui identificar a conta de WhatsApp',
+      TENTATIVAS: tentativas,
+      ondeEncontrar: 'WhatsApp Manager → Configurações da conta → ID da conta do WhatsApp Business',
+      dica: 'informe em &waba=SEU_ID' });
     const id = String(waba);
     try {
       const r = await fetch(`https://graph.facebook.com/v20.0/${id}/message_templates` +
