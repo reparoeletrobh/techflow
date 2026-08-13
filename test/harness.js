@@ -625,6 +625,65 @@ function check(nome, cond, extra) {
   // objeto — o que ficasse de fora nunca chegava ao banco, embora a resposta
   // dissesse que deu certo.
   // ── ⚡ duas rotinas gravando ao mesmo tempo não podem se apagar ──
+  // ── 🔬 board: mover para o controle de qualidade cria a inspeção certa ──
+  console.log('▶ Cenário BQ — board cria inspeção com técnico e sem duplicar');
+  {
+    const bd = carregarHandler('api/board.js');
+    KV['reparoeletro_board'] = { phases: [{ id: 'producao' }, { id: 'controle_qualidade' }],
+      cards: [{ id: 'BQ1', pipefyId: 'PQ1', nomeContato: 'Carlos', telefone: '5531955554444',
+        equipamento: 'Micro-ondas Electrolux', phaseId: 'producao' }], syncedIds: [] };
+    KV['reparoeletro_qualidade'] = { inspecoes: [], config: { tecnicos: ['Lucas'], proximoNum: 1 } };
+    await bd(req({ action: 'move', ...K },
+      { pipefyId: 'PQ1', phaseId: 'controle_qualidade', tecnico: 'Kassio' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 300));
+    let insp = KV['reparoeletro_qualidade'].inspecoes || [];
+    check('board: inspeção criada', insp.length === 1, insp.length);
+    check('board: com o técnico que fez', (insp[0] || {}).tecnico === 'Kassio', (insp[0] || {}).tecnico);
+    // duplo clique não pode gerar duas
+    await bd(req({ action: 'move', ...K },
+      { pipefyId: 'PQ1', phaseId: 'controle_qualidade', tecnico: 'Kassio' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 300));
+    insp = KV['reparoeletro_qualidade'].inspecoes || [];
+    check('board: não duplica ao repetir o movimento', insp.length === 1, insp.length);
+    // segundo equipamento do MESMO cliente precisa gerar a sua
+    KV['reparoeletro_board'].cards.push({ id: 'BQ2', pipefyId: 'PQ2', nomeContato: 'Carlos',
+      telefone: '5531955554444', equipamento: 'Purificador Consul', phaseId: 'producao' });
+    await bd(req({ action: 'move', ...K },
+      { pipefyId: 'PQ2', phaseId: 'controle_qualidade', tecnico: 'Lucas' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 300));
+    insp = KV['reparoeletro_qualidade'].inspecoes || [];
+    check('board: segundo equipamento do mesmo cliente gera inspeção', insp.length === 2, insp.length);
+  }
+
+  // ── 🛡️ garantia: cadastro, fila e envio ao controle de qualidade ──
+  console.log('▶ Cenário GQ — garantia exige técnico e credita a inspeção');
+  {
+    const gr = carregarHandler('api/garantia.js');
+    KV['reparoeletro_garantia_v2'] = { fichas: [] };
+    KV['reparoeletro_garantia_fila'] = { itens: [] };
+    KV['reparoeletro_qualidade'] = { inspecoes: [], config: { tecnicos: ['Lucas'], proximoNum: 1 } };
+    await gr(req({ action: 'cadastrar', ...K }, { nome: 'Dona Rita',
+      telefone: '5531944443333', defeito: 'voltou a falhar', tipo: 'loja_acompanhamento',
+      tecnico: 'Lucas', equipamento: 'Micro-ondas' }, 'POST'), res());
+    const fila = KV['reparoeletro_garantia_fila'].itens || [];
+    check('garantia: entrou na fila de tratamento', fila.length === 1, fila.length);
+    if (fila.length) {
+      const rSem = res();
+      await gr(req({ action: 'fila-resolver', ...K },
+        { id: fila[0].id, destino: 'qc' }, 'POST'), rSem);
+      check('garantia: recusa enviar ao CQ sem informar o técnico',
+        rSem.dado && rSem.dado.ok === false);
+      await gr(req({ action: 'fila-resolver', ...K },
+        { id: fila[0].id, destino: 'qc', tecnico: 'Kassio' }, 'POST'), res());
+      await new Promise(s => setTimeout(s, 300));
+      const insp = KV['reparoeletro_qualidade'].inspecoes || [];
+      check('garantia: inspeção criada no controle de qualidade', insp.length === 1, insp.length);
+      check('garantia: creditada ao técnico', (insp[0] || {}).tecnico === 'Kassio');
+      check('garantia: marcada como garantia, fora da meta',
+        (insp[0] || {}).origem === 'garantia');
+    }
+  }
+
   console.log('▶ Cenário CC — gravações simultâneas não se perdem');
   {
     for (const [arq, banco] of [['api/logistica.js', 'reparoeletro_logistica'],
