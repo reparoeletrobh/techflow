@@ -166,6 +166,18 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 .uc-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.12);color:#ef4444;width:fit-content;}
 .sr-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;background:#f59e0b;color:#000;transition:all .15s;}
 .sr-btn:hover{filter:brightness(1.1);}
+
+/* 🏷️ etiquetas e filtros da aba Sem Resposta */
+.sr-badge{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,monospace;
+  font-size:11px;font-weight:800;padding:3px 9px;border-radius:7px;margin-top:5px;white-space:nowrap;}
+.sr-badge.viva{background:rgba(52,211,153,.16);color:#34d399;border:1px solid rgba(52,211,153,.4);}
+.sr-badge.esgotada{background:rgba(239,68,68,.16);color:#ef4444;border:1px solid rgba(239,68,68,.45);}
+.sr-badge.humano{background:rgba(239,68,68,.16);color:#ef4444;border:1px solid rgba(239,68,68,.45);}
+.f-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:9px;
+  padding:7px 13px;font-size:12px;font-weight:700;color:#8b93a3;cursor:pointer;transition:.15s;}
+.f-btn:hover{color:#fff;border-color:rgba(255,255,255,.25);}
+.f-btn.on{background:rgba(59,158,255,.16);border-color:#3b9eff;color:#3b9eff;}
+.f-btn b{font-family:ui-monospace,monospace;margin-left:4px;}
 </style>
 </head>
 <body>
@@ -804,7 +816,8 @@ function agendarLimpeza() {
 }
 agendarLimpeza();
 </script>
-<div class="page" id="page-sem-resposta"><div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Clientes +48h em Aguardando Aprovacao</span><button onclick="loadSemResposta()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-sem" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
+<div class="page" id="page-sem-resposta"><div id="filtros-sem" style="padding:10px 16px 0;display:flex;gap:6px;flex-wrap:wrap;"></div>
+<div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Clientes +48h em Aguardando Aprovacao</span><button onclick="loadSemResposta()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-sem" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
 <div class="page" id="page-ultima-chamada"><div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Espelho Ultima Chamada do Pipefy</span><button onclick="loadUltimaChamada()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-ult" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
 <script>
 var MSG_PARTES=["*ATENCAO* comunicado importante da Reparo Eletro.","Estamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.","Por este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao."];
@@ -904,7 +917,70 @@ function filtrarGMB(){
   });
 }
 
-async function loadSemResposta(){loadMsg('list-sem','Carregando...');try{var d=await fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();});var bg=document.getElementById('badge-sem');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-sem',d.error||'Nenhum cliente +48h em Aguardando Aprovacao');return;}var list=document.getElementById('list-sem');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(srCard(card));});}catch(e){loadMsg('list-sem','Erro: '+e.message);}}
+
+// ── 🏷️ etiquetas e filtros por situação da negociação ──
+var _srBadges = null, _srCards = [], _srFiltro = 'todos';
+
+async function carregarBadgesSem(){
+  try {
+    var r = await fetch('/api/wa-bot?action=badges-aguardando').then(function(x){return x.json();});
+    if(r && r.ok) _srBadges = r.badges || {};
+  } catch(e){ _srBadges = {}; }
+}
+function situacaoDe(card){
+  var b = _srBadges && (_srBadges[card.id] || _srBadges[card.pipefyId] || _srBadges[card.cardId]);
+  if(!b || b.semBot) return { grupo:'humano', txt:'👤 atendimento humano', classe:'humano' };
+  var d = b.disparos || 0, f = b.fase || 0;
+  if(d >= 7) return { grupo:'esgotada', txt:f+'F · '+d+'D ⚠️ encerrada', classe:'esgotada', fase:f, disparos:d };
+  return { grupo:'F'+f, txt:(f||'—')+'F · '+d+'D', classe:'viva', fase:f, disparos:d };
+}
+function montarFiltrosSem(){
+  var cx = document.getElementById('filtros-sem');
+  if(!cx) return;
+  var cont = { todos:_srCards.length, humano:0, esgotada:0 };
+  for(var i=1;i<=5;i++) cont['F'+i] = 0;
+  _srCards.forEach(function(c){
+    var s = situacaoDe(c);
+    cont[s.grupo] = (cont[s.grupo]||0) + 1;
+  });
+  var botoes = [['todos','Todos']];
+  for(var j=1;j<=5;j++) if(cont['F'+j]) botoes.push(['F'+j, j+'ª fase']);
+  if(cont.esgotada) botoes.push(['esgotada','⚠️ Tentativas encerradas']);
+  if(cont.humano) botoes.push(['humano','👤 Atendimento humano']);
+  cx.innerHTML = botoes.map(function(b){
+    return '<button class="f-btn'+(_srFiltro===b[0]?' on':'')+'" onclick="filtrarSem(\''+b[0]+'\')">'
+      + b[1] + ' <b>' + (cont[b[0]]||0) + '</b></button>';
+  }).join('');
+}
+function filtrarSem(g){
+  _srFiltro = g;
+  montarFiltrosSem();
+  desenharSem();
+}
+function desenharSem(){
+  var list = document.getElementById('list-sem');
+  if(!list) return;
+  var mostrar = _srCards.filter(function(c){
+    return _srFiltro === 'todos' || situacaoDe(c).grupo === _srFiltro;
+  });
+  list.innerHTML = '';
+  if(!mostrar.length){ loadMsg('list-sem','Nenhum cliente neste grupo'); return; }
+  mostrar.forEach(function(card){
+    var el = srCard(card);
+    var s = situacaoDe(card);
+    var sp = document.createElement('div');
+    sp.className = 'sr-badge ' + s.classe;
+    sp.textContent = s.txt;
+    sp.title = s.grupo === 'humano' ? 'nenhuma mensagem do bot para este cliente'
+      : 'fase ' + (s.fase||0) + ' de 5 · disparo ' + (s.disparos||0) + ' de 7';
+    var nome = el.querySelector('.sr-nome');
+    if(nome && nome.parentNode) nome.parentNode.insertBefore(sp, nome.nextSibling);
+    else el.appendChild(sp);
+    list.appendChild(el);
+  });
+}
+
+async function loadSemResposta(){loadMsg('list-sem','Carregando...');try{var d=await fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();});var bg=document.getElementById('badge-sem');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-sem',d.error||'Nenhum cliente +48h em Aguardando Aprovacao');return;}_srCards = d.cards; await carregarBadgesSem(); montarFiltrosSem(); desenharSem();}catch(e){loadMsg('list-sem','Erro: '+e.message);}}
 async function alertarCliente(pipefyId){var btn=document.getElementById('btn-al-'+pipefyId);if(btn){btn.disabled=true;btn.textContent='...';}try{var d=await fetch('/api/orcamento?action=alertar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pipefyId})}).then(function(r){return r.json();});if(d.ok){showToast('OK','Movido para Ultima Chamada!','Prazo: '+(d.dataLimite||''));loadSemResposta();}else{showToast('Erro',d.error||'','');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}catch(e){showToast('Erro',e.message,'');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}
 async function loadUltimaChamada(){loadMsg('list-ult','Carregando...');try{var d=await fetch('/api/orcamento?action=ultima-chamada').then(function(r){return r.json();});var bg=document.getElementById('badge-ult');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-ult',d.error||'Nenhuma ficha em Ultima Chamada');return;}var list=document.getElementById('list-ult');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(ucCard(card));});}catch(e){loadMsg('list-ult','Erro: '+e.message);}}
 
