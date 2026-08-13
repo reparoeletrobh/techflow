@@ -52,6 +52,13 @@ module.exports = async function handler(req, res) {
     feitos.push(await chamar('devoluções pendentes do remarcar',
       'logistica?action=processar-pendentes&aplicar=1'));
     feitos.push(await chamar('exame do sistema', 'vigia?action=exame-completo&horas=48'));
+    // 🏪 lembrete de retirada: só às 10h, uma vez por dia (o limite de crons
+    // da Vercel está esgotado, então a rotina de hora em hora faz o papel)
+    const horaBR = new Date(Date.now() - 3 * 3600000).getUTCHours();
+    if (horaBR === 10) {
+      feitos.push(await chamar('lembrete de retirada na loja',
+        'wa-bot?action=retirada-loja&aplicar=1'));
+    }
   }
   else return res.status(400).json({ ok: false, acoes: ['frequente', 'de-hora-em-hora'] });
 
