@@ -417,6 +417,122 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 🔍 CONFERIR-DISPAROS-FANTASMA: consta no controle, sem prova de envio ──
+  // O controle da sequência registra a tentativa, mas se a mensagem não saiu de
+  // fato o cliente nunca soube do orçamento — e, por constar como avisado, a
+  // régua deixa de alcançá-lo e o painel não o cobra. Fica invisível.
+  if (action === 'conferir-disparos-fantasma') {
+    const d8g = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [ppA4, ppT4, ctrl4, idx] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+      dbGet('wa_envios_index'),
+    ]);
+    const clientes4 = ((ctrl4 || {}).clientes) || {};
+    // 📇 índice de mensagens confirmadas pela Meta (id de envio)
+    const confirmados = new Set();
+    try {
+      const itens = (idx || {}).itens || (idx || {}).envios || {};
+      for (const [, v] of Object.entries(itens)) {
+        const t = d8g((v || {}).to || (v || {}).tel);
+        if (t) confirmados.add(t);
+      }
+    } catch (e) {}
+    // 📜 mensagens registradas na conversa
+    let evts4 = [];
+    try {
+      const r = await fetch(`${U}/lrange/${EVT_LIST}/-8000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) { try { evts4.push(JSON.parse(s)); } catch (e) {} }
+    } catch (e) {}
+    const temMensagem = {};
+    for (const e of evts4) {
+      const t = d8g(e.tel); if (!t) continue;
+      temMensagem[t] = temMensagem[t] || { out: 0, in: 0, ultima: null };
+      if (e.dir === 'out') temMensagem[t].out++; else temMensagem[t].in++;
+      const q = String(e.ts || '');
+      if (!temMensagem[t].ultima || q > temMensagem[t].ultima) temMensagem[t].ultima = q;
+    }
+
+    const fantasmas = [], comProva = [];
+    for (const [db, sis, banco] of [[ppA4, 'ADM', 'reparoeletro_pipe'], [ppT4, 'TV', 'tv_pipe']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+        const d = d8g(c.telefone);
+        const rec = clientes4[d];
+        if (!rec || !(rec.tentativas > 0)) continue;   // não consta como disparado
+        const msg = temMensagem[d];
+        const item = { sis, banco, id: c.id, nome: c.nomeContato || c.nome || '?', tel: d,
+          valor: Number(c.valor || 0), tentativas: rec.tentativas, ultimoControle: rec.ultimo,
+          equipamento: String(c.equipamento || c.descricao || 'equipamento').slice(0, 40),
+          mensagens: msg ? msg.out + '↑/' + msg.in + '↓' : 'nenhuma',
+          confirmadoPelaMeta: confirmados.has(d) };
+        // fantasma = consta disparo, mas nenhuma mensagem nossa no registro
+        if (!msg || msg.out === 0) fantasmas.push(item);
+        else comProva.push(item);
+      }
+    }
+    const valorF = fantasmas.reduce((s, x) => s + x.valor, 0);
+    return res.status(200).json({ ok: fantasmas.length === 0,
+      comDisparoRegistrado: fantasmas.length + comProva.length,
+      COM_PROVA_DE_ENVIO: comProva.length,
+      SEM_PROVA_DE_ENVIO: fantasmas.length,
+      valorSemProva: +valorF.toFixed(2),
+      VEREDITO: fantasmas.length
+        ? '🚨 ' + fantasmas.length + ' cliente(s) constam como avisados mas não há ' +
+          'nenhuma mensagem nossa no registro — R$ ' + valorF.toFixed(2) + ' em orçamentos'
+        : '✅ todo disparo registrado tem mensagem correspondente',
+      LISTA: fantasmas.sort((a, b) => b.valor - a.valor)
+        .map(x => x.sis + ' | ' + x.nome.slice(0, 20).padEnd(20) + ' ' + x.tel.slice(-4) +
+          ' | R$ ' + String(x.valor.toFixed(2)).padStart(8) +
+          ' | controle diz ' + x.tentativas + ' tentativa(s) em ' + (x.ultimoControle || '—') +
+          ' | conversa: ' + x.mensagens +
+          (x.confirmadoPelaMeta ? ' | ⚠️ há id de envio confirmado' : ' | sem id de envio')),
+      comoDisparar: fantasmas.length
+        ? 'action=disparar-fantasmas&aplicar=1 — limpa o registro falso e envia de verdade'
+        : null });
+  }
+
+  // ── 📨 DISPARAR-FANTASMAS: limpa o registro sem prova e envia ──
+  if (action === 'disparar-fantasmas') {
+    const K5 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    let conf = null;
+    try {
+      conf = await fetch('https://reparoeletroadm.com/api/wa-bot' +
+        '?action=conferir-disparos-fantasma&k=' + K5).then(x => x.json());
+    } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui conferir' }); }
+    const linhas = (conf && conf.LISTA) || [];
+    if (!linhas.length) return res.status(200).json({ ok: true, nada: 'nenhum caso a tratar' });
+    const excluirF = new Set(String(req.query.excluir || '')
+      .split(',').map(x => x.replace(/\D/g, '')).filter(Boolean).map(x => x.slice(-4)));
+    const tels = linhas.map(l => {
+      const m2 = String(l).match(/\s(\d{4})\s\|/);
+      return m2 ? m2[1] : null;
+    }).filter(Boolean).filter(t => !excluirF.has(t));
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoReceber: tels.length,
+        oQueVaiAcontecer: 'o registro falso é apagado e o disparo de orçamento é enviado ' +
+          'de verdade, como primeiro aviso',
+        L: linhas.filter(l => { const m3 = String(l).match(/\s(\d{4})\s\|/);
+          return m3 && !excluirF.has(m3[1]); }),
+        dica: 'para enviar: &aplicar=1' });
+    }
+    // 🧹 remove o registro sem prova, para o disparo normal alcançá-los
+    const ctrl5 = (await dbGet('wa_recuperacao_7d')) || { clientes: {} };
+    let limpos = 0;
+    for (const [t, v] of Object.entries(ctrl5.clientes || {})) {
+      if (tels.includes(String(t).slice(-4))) {
+        delete ctrl5.clientes[t]; limpos++;
+      }
+    }
+    if (limpos) await dbSet('wa_recuperacao_7d', ctrl5);
+    return res.status(200).json({ ok: true, registrosLimpos: limpos,
+      proximoPasso: 'agora rode disparar-orcamentos-pendentes: eles entram na fila normalmente' });
+  }
+
   // ── 📨 DISPARAR-ORCAMENTOS-PENDENTES: quem tem orçamento e nunca foi avisado ──
   // Confere na hora do envio que o card AINDA está em aguardando aprovação: se
   // saiu para aprovado, descarte ou outra fase, o disparo não faz mais sentido.
