@@ -290,6 +290,8 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 </style>
 </head>
 <body>
+<div id="painel-ciclo-compras" style="padding:14px 16px 0;"></div>
+
 
 <header>
   <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> &mdash; <span style="color:var(--orange)">Compras</span></div>
@@ -560,6 +562,49 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 <div class="toast" id="toast"></div>
 
 <script>
+// ── 💰 painel do ciclo de compras: teto semanal e quanto já saiu ──
+var _tetoCompras = 4000;
+async function carregarCicloCompras(){
+  var cx = document.getElementById('painel-ciclo-compras');
+  if(!cx) return;
+  var r = null;
+  try { r = await fetch('/api/compras-pecas?action=painel-ciclo&teto=' + _tetoCompras)
+    .then(function(x){ return x.json(); }); } catch(e){}
+  if(!r || !r.ok){ cx.innerHTML = ''; return; }
+  var pct = Math.min(100, r.percentual || 0);
+  var cor = pct >= 100 ? '#f87171' : pct >= 80 ? '#fbbf24' : '#34d399';
+  var ag = r.AGUARDANDO_PAGAMENTO || {};
+  cx.innerHTML =
+    '<div style="background:#0d1117;border:1px solid #1e2430;border-radius:14px;padding:15px 17px;">'
+    + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+      + '<span style="font-size:12.5px;font-weight:800;">💰 Compras da semana</span>'
+      + '<span style="font-family:ui-monospace,monospace;font-size:19px;font-weight:700;color:' + cor + ';">'
+        + 'R$ ' + Number(r.gasto||0).toLocaleString('pt-BR',{minimumFractionDigits:2})
+        + '<span style="font-size:12px;color:#5a6270;"> / ' 
+        + Number(r.teto||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span></span>'
+      + '<span style="margin-left:auto;font-size:11px;color:#5a6270;">'
+        + (r.cicloComecaEm||'') + ' → ' + (r.cicloTerminaEm||'') + '</span>'
+    + '</div>'
+    + '<div style="height:11px;background:#161c26;border-radius:6px;overflow:hidden;margin-top:9px;">'
+      + '<div style="height:100%;width:' + pct + '%;background:' + cor + ';border-radius:6px;'
+      + 'transition:width .4s;"></div></div>'
+    + '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#8b93a3;margin-top:8px;">'
+      + '<span>' + (r.compras||0) + ' compra(s) paga(s)</span>'
+      + '<span>restam R$ ' + Number(r.restante||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span>'
+      + (ag.quantas ? '<span style="color:' + (ag.estouraria ? '#f87171' : '#fbbf24') + ';">'
+          + '⏳ ' + ag.quantas + ' aguardando pagamento · R$ '
+          + Number(ag.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})
+          + (ag.estouraria ? ' — pagando tudo, o teto estoura (R$ '
+              + Number(ag.seTudoForPago||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + ')' : '')
+          + '</span>' : '')
+    + '</div>'
+    + ((r.POR_DIA||[]).length
+        ? '<div style="font-family:ui-monospace,monospace;font-size:10.5px;color:#5a6270;'
+          + 'margin-top:8px;line-height:1.7;">' + r.POR_DIA.join('  ·  ') + '</div>'
+        : '')
+    + '</div>';
+}
+
 // ══════════════════════════════════════════════
 //  MÓDULOS
 // ══════════════════════════════════════════════
@@ -1146,7 +1191,7 @@ async function finCompra(){
   else toast('Erro: '+d.error,'var(--red)');
 }
 
-async function confPag(ids){var d=await fetch('/api/compras-pecas?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})}).then(function(r){return r.json();});if(d.ok){await pecLoad();toast('Pagamento confirmado!','var(--green)');}else toast('Erro: '+d.error,'var(--red)');}
+async function confPag(ids){var d=await fetch('/api/compras-pecas?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})}).then(function(r){return r.json();});if(d.ok){await pecLoad();carregarCicloCompras();toast('Pagamento confirmado!','var(--green)');}else toast('Erro: '+d.error,'var(--red)');}
 async function confGrupo(gid){var ids=itens.filter(function(p){return p.grupoId===gid;}).map(function(p){return p.id;});if(ids.length)await confPag(ids);}
 
 function vPgto(id){var p=itens.find(function(x){return x.id===id;});if(p)mostraPgto([p]);}
@@ -1447,10 +1492,14 @@ async function kbPagarGrupo(e, grupoId) {
   var ids = itens.filter(function(p){ return p.grupoId === grupoId && p.status === 'aguardando_pagamento'; }).map(function(p){ return p.id; });
   if (!ids.length) { toast('Nenhuma peca pendente neste grupo','var(--yellow)'); return; }
   var d = await fetch('/api/compras-pecas?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})}).then(function(r){return r.json();});
-  if (d.ok) { await kbReload(); toast('Grupo pago! '+ids.length+' peca(s)','var(--green)'); }
+  if (d.ok) { await kbReload(); carregarCicloCompras(); toast('Grupo pago! '+ids.length+' peca(s)','var(--green)'); }
   else toast('Erro: '+(d.error||''),'var(--red)');
 }
 
+
+// 💰 painel do ciclo de compras, ao abrir e a cada 3 minutos
+carregarCicloCompras();
+setInterval(carregarCicloCompras, 180000);
 </script>
 </body>
 </html>

@@ -121,16 +121,82 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok:true, grupoId });
   }
 
+  // ── 💰 GET painel-ciclo: quanto já se gastou na semana comercial ──
+  // O ciclo vai de sábado 13h a sábado 13h, o mesmo do comercial, para que a
+  // compra de peças possa ser lida junto com o que a semana produziu.
+  if (action === "painel-ciclo") {
+    const TETO = Math.max(0, Number(req.query.teto || 4000));
+    // início do ciclo: último sábado às 13h de Brasília
+    const agoraBR = new Date(Date.now() - 3 * 3600000);
+    const diaSem = agoraBR.getUTCDay();          // 0=dom … 6=sáb
+    const hora = agoraBR.getUTCHours();
+    let voltar = (diaSem - 6 + 7) % 7;           // dias desde o último sábado
+    if (diaSem === 6 && hora < 13) voltar = 7;   // sábado antes das 13h: ciclo anterior
+    const ini = new Date(agoraBR.getTime() - voltar * 86400000);
+    ini.setUTCHours(13, 0, 0, 0);
+    const iniMs = ini.getTime() + 3 * 3600000;   // de volta para UTC real
+    const fimMs = iniMs + 7 * 86400000;
+
+    const pecas = (db.pecas || []);
+    const noCiclo = pecas.filter(p => {
+      if (p.status !== 'pago' || !p.pagoEm) return false;
+      const t = new Date(p.pagoEm).getTime();
+      return t >= iniMs && t < fimMs;
+    });
+    const gasto = noCiclo.reduce((s, p) =>
+      s + Number(p.valor || p.preco || p.custo || 0), 0);
+    const aguardando = pecas.filter(p => p.status === 'aguardando_pagamento');
+    const aguardandoValor = aguardando.reduce((s, p) =>
+      s + Number(p.valor || p.preco || p.custo || 0), 0);
+
+    // por dia, para ver onde o dinheiro saiu
+    const porDia = {};
+    for (const p of noCiclo) {
+      const d = new Date(new Date(p.pagoEm).getTime() - 3 * 3600000).toISOString().slice(0, 10);
+      porDia[d] = (porDia[d] || 0) + Number(p.valor || p.preco || p.custo || 0);
+    }
+    const hh = d => new Date(d).toISOString().slice(0, 16).replace('T', ' ');
+    return res.status(200).json({ ok: true,
+      cicloComecaEm: hh(iniMs) + ' BRT', cicloTerminaEm: hh(fimMs) + ' BRT',
+      teto: TETO,
+      gasto: +gasto.toFixed(2),
+      restante: +(TETO - gasto).toFixed(2),
+      percentual: TETO ? Math.round(gasto / TETO * 100) : 0,
+      compras: noCiclo.length,
+      AGUARDANDO_PAGAMENTO: { quantas: aguardando.length, valor: +aguardandoValor.toFixed(2),
+        seTudoForPago: +(gasto + aguardandoValor).toFixed(2),
+        estouraria: (gasto + aguardandoValor) > TETO },
+      POR_DIA: Object.entries(porDia).sort()
+        .map(([d, v]) => d + ' · R$ ' + v.toFixed(2)),
+      MAIORES: noCiclo
+        .sort((a, b) => Number(b.valor || b.preco || 0) - Number(a.valor || a.preco || 0))
+        .slice(0, 12)
+        .map(p => 'R$ ' + Number(p.valor || p.preco || p.custo || 0).toFixed(2).padStart(9) +
+          ' | ' + String(p.nome || p.descricao || '?').slice(0, 32) +
+          ' | ' + hh(p.pagoEm)) });
+  }
+
   // ── POST confirmar-pagamento ───────────────────────────────────
   if (req.method === "POST" && action === "confirmar-pagamento") {
     const { ids } = req.body || {};
     if (!ids?.length) return res.status(400).json({ ok:false, error:"ids obrigatórios" });
+    const agoraPg = new Date().toISOString();
+    let somaPg = 0;
+    const pagas = [];
     for (const id of ids) {
       const p = db.pecas.find(x => x.id === id);
-      if (p) { p.status = "pago"; p.pagoEm = new Date().toISOString(); }
+      if (!p) continue;
+      // 💰 não soma de novo o que já estava pago: clicar duas vezes contaria
+      // o mesmo valor duas vezes no teto da semana
+      if (p.status === 'pago' && p.pagoEm) { pagas.push({ ja: true, nome: p.nome }); continue; }
+      p.status = "pago";
+      p.pagoEm = agoraPg;
+      const v = Number(p.valor || p.preco || p.custo || 0);
+      somaPg += v;
+      pagas.push({ nome: p.nome || p.descricao || '?', valor: v });
     }
     await dbSet(KEY, db);
-    return res.status(200).json({ ok:true });
+    return res.status(200).json({ ok:true, confirmadas: pagas.length, valorConfirmado: +somaPg.toFixed(2) });
   }
 
   // ── POST previsao — atualiza previsão de chegada de peça online ─
