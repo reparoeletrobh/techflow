@@ -311,6 +311,41 @@ module.exports = async function handler(req,res){
       lista:achados.slice(0,30),dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── 🧹 FINALIZAR-RELATAR: move para finalizados sem avisar o cliente ──
+  // Os casos acumulados na aba de relato são anteriores ao fluxo automático:
+  // já foram tratados, e mandar aviso agora confundiria quem não espera mais
+  // retorno. Vão para finalizados marcados como não avisados, para que o
+  // disparo automático futuro não os alcance.
+  if(action==='finalizar-relatar'){
+    const alvo=(db.conflitos||[]).filter(c=>String(c.status||'')==='relatar');
+    if(String(req.query.aplicar||'')!=='1'){
+      return res.status(200).json({ok:true,modo:'prévia',
+        vaoSerFinalizados:alvo.length,
+        L:alvo.slice(0,60).map(c=>String(c.cliente||c.ficha||'?').slice(0,24)+' '
+          +String(c.telefone||c.tel||'').slice(-4)+' | '+String(c.motivo||'').slice(0,38)),
+        oQueVaiAcontecer:'vão para finalizados SEM nenhuma mensagem ao cliente',
+        dica:'para aplicar: &aplicar=1'});
+    }
+    const agora=new Date().toISOString();
+    let n=0;
+    for(const c of alvo){
+      c.status='resolvido';
+      c.clienteRelatado=false;
+      c.finalizadoSemAviso=true;
+      c.finalizadoSemAvisoEm=agora;
+      // 🔕 impede que o disparo automático alcance estes casos depois
+      c.avisoAberturaEm=c.avisoAberturaEm||agora;
+      c.avisoResolucaoEm=c.avisoResolucaoEm||agora;
+      c.avisoAberturaVia='não enviado — caso anterior ao fluxo automático';
+      c.avisoResolucaoVia='não enviado — caso anterior ao fluxo automático';
+      c.atualizadoEm=agora;
+      n++;
+    }
+    if(n) await dbSet(KEY,db);
+    return res.status(200).json({ok:true,finalizados:n,
+      observacao:'nenhuma mensagem foi enviada e estes casos não entram nos avisos futuros'});
+  }
+
   // ── 📣 AVISAR-CLIENTE: disparo automático de abertura e de resolução ──
   // O cliente que gerou um conflito está insatisfeito e em silêncio. Saber que
   // um chamado foi aberto — e depois que foi resolvido — muda a percepção mais
