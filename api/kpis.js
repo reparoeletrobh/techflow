@@ -291,6 +291,49 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 📜 QUEM-APROVOU: a lista nominal de um dia, direto do livro-razão ──
+  
+  // ── 📄 QUEM-ORCOU: a lista nominal dos orçamentos do dia ──
+  // Existe para conferir o número do painel contra a realidade: se o painel diz
+  // sete e o diagnóstico do dia mostra dois, esta lista revela quais cinco
+  // entraram indevidamente e por qual data foram contados.
+  if ((req.query || {}).action === 'quem-orcou') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const frente = String(req.query.frente || '').toLowerCase();
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000 - 1;
+    const banco = frente === 'tv' ? 'tv_pipe' : 'reparoeletro_pipe';
+    const db = (await dbGet(banco)) || { cards: [] };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const dentroDia = d => { const t = new Date(d || 0).getTime(); return t >= ini && t <= fim; };
+    const comCarimbo = [], porHistorico = [], semData = [];
+    for (const c of (db.cards || [])) {
+      const linha = String(c.nomeContato || c.nome || '?').slice(0, 22) +
+        ' ' + String(c.telefone || '').slice(-4) +
+        ' | R$ ' + Number(c.valor || 0).toFixed(2);
+      if (c.orcamentoEm) {
+        if (dentroDia(c.orcamentoEm)) comCarimbo.push(linha + ' | carimbo ' + hh(c.orcamentoEm));
+        continue;
+      }
+      const h2 = (c.history || [])
+        .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
+          .includes(String(x.phase || x.phaseId || '')))
+        .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+      if (h2.length && dentroDia(h2[0])) porHistorico.push(linha + ' | histórico ' + hh(h2[0]));
+      else if (Number(c.valor || 0) > 0 && dentroDia(c.criadoEm)) {
+        semData.push(linha + ' | criado ' + hh(c.criadoEm) +
+          ' — tem valor mas NÃO tem data de orçamento');
+      }
+    }
+    return res.status(200).json({ ok: true, dia, frente: frente || 'adm',
+      contagem: comCarimbo.length + porHistorico.length,
+      COM_CARIMBO: comCarimbo,
+      PELO_HISTORICO: porHistorico,
+      NAO_CONTADOS_SEM_DATA: semData,
+      explicacao: 'só entram na contagem os que têm data do orçamento, por carimbo ' +
+        'ou por entrada em aguardando aprovação; ter valor não basta' });
+  }
+
   if ((req.query || {}).action === 'quem-aprovou') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
     const frente = String(req.query.frente || '').toLowerCase();
@@ -624,8 +667,19 @@ module.exports = async function handler(req, res) {
     const ehBalcao = c => String(c.origem || '') === 'frenteloja' ||
       c.aprovadoNoBalcao === true || String(c.id || '').includes('-loja') ||
       tb.has(d8(c.telefone));
-    const orcs = cards.filter(c => dentro(c.orcamentoEm || c.criadoEm) &&
-      (Number(c.valor || 0) > 0 || c.orcamentoEm));
+    // 📄 orçamento é um FATO com data própria: o momento em que o valor foi
+    // registrado. Usar a criação do card como substituto contava como orçamento
+    // do dia todo card que nasceu hoje e em algum momento ganhou valor, mesmo
+    // que o valor tenha sido definido depois — por isso o número vinha inflado.
+    const orcs = cards.filter(c => {
+      if (c.orcamentoEm) return dentro(c.orcamentoEm);
+      // sem carimbo, só conta pelo histórico: entrada em aguardando aprovação
+      const h2 = (c.history || [])
+        .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
+          .includes(String(x.phase || x.phaseId || '')))
+        .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+      return h2.length ? dentro(h2[0]) : false;
+    });
     // ✅ contam os que PASSARAM pela aprovação no período, mesmo que já tenham
     // seguido para produção, entrega ou finalizado — olhar só quem está parado
     // na coluna hoje esconderia todo card que avançou depois
