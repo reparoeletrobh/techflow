@@ -657,6 +657,31 @@ function check(nome, cond, extra) {
 
   // ── 🛡️ garantia: cadastro, fila e envio ao controle de qualidade ──
   // ── 📺 os sistemas replicados para TV não podem tocar os bancos do ADM ──
+  // ── 📇 tentativa de disparo só pode ser registrada se a mensagem saiu ──
+  // 16 clientes ficaram invisíveis por constarem como avisados sem que a
+  // mensagem tivesse saído: como o controle os dava por atendidos, a régua
+  // parava de alcançá-los e o painel deixava de cobrá-los.
+  console.log('▶ Cenário FT — controle só registra envio confirmado');
+  {
+    const fsF = require('fs');
+    const c = fsF.readFileSync('api/wa-bot.js', 'utf8');
+    const linhas = c.split('\n');
+    const suspeitas = [];
+    linhas.forEach((l, i) => {
+      // gravação de tentativa no controle da sequência
+      if (!/controle\d*\.clientes\[[^\]]+\]\s*=\s*\{[^}]*tentativas/.test(l)) return;
+      const ctx = linhas.slice(Math.max(0, i - 12), i + 2).join(' ');
+      // precisa estar dentro de uma verificação de que a Meta aceitou
+      const confirmado = /if \(ok\)|r\.messages\s*&&\s*r\.messages\[0\]|messages\[0\]\)/.test(ctx);
+      if (!confirmado) suspeitas.push('linha ' + (i + 1));
+    });
+    check('registro de disparo exige confirmação da Meta',
+      suspeitas.length === 0, suspeitas.join(', '));
+    // a conferência de fantasmas precisa continuar existindo
+    check('existe conferência de disparo sem prova de envio',
+      /conferir-disparos-fantasma/.test(c));
+  }
+
   console.log('▶ Cenário TV — almoxarifado e garantia de TV são independentes');
   {
     const gTv = carregarHandler('api/tv-garantia-v2.js');

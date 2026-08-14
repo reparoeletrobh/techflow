@@ -52,6 +52,10 @@ module.exports = async function handler(req, res) {
     feitos.push(await chamar('devoluções pendentes do remarcar',
       'logistica?action=processar-pendentes&aplicar=1'));
     feitos.push(await chamar('exame do sistema', 'vigia?action=exame-completo&horas=48'));
+    // 📇 disparo registrado sem mensagem correspondente deixa o cliente invisível:
+    // a régua o dá por atendido e ninguém o cobra. Confere sem aplicar nada.
+    feitos.push(await chamar('disparos sem prova de envio',
+      'wa-bot?action=conferir-disparos-fantasma'));
     // 🏪 lembrete de retirada: só às 10h, uma vez por dia (o limite de crons
     // da Vercel está esgotado, então a rotina de hora em hora faz o papel)
     const agoraBR2 = new Date(Date.now() - 3 * 3600000);
