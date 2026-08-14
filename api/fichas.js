@@ -129,6 +129,63 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🧹 LIMPAR-JA-ADIANTE: tira da fila quem já avançou no funil ──
+  if (action === 'limpar-ja-adiante') {
+    const d8l = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const FASES_ADIANTE = ['horario_marcado', 'motorista_parceiro', 'em_rota',
+      'liberado_para_rota', 'orc_registrado', 'coleta_efetuada', 'recebido'];
+    const adiante = {};
+    for (const k of ['reparoeletro_logistica', 'tv_logistica']) {
+      const b = await dbGet(k);
+      for (const x of (((b || {}).fichas) || [])) {
+        if (!FASES_ADIANTE.includes(String(x.phase || ''))) continue;
+        const t = d8l(x.telefone); if (t) adiante[t] = k + ':' + x.phase;
+      }
+    }
+    for (const k of ['reparoeletro_pipe', 'tv_pipe']) {
+      const b = await dbGet(k);
+      for (const x of (((b || {}).cards) || [])) {
+        const fase = String(x.phaseId || x.phase || '');
+        if (!fase || fase === 'descarte' || fase === 'perdido') continue;
+        const t = d8l(x.telefone); if (t) adiante[t] = k + ':' + fase;
+      }
+    }
+    const alvo = [];
+    for (const [chave, sis] of [[KEY_ADM, 'ADM'], [KEY_TV, 'TV']]) {
+      const db = await dbGet(chave);
+      for (const f of (((db || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'entrar_contato') continue;
+        const t = d8l(f.telefone);
+        if (!adiante[t]) continue;
+        alvo.push({ chave, sis, id: f.id, nome: f.nome, tel: t, onde: adiante[t] });
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: alvo.length === 0,
+        naFila: alvo.length,
+        explicacao: 'estão na fila de ligação, mas o cliente já avançou no funil',
+        L: alvo.map(a => a.sis + ' | ' + String(a.nome || '?').slice(0, 22) + ' ' +
+          a.tel.slice(-4) + ' | já está em ' + a.onde),
+        dica: 'para tirar da fila: &aplicar=1' });
+    }
+    let n = 0;
+    for (const chave of [KEY_ADM, KEY_TV]) {
+      const meus = alvo.filter(a => a.chave === chave);
+      if (!meus.length) continue;
+      const db = await dbGet(chave);
+      for (const a of meus) {
+        const f = (db.fichas || []).find(x => String(x.id) === String(a.id));
+        if (!f || f.status !== 'entrar_contato') continue;
+        f.status = 'prospeccao';
+        f.encerradaPorAvanco = new Date().toISOString();
+        f.encerradaMotivo = 'cliente já está em ' + a.onde;
+        n++;
+      }
+      await dbSet(chave, db);
+    }
+    return res.status(200).json({ ok: true, retiradas: n });
+  }
+
   // ── 🔬 HISTORIA-COMPLETA: tudo que já aconteceu com cada ficha da coluna ──
   // Cruza o registro de passagens da própria ficha com exclusões, cancelamentos
   // e presença em outros bancos, para explicar por que ela está ali de novo.
@@ -1699,6 +1756,29 @@ export default async function handler(req, res) {
     const agora = Date.now();
     let mudou = false;
     const novosEntrar = [];
+    // 📍 quem já está adiante no funil: coleta marcada, orçamento registrado,
+    // aprovado. Essas fichas não devem entrar na fila de ligação.
+    const d8reg = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const emOperacaoAgora = new Set();
+    try {
+      const FASES_ADIANTE = ['horario_marcado', 'motorista_parceiro', 'em_rota',
+        'liberado_para_rota', 'orc_registrado', 'coleta_efetuada', 'recebido'];
+      for (const k of ['reparoeletro_logistica', 'tv_logistica']) {
+        const b = await dbGet(k);
+        for (const x of (((b || {}).fichas) || [])) {
+          if (!FASES_ADIANTE.includes(String(x.phase || ''))) continue;
+          const t = d8reg(x.telefone); if (t) emOperacaoAgora.add(t);
+        }
+      }
+      for (const k of ['reparoeletro_pipe', 'tv_pipe']) {
+        const b = await dbGet(k);
+        for (const x of (((b || {}).cards) || [])) {
+          const fase = String(x.phaseId || x.phase || '');
+          if (!fase || fase === 'descarte' || fase === 'perdido') continue;
+          const t = d8reg(x.telefone); if (t) emOperacaoAgora.add(t);
+        }
+      }
+    } catch (e) {}
     for (const f of db.fichas) {
       if (f.status === 'contato_feito' && f.contatoFeitoEm) {
         // 🕐 a contagem só corre DENTRO do horário de trabalho. Uma ficha abordada
@@ -1712,6 +1792,16 @@ export default async function handler(req, res) {
         // Bot abordou → 1 hora para cadastrar na logística; contato manual → 24 horas
         const limiteMs = f.abordadoPorBot ? 60*60*1000 : 24*60*60*1000;
         if (agora - new Date(f.contatoFeitoEm).getTime() > limiteMs) {
+          // 🚫 o cliente já avançou no funil? então esta ficha é uma sobra: ele
+          // não precisa de ligação, está em coleta, orçamento ou já aprovou.
+          // Sem esta checagem a equipe ligava para quem já estava negociando.
+          if (emOperacaoAgora.has(d8reg(f.telefone))) {
+            f.status = 'prospeccao';
+            f.encerradaPorAvanco = new Date().toISOString();
+            f.encerradaMotivo = 'cliente já está em atendimento adiante no funil';
+            mudou = true;
+            continue;
+          }
           _ec.marcarEntrarContato(f, 'régua de contato',
             f.abordadoPorBot ? 'abordado pelo bot, sem resposta em 1h' : 'contato manual sem retorno em 24h');
           mudou = true;
