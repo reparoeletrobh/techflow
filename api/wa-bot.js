@@ -460,15 +460,57 @@ export default async function handler(req, res) {
             ? Math.floor((Date.now() - new Date(c.criadoEm).getTime()) / 86400000) : null });
       }
     }
-    // 👥 um disparo por cliente, mesmo com vários cards
-    const porCliente = {};
-    for (const a of alvo) if (!porCliente[a.d] || a.valor > porCliente[a.d].valor) porCliente[a.d] = a;
+    // 💬 quem já está conversando não recebe aviso automático: o template chega
+    // como primeiro contato e atropela um atendimento em andamento, às vezes uma
+    // reclamação. Esses casos ficam para a equipe conduzir.
+    const conversaViva = {}, conflitoAberto = {};
+    for (const e of evts2) {
+      const t = d8d(e.tel); if (!t) continue;
+      const q = new Date(e.ts || 0).getTime();
+      if (!conversaViva[t] || q > conversaViva[t].ts) conversaViva[t] = { ts: q };
+      conversaViva[t].total = (conversaViva[t].total || 0) + 1;
+      if (e.dir === 'in') conversaViva[t].dele = (conversaViva[t].dele || 0) + 1;
+    }
+    // conflitos já abertos na prospecção
+    try {
+      const pr = await dbGet('prospeccao_adm');
+      for (const f of (((pr || {}).fichas) || [])) {
+        if (!/conflito/i.test(String(f.status || ''))) continue;
+        const t = d8d(f.telefone); if (t) conflitoAberto[t] = f.status;
+      }
+    } catch (e) {}
+
+    const DIAS_CONVERSA = 7;
+    const porCliente = {}, comConversa = [], comConflito = [];
+    for (const a of alvo) {
+      const cv = conversaViva[a.d];
+      const recente = cv && (Date.now() - cv.ts) < DIAS_CONVERSA * 86400000 && (cv.dele || 0) > 0;
+      if (conflitoAberto[a.d]) {
+        comConflito.push({ ...a, status: conflitoAberto[a.d] });
+        continue;
+      }
+      if (recente) {
+        comConversa.push({ ...a, msgs: cv.dele + ' resposta(s)',
+          ultima: new Date(cv.ts).toISOString() });
+        continue;
+      }
+      if (!porCliente[a.d] || a.valor > porCliente[a.d].valor) porCliente[a.d] = a;
+    }
     const fila = Object.values(porCliente);
 
     if (!aplicar) {
+      const hhx = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+        .toISOString().slice(5, 16).replace('T', ' ') : '—';
       return res.status(200).json({ ok: true, modo: 'prévia',
         cardsEncontrados: alvo.length,
         clientesQueSeriamAvisados: fila.length,
+        FORA_POR_CONVERSA_ATIVA: comConversa.map(x => x.sis + ' | ' +
+          x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
+          ' | ' + x.msgs + ' | última em ' + hhx(x.ultima) +
+          ' — a equipe conduz'),
+        FORA_POR_CONFLITO_ABERTO: comConflito.map(x => x.sis + ' | ' +
+          x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
+          ' | ' + x.status + ' — já está com a equipe'),
         valorTotal: +fila.reduce((s, x) => s + x.valor, 0).toFixed(2),
         criterio: 'em aguardando aprovação AGORA, com valor definido e sem nenhum disparo de orçamento',
         L: fila.sort((a, b) => (b.dias || 0) - (a.dias || 0))
