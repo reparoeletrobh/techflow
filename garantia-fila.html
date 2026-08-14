@@ -46,7 +46,6 @@ h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;}
 @keyframes pulseT{50%{opacity:.55;}}
 .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
 .b{flex:1;min-width:44%;border:none;border-radius:9px;padding:11px;font-size:12.5px;font-weight:900;cursor:pointer;}
-.b-video{background:#7c3aed;color:#fff;}
 .b-qc{background:#16a34a;color:#fff;}
 .b-reabrir{background:#374151;color:#fff;flex:0 0 auto;min-width:auto;padding:8px 12px;font-size:11px;}
 .empty{text-align:center;color:var(--dim);padding:40px 20px;font-size:13px;}
@@ -151,7 +150,6 @@ function render(){
          '<div class="acts"><button class="b b-reabrir" onclick="reabrir(\''+g.id+'\')">↩ reabrir</button></div>'
         :'<div class="tempo '+t.cls+'">⏱ '+t.txt+'</div>'+
          '<div class="acts">'+
-           '<button class="b b-video" onclick="resolver(\''+g.id+'\',\'video\')">🎬 Liberar para Vídeo</button>'+
            '<button class="b b-qc" onclick="resolver(\''+g.id+'\',\'qc\')">✅ Controle de Qualidade</button>'+
          '</div>')+
     '</div>';

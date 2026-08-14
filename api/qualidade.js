@@ -71,10 +71,17 @@ export default async function handler(req, res) {
       const fim = i.aprovadoEm || i.reprovadoEm;
       if (doDia(fim)) {
         saidas[o]++;
-        if (i.criadoEm) {
-          const h = (new Date(fim).getTime() - new Date(i.criadoEm).getTime()) / 3600000;
-          if (h >= 0 && h < 24 * 30) tempos.push({ origem: o, horas: +h.toFixed(1),
-            tecnico: i.tecnico || '?' });
+        // ⏱️ o tempo que interessa é o da PRODUÇÃO: da aprovação no setor
+        // técnico até o serviço chegar ao controle de qualidade. O intervalo
+        // entre entrar no CQ e ser inspecionado mede a inspeção, não o serviço.
+        const inicio = i.entrouTecnicoEm;
+        if (inicio) {
+          const ref = i.criadoEm || fim;   // criadoEm da inspeção = entrada no CQ
+          const hProd = (new Date(ref).getTime() - new Date(inicio).getTime()) / 3600000;
+          if (hProd >= 0 && hProd < 24 * 90) {
+            tempos.push({ origem: o, horas: +hProd.toFixed(1), tecnico: i.tecnico || '?',
+              medida: 'produção (aprovado → controle de qualidade)' });
+          }
         }
       }
     }
@@ -106,8 +113,11 @@ export default async function handler(req, res) {
       naFila: { ...fila, total: Object.values(fila).reduce((a, b) => a + b, 0) },
       aguardandoInspecao: insp.filter(i => i.status === 'aguardando').length,
       aprovadosHojeNoTecnico: aprovadosHoje,
-      tempoMedioHoras: tempos.length
+      tempoMedioProducaoHoras: tempos.length
         ? +(tempos.reduce((s, t) => s + t.horas, 0) / tempos.length).toFixed(1) : null,
+      oQueMede: 'horas entre a aprovação no setor técnico e a entrada no controle de qualidade',
+      semCarimboDeEntrada: insp.filter(i => doDia(i.aprovadoEm || i.reprovadoEm) &&
+        !i.entrouTecnicoEm).length,
       amostraTempos: tempos.slice(0, 40) };
 
     // guarda uma linha por leitura, sem sobrescrever: o histórico é o valor
@@ -134,7 +144,8 @@ export default async function handler(req, res) {
       const ent = Object.values(f.entradas || {}).reduce((a, b) => a + b, 0);
       const sai = Object.values(f.saidas || {}).reduce((a, b) => a + b, 0);
       return { dia: d, entrou: ent, saiu: sai, saldo: ent - sai,
-        fila: (f.naFila || {}).total || 0, tempoMedio: f.tempoMedioHoras,
+        fila: (f.naFila || {}).total || 0,
+        tempoMedio: f.tempoMedioProducaoHoras != null ? f.tempoMedioProducaoHoras : f.tempoMedioHoras,
         tecnico: (f.entradas || {}).tecnico || 0,
         garantia: (f.entradas || {}).garantia || 0,
         avulsa: (f.entradas || {}).avulsa || 0 };

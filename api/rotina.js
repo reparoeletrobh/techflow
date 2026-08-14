@@ -67,7 +67,9 @@ module.exports = async function handler(req, res) {
       feitos.push(await chamar('ritmo da qualidade', 'qualidade?action=registrar-ritmo'));
     }
     // 🌙 fechamento do dia: última chance de trazer o que ficou para trás, e
-    // somente do próprio dia. Depois da meia-noite aquela linha não entra mais.
+    // somente do próprio dia. A rotina roda aos 58 minutos justamente para que
+    // esta passagem caia às 23:58 — se fosse mais cedo, a linha registrada
+    // depois disso se perderia na virada.
     if (horaBR === 23) {
       feitos.push(await chamar('fechamento do dia — fichas de hoje',
         'fichas?action=sync-completo&aplicar=1'));

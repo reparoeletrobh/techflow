@@ -682,10 +682,22 @@ module.exports = async function handler(req, res) {
         ('bd_' + String(card.telefone || '').replace(/\D/g, '').slice(-8) + '_' +
          Date.now().toString(36));
       card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
+      // ⏱️ entrada no setor técnico: é daqui que se conta o tempo até o serviço
+      // chegar ao controle de qualidade — a medida que diz quanto a produção
+      // realmente leva, e não o tempo da inspeção em si
+      if (phaseId === 'aprovado' && !card.entrouTecnicoEm) {
+        card.entrouTecnicoEm = new Date().toISOString();
+      }
       // 🔍 observação técnica do Controle de Qualidade — INTERNA, nunca vai ao cliente
       if (phaseId === 'controle_qualidade') {
         card.tecnicoServico = tecnico || card.tecnico || null;   // quem fez o serviço
         card.entrouCqEm = new Date().toISOString();
+        // guarda o tempo de produção junto com o card, para o relatório não
+        // depender de recalcular a partir de históricos que podem sumir
+        if (card.entrouTecnicoEm) {
+          card.horasNoTecnico = +(((new Date(card.entrouCqEm).getTime() -
+            new Date(card.entrouTecnicoEm).getTime()) / 3600000)).toFixed(1);
+        }
         // 🔬 cria a inspeção no Controle de Qualidade — antes o card entrava na fase
         // mas nada aparecia na tela de qualidade, e o inspetor não sabia o que conferir
         try {
@@ -721,6 +733,10 @@ module.exports = async function handler(req, res) {
               flFichaId: card.flFichaId || null,   // 🏪 vínculo direto com a ficha do balcão
               cliente: card.nomeContato || card.nome || '—',
               telefone: card.telefone || '',
+              // ⏱️ tempo que o serviço levou DENTRO do setor técnico, da
+              // aprovação até chegar ao controle de qualidade
+              entrouTecnicoEm: card.entrouTecnicoEm || null,
+              horasNoTecnico: card.horasNoTecnico != null ? card.horasNoTecnico : null,
               equipamento: tipo,
               equipamentoTexto: card.equipamento || card.descricao || '',
               tecnico: card.tecnicoServico || null,      // 👨‍🔧 quem fez o serviço

@@ -154,7 +154,7 @@
     },
     {
       "path": "/api/rotina?action=de-hora-em-hora&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "25 * * * *"
+      "schedule": "58 * * * *"
     },
     {
       "path": "/api/rotina?action=frequente&k=tfk-re2026-Bx7mQp9zKw4Y",
