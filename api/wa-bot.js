@@ -761,8 +761,15 @@ export default async function handler(req, res) {
         if (fase !== 'aguardando_aprovacao' && fase !== 'ultima_chamada') continue;
         const d = d8n(c.telefone);
         if (!recebeuOrcamento.has(d)) {
+          // 🔎 por que este não foi disparado? o disparo exige estar em
+          // aguardando aprovação e ter valor definido
+          const valorC = Number(c.valor || 0);
+          const motivo = valorC <= 0 ? 'sem valor definido — não há orçamento a comunicar'
+            : fase !== 'aguardando_aprovacao' ? 'está em ' + fase + ', não em aguardando aprovação'
+            : d.length < 8 ? 'telefone inválido'
+            : 'ELEGÍVEL — pode ser disparado';
           foraDoPainel.push({ sis, nome: c.nomeContato || c.nome || '?', tel: d,
-            valor: Number(c.valor || 0), criadoEm: c.criadoEm,
+            valor: valorC, criadoEm: c.criadoEm, fase, motivo,
             dias: c.criadoEm
               ? Math.floor((Date.now() - new Date(c.criadoEm).getTime()) / 86400000) : null });
           continue;
@@ -808,11 +815,14 @@ export default async function handler(req, res) {
         ? '🚨 ' + foraDoPainel.length + ' card(s) com orçamento registrado NUNCA receberam ' +
           'o disparo — R$ ' + semDisparoValor.toFixed(2) + ' parados sem o cliente ser avisado'
         : null,
+      POR_QUE_NAO_FORAM_DISPARADOS: foraDoPainel.reduce((o, x) => {
+        o[x.motivo] = (o[x.motivo] || 0) + 1; return o; }, {}),
       SEM_DISPARO_DE_ORCAMENTO: foraDoPainel
         .sort((a, b) => (b.dias || 0) - (a.dias || 0))
         .map(x => x.sis + ' | ' + String(x.nome).slice(0, 20).padEnd(20) + ' ' + x.tel.slice(-4) +
           ' | R$ ' + String(x.valor.toFixed(2)).padStart(8) +
-          (x.dias != null ? ' | parado há ' + x.dias + ' dia(s)' : '')),
+          (x.dias != null ? ' | há ' + x.dias + 'd' : '') +
+          ' | ' + x.motivo),
       RESUMO: {
         emNegociacao: linhas.length,
         cardsSemDisparoDeOrcamento: foraDoPainel.length,
