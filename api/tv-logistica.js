@@ -330,6 +330,88 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action;
 
+  // ── 🚚 MOTORISTAS: cadastro com telefone e regra de atendimento ──
+  // Os nomes estavam fixos no código: incluir alguém exigia alterar o sistema,
+  // e não havia onde guardar o telefone — sem ele não dá para avisar o
+  // motorista quando uma coleta é atribuída a ele.
+  if (action === 'motoristas') {
+    const mdb = (await dbGet('reparoeletro_motoristas')) || { lista: [] };
+    if (!mdb.lista.length) {
+      // primeira carga: traz quem já aparece nas fichas, para não começar vazio
+      const semente = [
+        { nome: 'Jhonatan', telefone: '', regra: 'acima de 55 polegadas e Nova Lima', ativo: true },
+        { nome: 'Wilde', telefone: '', regra: 'até 55 pol · BH Norte, Venda Nova, Santa Luzia, Vespasiano, Sabará, Neves', ativo: true },
+        { nome: 'Eduardo', telefone: '', regra: 'até 55 pol · BH Oeste, BH Sul, Contagem, Betim, Ibirité', ativo: true },
+      ];
+      mdb.lista = semente.map(x => ({ id: 'mot_' + x.nome.toLowerCase(), ...x,
+        criadoEm: new Date().toISOString() }));
+      await dbSet('reparoeletro_motoristas', mdb);
+    }
+    return res.status(200).json({ ok: true, motoristas: mdb.lista });
+  }
+
+  if (req.method === 'POST' && action === 'motorista-salvar') {
+    const { id, nome, telefone, regra, ativo } = req.body || {};
+    if (!String(nome || '').trim()) {
+      return res.status(400).json({ ok: false, error: 'o nome é obrigatório' });
+    }
+    // 📞 o telefone precisa servir para o WhatsApp: normaliza em vez de recusar
+    let tel = String(telefone || '').replace(/\D/g, '');
+    if (tel && (tel.length === 10 || tel.length === 11)) tel = '55' + tel;
+    if (tel && (tel.length < 12 || tel.length > 13)) {
+      return res.status(400).json({ ok: false,
+        error: 'telefone inválido — informe com DDD, ex.: 31 99999-8888' });
+    }
+    const mdb = (await dbGet('reparoeletro_motoristas')) || { lista: [] };
+    mdb.lista = mdb.lista || [];
+    let m2 = id ? mdb.lista.find(x => String(x.id) === String(id)) : null;
+    if (!m2) {
+      // não duplica motorista com o mesmo nome
+      const igual = mdb.lista.find(x =>
+        String(x.nome || '').toLowerCase().trim() === String(nome).toLowerCase().trim());
+      if (igual && !id) {
+        return res.status(200).json({ ok: false, error: 'já existe um motorista com esse nome' });
+      }
+      m2 = { id: 'mot_' + Date.now().toString(36), criadoEm: new Date().toISOString() };
+      mdb.lista.push(m2);
+    }
+    m2.nome = String(nome).trim().slice(0, 40);
+    m2.telefone = tel;
+    m2.regra = String(regra || '').slice(0, 140);
+    m2.ativo = ativo !== false;
+    m2.atualizadoEm = new Date().toISOString();
+    await dbSet('reparoeletro_motoristas', mdb);
+    // confirma que gravou
+    const conf = await dbGet('reparoeletro_motoristas');
+    const ok2 = (((conf || {}).lista) || []).some(x => String(x.id) === String(m2.id) &&
+      String(x.nome) === m2.nome);
+    if (!ok2) return res.status(200).json({ ok: false, error: 'não consegui gravar — tente de novo' });
+    return res.status(200).json({ ok: true, motorista: m2 });
+  }
+
+  if (req.method === 'POST' && action === 'motorista-remover') {
+    const { id } = req.body || {};
+    const mdb = (await dbGet('reparoeletro_motoristas')) || { lista: [] };
+    const m3 = (mdb.lista || []).find(x => String(x.id) === String(id));
+    if (!m3) return res.status(404).json({ ok: false, error: 'motorista não encontrado' });
+    // 🚫 não some com quem tem corrida em aberto: as fichas ficariam órfãs
+    const db2 = (await dbGet(LOG_KEY)) || { fichas: [] };
+    const emAberto = (db2.fichas || []).filter(f =>
+      String(f.motoristaNome || '').toLowerCase() === String(m3.nome).toLowerCase() &&
+      ['motorista_parceiro', 'horario_marcado', 'em_rota', 'liberado_para_rota']
+        .includes(String(f.phase || '')));
+    if (emAberto.length) {
+      return res.status(200).json({ ok: false,
+        error: m3.nome + ' tem ' + emAberto.length + ' corrida(s) em aberto — ' +
+          'transfira antes de remover',
+        corridas: emAberto.map(f => String(f.nome || '?').slice(0, 22)) });
+    }
+    m3.ativo = false;
+    m3.removidoEm = new Date().toISOString();
+    await dbSet('reparoeletro_motoristas', mdb);
+    return res.status(200).json({ ok: true, desativado: m3.nome });
+  }
+
   // ── 🚚 CARGA-MOTORISTAS: quantas corridas cada um tem, e o que dá para mover ──
   if (action === 'carga-motoristas') {
     const db = (await dbGet(LOG_KEY)) || { fichas: [] };

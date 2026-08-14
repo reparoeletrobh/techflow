@@ -384,11 +384,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
       <div class="diag-section-label">Escolha o motorista — a ficha vai direto para a rota dele</div>
-      <div style="display:flex;gap:10px;">
-        <button class="cbtn" style="flex:1;background:#8b5cf6;color:#fff;border:none;padding:16px;font-size:15px;font-weight:900;" onclick="confirmarMotorista('Jhonatan')">🏍️ Jhonatan</button>
-        <button class="cbtn" style="flex:1;background:#06b6d4;color:#fff;border:none;padding:16px;font-size:15px;font-weight:900;" onclick="confirmarMotorista('Wilde')">🏍️ Wilde</button>
-        <button class="cbtn" style="flex:1;background:#f59e0b;color:#fff;border:none;padding:16px;font-size:15px;font-weight:900;" onclick="confirmarMotorista('Eduardo')">🏍️ Eduardo</button>
+      <div id="lista-motoristas" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <span style="color:#8b93a3;font-size:12px;">carregando…</span>
       </div>
+      <button class="cbtn cbtn-outline" onclick="abrirCadastroMotorista()"
+        style="font-size:12px;padding:9px;">⚙️ Gerenciar motoristas</button>
       <div id="motorista-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="cbtn cbtn-outline" onclick="fecharMotorista()">Cancelar</button>
@@ -1284,6 +1284,7 @@ function mostrarMsgCad(txt, tipo) {
 let motoristaFichaId = null;
 
 function abrirMotorista(id) {
+  carregarMotoristas();
   motoristaFichaId = id;
   document.getElementById('motorista-msg').style.display = 'none';
   document.getElementById('ov-motorista').style.display = 'flex';
@@ -1292,6 +1293,165 @@ function abrirMotorista(id) {
 function fecharMotorista() {
   document.getElementById('ov-motorista').style.display = 'none';
   motoristaFichaId = null;
+}
+
+async 
+// ── 🚚 motoristas: lista vinda do cadastro, não mais fixa no código ──
+var _motoristas = [];
+var CORES_MOT = ['#8b5cf6','#06b6d4','#f59e0b','#34d399','#f472b6','#60a5fa'];
+async function carregarMotoristas(){
+  try {
+    var r = await fetch('/api/tv-logistica?action=motoristas').then(function(x){return x.json();});
+    if(r && r.ok) _motoristas = (r.motoristas||[]).filter(function(m){ return m.ativo !== false; });
+  } catch(e){}
+  var cx = document.getElementById('lista-motoristas');
+  if(!cx) return;
+  if(!_motoristas.length){
+    cx.innerHTML = '<span style="color:#f87171;font-size:12px;">nenhum motorista cadastrado — '
+      + 'use Gerenciar motoristas</span>';
+    return;
+  }
+  cx.innerHTML = _motoristas.map(function(m, i){
+    var cor = CORES_MOT[i % CORES_MOT.length];
+    return '<button class="cbtn" style="flex:1;min-width:120px;background:' + cor + ';color:#fff;'
+      + 'border:none;padding:16px;font-size:15px;font-weight:900;" '
+      + 'onclick="confirmarMotorista(\'' + String(m.nome).replace(/'/g,'') + '\')" '
+      + 'title="' + (m.regra||'').replace(/"/g,'') + '">🏍️ '
+      + String(m.nome).replace(/</g,'&lt;')
+      + (m.telefone ? '' : '<div style="font-size:9px;font-weight:600;opacity:.8;">sem telefone</div>')
+      + '</button>';
+  }).join('');
+}
+
+function abrirCadastroMotorista(){
+  var ov = document.getElementById('ov-cad-mot');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-cad-mot';
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+                : 'border-radius:16px;padding:20px 22px;')
+    + 'max-width:560px;width:100%;max-height:90vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+      + '<div style="font-size:15px;font-weight:900;">🚚 Motoristas</div>'
+      + '<button onclick="document.getElementById(\'ov-cad-mot\').remove()" '
+        + 'style="margin-left:auto;background:#374151;border:none;border-radius:8px;padding:7px 14px;'
+        + 'color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">Fechar</button>'
+    + '</div>'
+    + '<div id="cad-mot-lista"></div>'
+    + '<div style="border-top:1px solid #1e2430;margin-top:14px;padding-top:14px;">'
+      + '<div style="font-size:12px;font-weight:800;margin-bottom:9px;">➕ Novo motorista</div>'
+      + '<input id="nm-nome" placeholder="Nome" style="width:100%;background:#12161d;'
+        + 'border:1px solid #2a3140;border-radius:9px;padding:10px 12px;color:#f0f2f5;'
+        + 'font-size:13px;margin-bottom:7px;">'
+      + '<input id="nm-tel" placeholder="Telefone com DDD — ex.: 31 99999-8888" '
+        + 'style="width:100%;background:#12161d;border:1px solid #2a3140;border-radius:9px;'
+        + 'padding:10px 12px;color:#f0f2f5;font-size:13px;margin-bottom:7px;">'
+      + '<input id="nm-regra" placeholder="Regra de atendimento (opcional)" '
+        + 'style="width:100%;background:#12161d;border:1px solid #2a3140;border-radius:9px;'
+        + 'padding:10px 12px;color:#f0f2f5;font-size:13px;margin-bottom:9px;">'
+      + '<button onclick="salvarMotorista()" style="width:100%;background:#8b5cf6;border:none;'
+        + 'border-radius:9px;padding:12px;color:#fff;font-weight:800;cursor:pointer;'
+        + 'font-size:13px;">Cadastrar</button>'
+      + '<div id="nm-msg" style="font-size:11.5px;margin-top:8px;line-height:1.6;"></div>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  desenharCadMot();
+}
+
+async function desenharCadMot(){
+  var cx = document.getElementById('cad-mot-lista');
+  if(!cx) return;
+  try {
+    var r = await fetch('/api/tv-logistica?action=motoristas').then(function(x){return x.json();});
+    if(r && r.ok) _motoristas = r.motoristas || [];
+  } catch(e){}
+  var ativos = _motoristas.filter(function(m){ return m.ativo !== false; });
+  cx.innerHTML = ativos.length ? ativos.map(function(m){
+    return '<div style="background:#12161d;border:1px solid #1e2430;border-radius:10px;'
+      + 'padding:11px 13px;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<span style="font-weight:800;font-size:13px;">' + String(m.nome).replace(/</g,'&lt;') + '</span>'
+        + '<span style="font-family:ui-monospace,monospace;font-size:11.5px;color:'
+          + (m.telefone ? '#34d399' : '#f87171') + ';">'
+          + (m.telefone ? formatarTel(m.telefone) : 'sem telefone') + '</span>'
+        + '<button onclick="editarMotorista(\'' + m.id + '\')" style="margin-left:auto;'
+          + 'background:none;border:1px solid #2a3140;border-radius:7px;padding:5px 10px;'
+          + 'color:#8b93a3;font-size:11px;cursor:pointer;">✏️</button>'
+        + '<button onclick="removerMotorista(\'' + m.id + '\')" style="background:none;'
+          + 'border:1px solid rgba(248,113,113,.3);border-radius:7px;padding:5px 10px;'
+          + 'color:#f87171;font-size:11px;cursor:pointer;">🗑️</button>'
+      + '</div>'
+      + (m.regra ? '<div style="font-size:10.5px;color:#5a6270;margin-top:5px;line-height:1.5;">'
+          + String(m.regra).replace(/</g,'&lt;') + '</div>' : '')
+      + '</div>';
+  }).join('') : '<div style="color:#5a6270;font-size:12px;">nenhum motorista cadastrado</div>';
+}
+
+function formatarTel(t){
+  var d = String(t||'').replace(/\D/g,'');
+  if(d.length >= 12) d = d.slice(2);
+  if(d.length === 11) return '(' + d.slice(0,2) + ') ' + d.slice(2,7) + '-' + d.slice(7);
+  if(d.length === 10) return '(' + d.slice(0,2) + ') ' + d.slice(2,6) + '-' + d.slice(6);
+  return t || '';
+}
+
+async function salvarMotorista(id){
+  var nome = (document.getElementById('nm-nome')||{}).value || '';
+  var tel = (document.getElementById('nm-tel')||{}).value || '';
+  var regra = (document.getElementById('nm-regra')||{}).value || '';
+  var msg = document.getElementById('nm-msg');
+  if(!String(nome).trim()){ if(msg){ msg.style.color='#f87171'; msg.textContent='informe o nome'; } return; }
+  var r = await fetch('/api/tv-logistica?action=motorista-salvar',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id||null,nome:nome,telefone:tel,regra:regra})})
+    .then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha de rede'};});
+  if(msg){
+    msg.style.color = r.ok ? '#34d399' : '#f87171';
+    msg.textContent = r.ok ? '✅ ' + r.motorista.nome + ' salvo' : '🚨 ' + (r.error||'não consegui salvar');
+  }
+  if(r.ok){
+    ['nm-nome','nm-tel','nm-regra'].forEach(function(i){
+      var e = document.getElementById(i); if(e) e.value = '';
+    });
+    desenharCadMot();
+    carregarMotoristas();
+  }
+}
+
+function editarMotorista(id){
+  var m = _motoristas.find(function(x){ return x.id === id; });
+  if(!m) return;
+  var n = document.getElementById('nm-nome'), t = document.getElementById('nm-tel'),
+      g = document.getElementById('nm-regra');
+  if(n) n.value = m.nome || '';
+  if(t) t.value = m.telefone ? formatarTel(m.telefone) : '';
+  if(g) g.value = m.regra || '';
+  var msg = document.getElementById('nm-msg');
+  if(msg){ msg.style.color='#fbbf24'; msg.textContent='editando ' + m.nome + ' — altere e clique em Cadastrar'; }
+  // o próximo salvar atualiza este
+  var btn = document.querySelector('#ov-cad-mot button[onclick="salvarMotorista()"]');
+  if(btn){ btn.setAttribute('onclick', "salvarMotorista('" + id + "')"); btn.textContent = 'Salvar alterações'; }
+}
+
+async function removerMotorista(id){
+  var m = _motoristas.find(function(x){ return x.id === id; });
+  if(!m) return;
+  if(!confirm('Remover ' + m.nome + ' da lista de motoristas?')) return;
+  var r = await fetch('/api/tv-logistica?action=motorista-remover',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
+    .then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var msg = document.getElementById('nm-msg');
+  if(r.ok){ desenharCadMot(); carregarMotoristas(); }
+  else if(msg){
+    msg.style.color='#f87171';
+    msg.textContent = '🚨 ' + (r.error||'não consegui remover')
+      + (r.corridas ? ' — ' + r.corridas.join(', ') : '');
+  }
 }
 
 async function confirmarMotorista(nomeEscolhido) {
