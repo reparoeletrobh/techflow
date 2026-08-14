@@ -217,15 +217,47 @@ async function conferirPlanilha(){
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
   var faltam = (r.FALTAM_NO_SISTEMA||[]).length;
   var conhecidos = (r.JA_CONHECIDOS||[]).length;
-  var cor = faltam ? '#f87171' : '#4ade80';
+  var leads = (r.LEADS_QUE_EVOLUIRAM||[]).length;
+  var cor = faltam ? '#f87171' : (leads ? '#fbbf24' : '#4ade80');
   el.innerHTML = '<span style="color:'+cor+';cursor:pointer;font-weight:700;" onclick="detalheConferencia()">'
-    + (faltam ? '🚨 '+faltam+' ficha(s) não entraram' : '✅ conferido')
+    + (faltam ? '🚨 '+faltam+' ficha(s) não entraram'
+       : leads ? '🔥 '+leads+' lead(s) voltaram — importar'
+       : '✅ conferido')
     + ' · planilha ' + ((r.PLANILHA||{}).total||0)
     + ' · sistema ' + ((r.SISTEMA||{}).total||0)
     + (conhecidos ? ' · '+conhecidos+' já conhecido'+(conhecidos>1?'s':'') : '')
     + '</span> <span style="color:#5a6270;">· ' + e2(r.conferidoEm) + '</span>';
   window._conf = r;
 }
+
+// 🔥 lead que preencheu o formulário: cria a ficha mesmo já existindo como lead
+async function importarLeads(){
+  var r = window._conf;
+  if(!r || !r.importarAssimMesmo){ alert('nada a importar'); return; }
+  var qtd = (r.LEADS_QUE_EVOLUIRAM||[]).length;
+  if(!confirm('Criar ficha para ' + qtd + ' lead(s) que preencheram o formulário?\n\n'
+    + 'Eles entram na fila de abordagem do bot.')) return;
+  var btn = event && event.target;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ importando…'; }
+  try {
+    var res = await fetch(r.importarAssimMesmo + '&aplicar=1').then(function(x){return x.json();});
+    if(res && res.ok){
+      alert('✅ ' + res.criadas + ' ficha(s) criada(s)'
+        + ((res.naoCriadas||[]).length ? '\n\nNão criadas: ' + res.naoCriadas.join(', ') : ''));
+      var ov = document.getElementById('ov-conferencia');
+      if(ov) ov.remove();
+      if(typeof load === 'function') load();
+      conferirPlanilha();
+    } else {
+      alert('🚨 ' + ((res && (res.error || (res.naoCriadas||[]).join(', '))) || 'não consegui importar'));
+      if(btn){ btn.disabled = false; btn.textContent = '🔥 Importar assim mesmo (' + qtd + ')'; }
+    }
+  } catch(e){
+    alert('🚨 ' + e.message);
+    if(btn){ btn.disabled = false; btn.textContent = '🔥 Importar assim mesmo (' + qtd + ')'; }
+  }
+}
+
 function detalheConferencia(){
   var r = window._conf; if(!r) return;
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
@@ -235,6 +267,7 @@ function detalheConferencia(){
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;display:flex;'
     + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
     + 'justify-content:center;-webkit-overflow-scrolling:touch;';
+  var leadsEv = r.LEADS_QUE_EVOLUIRAM || [];
   var bloco = function(t,arr,c){
     if(!arr||!arr.length) return '';
     return '<div style="margin-top:11px;"><div style="font-size:11.5px;font-weight:900;color:'+c+';">'+t+' ('+arr.length+')</div>'
@@ -257,6 +290,12 @@ function detalheConferencia(){
         + '<div style="font-family:ui-monospace,monospace;font-size:20px;font-weight:700;color:#4ade80;">'+((r.SISTEMA||{}).total||0)+'</div>'
         + '<div style="font-size:9.5px;color:#5a6270;font-weight:700;">NO SISTEMA</div></div>'
     + '</div>'
+    + bloco('🔥 Leads que preencheram o formulário — devem virar ficha', leadsEv, '#fbbf24')
+    + (leadsEv.length ? '<div style="font-size:11px;color:#fbbf24;margin-top:7px;line-height:1.6;'
+        + 'background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);'
+        + 'border-radius:8px;padding:9px 11px;">'
+        + 'Eram contatos que nunca tinham feito ficha. Preencheram agora, por conta própria — '
+        + 'é o lead mais quente que existe. Foram barrados como duplicata.</div>' : '')
     + bloco('🚨 Na planilha e sem ficha — precisam entrar', r.FALTAM_NO_SISTEMA, '#f87171')
     + bloco('✅ Já existiam no sistema — não geram ficha nova', r.JA_CONHECIDOS, '#4ade80')
     + bloco('⚠️ No sistema e sem linha na planilha', r.SOBRAM_NO_SISTEMA, '#fbbf24')
@@ -264,6 +303,9 @@ function detalheConferencia(){
         + 'ℹ️ ' + e2(r.explicacao) + '<br>🔄 ' + e2(r.syncAutomatico||'') + '</div>' : '')
     + '<div style="display:flex;gap:9px;margin-top:16px;'
       + (estreito ? 'flex-direction:column;position:sticky;bottom:0;background:#0d1117;padding-top:10px;' : '') + '">'
+      + (leadsEv.length ? '<button onclick="importarLeads()" style="flex:1;background:#b45309;'
+          + 'border:none;border-radius:9px;padding:12px;color:#fff;font-weight:800;cursor:pointer;'
+          + 'font-size:13px;">🔥 Importar assim mesmo (' + leadsEv.length + ')</button>' : '')
       + (r.comoCorrigir ? '<button onclick="recuperarFaltantes()" style="flex:1;background:#15803d;border:none;'
         + 'border-radius:10px;padding:' + (estreito ? '15px' : '10px') + ';color:#fff;font-weight:800;'
         + 'cursor:pointer;font-size:' + (estreito ? '15px' : '12.5px') + ';">🔄 Trazer as que faltam</button>' : '')

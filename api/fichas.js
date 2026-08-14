@@ -129,6 +129,92 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔥 IMPORTAR-ASSIM-MESMO: força a criação da ficha de quem foi barrado ──
+  // O lead que preenche o formulário é o contato mais quente que existe: já
+  // conhecia a loja e voltou por conta própria. Barrá-lo como duplicata o joga
+  // numa fila de milhares de contatos frios, à espera de um analista.
+  if (action === 'importar-assim-mesmo') {
+    const tels = String(req.query.tels || '').split(',')
+      .map(x => x.replace(/\D/g, '')).filter(Boolean).map(x => x.slice(-4));
+    if (!tels.length) return res.status(400).json({ ok: false,
+      error: 'informe os telefones em &tels=1234,5678' });
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const d8i = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    let linhas = [];
+    try {
+      const rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text()));
+      const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+      const iH = cab.findIndex(x => /hora|data/.test(x));
+      const iT = cab.findIndex(x => /numero|telefone|whats/.test(x));
+      const iN = cab.findIndex(x => /nome/.test(x));
+      const iE = cab.findIndex(x => /^equipamento$/.test(x));
+      const iD = cab.findIndex(x => /defeito|problema/.test(x));
+      const iEn = cab.findIndex(x => /endereco/.test(x));
+      const dd = dia.slice(8, 10), mm = dia.slice(5, 7), aa = dia.slice(2, 4);
+      rows.slice(1).forEach((r, ix) => {
+        const dt = String(r[iH] || '');
+        if (!dt.startsWith(dd + '/' + mm + '/' + aa)) return;
+        const t = String(r[iT] || '').replace(/\D/g, '');
+        if (!tels.includes(t.slice(-4))) return;
+        linhas.push({ linha: ix + 2, tel: t, nome: String(r[iN] || '').trim(),
+          equipamento: String(r[iE] || ''), defeito: String(r[iD] || ''),
+          endereco: iEn >= 0 ? String(r[iEn] || '') : '', hora: dt });
+      });
+    } catch (e) { return res.status(200).json({ ok: false, error: 'planilha: ' + e.message }); }
+    if (!linhas.length) return res.status(200).json({ ok: false,
+      error: 'não encontrei esses telefones na planilha de ' + dia });
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'previa',
+        vaoVirarFicha: linhas.length,
+        L: linhas.map(x => x.hora + ' | ' + x.nome.slice(0, 22) + ' ' + x.tel.slice(-4) +
+          ' | ' + x.equipamento.slice(0, 26) + ' | linha ' + x.linha),
+        oQueVaiAcontecer: 'cria a ficha normalmente e ela entra na fila de abordagem do bot',
+        dica: 'para criar: &aplicar=1' });
+    }
+
+    const criadas = [], naoCriadas = [];
+    for (const x of linhas) {
+      let tel = x.tel;
+      if (tel.length === 10 || tel.length === 11) tel = '55' + tel;
+      const sistema = detectSistema(x.equipamento);
+      const chave = sistema === 'tv' ? KEY_TV : KEY_ADM;
+      const db = (await dbGet(chave)) || { fichas: [] };
+      const jaTem = (db.fichas || []).some(f => d8i(f.telefone) === d8i(tel) &&
+        String(f.criadoEm || '').slice(0, 10) === dia);
+      if (jaTem) { naoCriadas.push(x.nome + ': ja tem ficha hoje'); continue; }
+      const ficha = {
+        id: 'lead_' + tel.slice(-4) + '_' + Date.now().toString(36) +
+          Math.random().toString(36).slice(2, 5),
+        nome: x.nome || 'Cliente', telefone: tel, equipamento: x.equipamento,
+        defeito: x.defeito, endereco: x.endereco, horario: x.hora,
+        sistema, sheetRow: x.linha,
+        status: 'criada', origemPlanilha: true,
+        veioDeLead: true,
+        importadaManualmente: new Date().toISOString(),
+        criadoEm: new Date().toISOString(),
+        registradoEm: new Date().toISOString(),
+      };
+      try {
+        _funil.registrar('ficha', { telefone: tel, nome: ficha.nome,
+          equipamento: x.equipamento, frente: sistema === 'tv' ? 'tv' : 'adm',
+          canal: 'lead que evoluiu' }).catch(() => {});
+      } catch (e) {}
+      db.fichas.unshift(ficha);
+      await dbSet(chave, db);
+      const conf = await dbGet(chave);
+      const ok2 = (((conf || {}).fichas) || []).some(f => f.id === ficha.id);
+      if (ok2) criadas.push(sistema.toUpperCase() + ' | ' + ficha.nome.slice(0, 22) +
+        ' ' + tel.slice(-4) + ' | ' + x.equipamento.slice(0, 24));
+      else naoCriadas.push(x.nome + ': a gravacao nao persistiu');
+    }
+    return res.status(200).json({ ok: criadas.length > 0,
+      criadas: criadas.length, L: criadas, naoCriadas,
+      proximoPasso: 'entram na fila de abordagem do bot no proximo ciclo' });
+  }
+
   // ── 📅 QUANDO-NASCERAM: data de criação e última aparição na planilha ──
   if (action === 'quando-nasceram') {
     const sis = String(req.query.sistema || 'tv');
@@ -972,16 +1058,26 @@ export default async function handler(req, res) {
             if (t.length < 8 || telSis.has(t)) continue;
             if (!telPla.has(t)) continue;
             const q = String(x.criadoEm || x.registradoEm || x.movedAt || '').slice(0, 10);
+            const st = String(x.status || x.phase || x.phaseId || '?');
             if (!ondeJaExiste[t] || q > ondeJaExiste[t].quando) {
-              ondeJaExiste[t] = { banco: k, quando: q || '?',
-                fase: String(x.status || x.phase || x.phaseId || '?') };
+              ondeJaExiste[t] = { banco: k, quando: q || '?', fase: st,
+                // 🎯 lead é contato que NUNCA virou ficha. Se voltou a aparecer
+                // na planilha, ele evoluiu: preencheu o formulário de verdade.
+                // Barrar como duplicata o joga numa fila de mil e quinhentos
+                // contatos frios, quando na verdade é o lead mais quente que há.
+                apenasLead: k === 'prospeccao_adm' && /^(lead|leads)$/i.test(st) };
             }
           }
         }
       } catch (e) {}
     }
     const semFichaHoje = daPlanilha.filter(x => !telSis.has(d8c(x.tel)));
-    const jaConhecidos = semFichaHoje.filter(x => ondeJaExiste[d8c(x.tel)]);
+    const conhecidosTodos = semFichaHoje.filter(x => ondeJaExiste[d8c(x.tel)]);
+    // 🔥 lead que voltou pela planilha merece entrar como ficha
+    const leadsQueEvoluiram = conhecidosTodos.filter(x =>
+      (ondeJaExiste[d8c(x.tel)] || {}).apenasLead === true);
+    const jaConhecidos = conhecidosTodos.filter(x =>
+      (ondeJaExiste[d8c(x.tel)] || {}).apenasLead !== true);
     const faltamNoSistema = semFichaHoje.filter(x => !ondeJaExiste[d8c(x.tel)]);
     const sobramNoSistema = doSistema.filter(x => !telPla.has(d8c(x.tel)));
     const bate = faltamNoSistema.length === 0 && sobramNoSistema.length === 0;
@@ -998,10 +1094,21 @@ export default async function handler(req, res) {
         tv: doSistema.filter(x => x.sis === 'TV').length },
       diferenca: doSistema.length - daPlanilha.length,
       VEREDITO: erroPlanilha ? '🚨 não consegui ler a planilha: ' + erroPlanilha
+        : leadsQueEvoluiram.length ? '🔥 ' + leadsQueEvoluiram.length +
+          ' lead(s) preencheram o formulário e foram barrados como duplicata — ' +
+          'use o botão Importar assim mesmo'
         : faltamNoSistema.length ? '🚨 ' + faltamNoSistema.length + ' ficha(s) da planilha não entraram — o sync automático traz em até 1h'
         : jaConhecidos.length ? '✅ conferido — ' + jaConhecidos.length + ' cliente(s) já existiam no sistema, por isso não geraram ficha nova'
         : bate ? '✅ conferido — planilha e sistema batem'
         : '⚠️ ' + sobramNoSistema.length + ' no sistema sem linha na planilha',
+      LEADS_QUE_EVOLUIRAM: leadsQueEvoluiram.map(x => x.hora + ' | ' +
+        String(x.nome).slice(0, 20) + ' ' + d8c(x.tel).slice(-4) +
+        ' | era lead na prospecção desde ' + (ondeJaExiste[d8c(x.tel)] || {}).quando +
+        ' e agora preencheu o formulário — deve virar ficha'),
+      importarAssimMesmo: leadsQueEvoluiram.length
+        ? '/api/fichas?action=importar-assim-mesmo&tels=' +
+          leadsQueEvoluiram.map(x => d8c(x.tel).slice(-4)).join(',')
+        : null,
       JA_CONHECIDOS: jaConhecidos.map(x => x.hora + ' | ' + String(x.nome).slice(0, 18) +
         ' ' + d8c(x.tel).slice(-4) + ' → já está em ' +
         (ondeJaExiste[d8c(x.tel)] || {}).banco + ' desde ' + (ondeJaExiste[d8c(x.tel)] || {}).quando +
