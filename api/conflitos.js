@@ -311,6 +311,55 @@ module.exports = async function handler(req,res){
       lista:achados.slice(0,30),dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── ✍️ POST mensagem-cliente: transforma a solução técnica em recado cordial ──
+  // O que a equipe escreve na resolução é registro interno: cita peça, custo,
+  // culpa e prazo em linguagem de bastidor. Enviar isso ao cliente soa seco e
+  // às vezes expõe o que não deveria. A IA lê o caso e escreve o retorno.
+  if(req.method==='POST'&&action==='mensagem-cliente'){
+    const{id}=req.body||{};
+    const c=db.conflitos.find(x=>x.id===id);
+    if(!c) return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    const primeiro=String(c.cliente||c.ficha||'').trim().split(/\s+/)[0]||'';
+    const CHAVE=(process.env.ANTHROPIC_API_KEY||'').trim();
+    const reserva='Oi'+(primeiro?' '+primeiro:'')+'! Passando para te dar um retorno: '
+      +'nossa equipe cuidou do seu caso e já está tudo resolvido. '
+      +'Qualquer dúvida é só chamar aqui. 😊';
+    if(!CHAVE) return res.status(200).json({ok:true,texto:reserva,via:'texto padrão'});
+    const contexto=[
+      c.motivo?('Motivo do conflito: '+c.motivo):'',
+      c.descricao?('Descrição: '+c.descricao):'',
+      c.solucao?('O que a equipe fez: '+c.solucao):'',
+      c.equipamento?('Equipamento: '+c.equipamento):'',
+    ].filter(Boolean).join('\n');
+    try{
+      const r=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'x-api-key':CHAVE,'anthropic-version':'2023-06-01','content-type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,temperature:0.4,
+          system:'Você escreve mensagens de WhatsApp de uma assistência técnica para o cliente, '
+            +'em português do Brasil. Recebe o registro interno de um problema e escreve o retorno '
+            +'ao cliente.\n\nRegras:\n'
+            +'- Tom cordial e tranquilizador, sem formalidade excessiva nem entusiasmo forçado\n'
+            +'- No máximo 4 linhas curtas\n'
+            +'- NUNCA mencione custo interno, nome de peça, culpa de funcionário, '
+            +'falha de fornecedor ou qualquer detalhe de bastidor\n'
+            +'- Não prometa prazo que o registro não garante\n'
+            +'- Se o caso foi resolvido, diga com segurança; se ainda está em andamento, '
+            +'diga que a equipe está cuidando e dará retorno\n'
+            +'- Não invente informação que não esteja no registro\n'
+            +'- Comece pelo primeiro nome do cliente quando houver\n'
+            +'- Responda APENAS com a mensagem, sem aspas nem comentários',
+          messages:[{role:'user',content:'Cliente: '+(primeiro||'(sem nome)')+'\n\n'+contexto
+            +'\n\nEscreva o retorno para este cliente.'}]}),
+      }).then(x=>x.json());
+      const txt=((r.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')||'').trim();
+      if(!txt) return res.status(200).json({ok:true,texto:reserva,via:'texto padrão — IA sem retorno'});
+      return res.status(200).json({ok:true,texto:txt,via:'escrita pela IA'});
+    }catch(e){
+      return res.status(200).json({ok:true,texto:reserva,via:'texto padrão — '+e.message});
+    }
+  }
+
   // ── POST relatado: cliente avisado do desfecho → vai para FINALIZADOS ──
   if(req.method==='POST'&&action==='relatado'){
     const{id,por}=req.body||{};
@@ -319,6 +368,9 @@ module.exports = async function handler(req,res){
     c.status='resolvido';
     c.clienteRelatado=true;
     c.relatadoEm=new Date().toISOString();
+    // guarda o que foi dito ao cliente: se ele responder, quem atender sabe
+    // exatamente qual retorno ele recebeu
+    if((req.body||{}).texto) c.textoEnviadoAoCliente=String(req.body.texto).slice(0,600);
     c.relatadoPor=String(por||'').slice(0,40);
     c.atualizadoEm=c.relatadoEm;
     await dbSet(KEY,db);

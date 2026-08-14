@@ -794,24 +794,85 @@ function desvincularFicha(){
   document.getElementById('f-ficha').value='';
   var v=document.getElementById('f-vinculo'); if(v)v.style.display='none';
 }
-async function relatarCliente(id){
+async async function relatarCliente(id){
   var c=(_dados||[]).find(function(x){return x.id===id;});
   if(!c)return;
-  var tel=String(c.telefone||c.tel||'').replace(/\D/g,'');
-  var primeiro=String(c.cliente||c.ficha||'').trim().split(/\s+/)[0]||'tudo bem';
-  var txt='Oi '+primeiro+'! Passando para te dar um retorno sobre o seu atendimento:\n\n'
-    +(c.solucao||'Seu caso foi resolvido.')+'\n\nQualquer dúvida é só chamar aqui. 😊';
-  try{await navigator.clipboard.writeText(txt);}catch(e){}
+  // ✍️ o texto vai ser escrito pela IA a partir do caso: o que a equipe
+  // registrou é linguagem interna e não deve ir cru para o cliente
+  var ov=document.getElementById('ov-relato');
+  if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='ov-relato';
+  var estreito=window.innerWidth<900;
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;'
+    +(estreito?'align-items:flex-end;padding:0;':'align-items:center;padding:18px;')
+    +'justify-content:center;';
+  ov.innerHTML='<div style="background:#0d1117;border:1px solid #2a3140;'
+    +(estreito?'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+              :'border-radius:16px;padding:20px 22px;')
+    +'max-width:540px;width:100%;">'
+    +'<div style="font-size:15px;font-weight:900;margin-bottom:4px;">💬 Retorno ao cliente</div>'
+    +'<div style="font-size:11.5px;color:#8b93a3;margin-bottom:12px;line-height:1.6;">'
+      +'escrito a partir do caso — confira e ajuste antes de enviar</div>'
+    +'<textarea id="rl-txt" style="width:100%;min-height:150px;background:#12161d;'
+      +'border:1px solid #2a3140;border-radius:10px;padding:11px 13px;color:#f0f2f5;'
+      +'font-size:13.5px;line-height:1.6;resize:vertical;" '
+      +'placeholder="preparando a mensagem…">⏳ preparando…</textarea>'
+    +'<div id="rl-via" style="font-size:10.5px;color:#5a6270;margin-top:6px;"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:14px;'+(estreito?'flex-direction:column;':'')+'">'
+      +'<button id="rl-env" onclick="enviarRelato(\''+id+'\')" style="flex:1;background:#25d366;'
+        +'border:none;border-radius:9px;padding:12px;color:#052e16;font-weight:800;'
+        +'cursor:pointer;font-size:13px;">📋 Copiar e enviar</button>'
+      +'<button onclick="document.getElementById(\'ov-relato\').remove()" style="flex:1;'
+        +'background:#374151;border:none;border-radius:9px;padding:12px;color:#fff;'
+        +'font-weight:800;cursor:pointer;font-size:13px;">Cancelar</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+
+  var r=null;
+  try{
+    r=await fetch('/api/conflitos?action=mensagem-cliente',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
+      .then(function(x){return x.json();});
+  }catch(e){}
+  var ta=document.getElementById('rl-txt');
+  var via=document.getElementById('rl-via');
+  if(ta){
+    if(r&&r.ok&&r.texto){ ta.value=r.texto; if(via) via.textContent=r.via||''; }
+    else {
+      var primeiro=String(c.cliente||c.ficha||'').trim().split(/\s+/)[0]||'';
+      ta.value='Oi'+(primeiro?' '+primeiro:'')+'! Passando para te dar um retorno: '
+        +'nossa equipe cuidou do seu caso e já está tudo resolvido. '
+        +'Qualquer dúvida é só chamar aqui. 😊';
+      if(via) via.textContent='não consegui gerar — texto padrão, ajuste se quiser';
+    }
+  }
+}
+
+async function enviarRelato(id){
+  var c=(_dados||[]).find(function(x){return x.id===id;});
+  var ta=document.getElementById('rl-txt');
+  var txt=ta?String(ta.value||'').trim():'';
+  if(!txt){ alert('a mensagem está vazia'); return; }
+  try{ await navigator.clipboard.writeText(txt); }catch(e){}
+  var tel=String((c&&(c.telefone||c.tel))||'').replace(/\D/g,'');
   if(tel.length>=10){
-    window.open('https://wa.me/'+(tel.indexOf('55')===0?tel:'55'+tel)+'?text='+encodeURIComponent(txt),'_blank');
+    window.open('https://wa.me/'+(tel.indexOf('55')===0?tel:'55'+tel)
+      +'?text='+encodeURIComponent(txt),'_blank');
   } else {
     alert('Sem telefone no conflito — a mensagem foi copiada, envie manualmente:\n\n'+txt);
   }
-  var r=await fetch('/api/conflitos?action=relatado',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:id})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  // 📌 conversa iniciada com o cliente: o conflito vai para finalizados
+  var r=await fetch('/api/conflitos?action=relatado',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,texto:txt})})
+    .then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var ov=document.getElementById('ov-relato');
+  if(ov) ov.remove();
   if(r&&r.ok){ if(typeof toast==='function')toast('✅ Cliente avisado — conflito finalizado'); }
+  else { alert('⚠️ a mensagem foi enviada, mas não consegui finalizar o conflito'); }
   carregar();
 }
+
 function abrirResolver(id){
   document.getElementById('r-id').value=id;
   document.getElementById('r-solucao').value='';
