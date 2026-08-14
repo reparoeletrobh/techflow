@@ -563,7 +563,7 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 
 <script>
 // ── 💰 painel do ciclo de compras: teto semanal e quanto já saiu ──
-var _tetoCompras = 4000, _ccAberto = false;
+var _tetoCompras = 4000, _ccAberto = false, _crAberto = false, _crPer = 'mes';
 async function carregarCicloCompras(){
   var cx = document.getElementById('painel-ciclo-compras');
   if(!cx) return;
@@ -602,6 +602,11 @@ async function carregarCicloCompras(){
         ? '<div style="font-family:ui-monospace,monospace;font-size:10.5px;color:#5a6270;'
           + 'margin-top:8px;line-height:1.7;">' + r.POR_DIA.join('  ·  ') + '</div>'
         : '')
+    + '<div onclick="ccRelatorio()" style="margin-top:10px;cursor:pointer;font-size:11.5px;'
+      + 'color:#a78bfa;font-weight:700;display:flex;align-items:center;gap:6px;">'
+      + '<span id="cr-seta">' + (_crAberto ? '▾' : '▸') + '</span>'
+      + '<span>📊 onde o dinheiro está indo — por tipo de peça</span></div>'
+    + '<div id="cr-lista" style="display:' + (_crAberto ? 'block' : 'none') + ';margin-top:9px;"></div>'
     + '<div onclick="ccExpandir()" style="margin-top:10px;cursor:pointer;font-size:11.5px;'
       + 'color:#60a5fa;font-weight:700;display:flex;align-items:center;gap:6px;">'
       + '<span id="cc-seta">' + (_ccAberto ? '▾' : '▸') + '</span>'
@@ -630,6 +635,67 @@ async function carregarCicloCompras(){
     + '</div>';
 }
 // 📋 abre e fecha a lista de compras da semana
+
+// ── 📊 relatório de gasto por tipo de peça ──
+function ccRelatorio(){
+  _crAberto = !_crAberto;
+  var l = document.getElementById('cr-lista');
+  var s = document.getElementById('cr-seta');
+  if(s) s.textContent = _crAberto ? '▾' : '▸';
+  if(l){ l.style.display = _crAberto ? 'block' : 'none'; if(_crAberto) carregarRelCategorias(); }
+}
+function crPeriodo(p){ _crPer = p; carregarRelCategorias(); }
+async function carregarRelCategorias(){
+  var l = document.getElementById('cr-lista');
+  if(!l) return;
+  l.innerHTML = '<div style="color:#5a6270;font-size:11px;padding:8px;">⏳ carregando…</div>';
+  var r = null;
+  try { r = await fetch('/api/compras-pecas?action=relatorio-categorias&periodo=' + _crPer)
+    .then(function(x){ return x.json(); }); } catch(e){}
+  if(!r || !r.ok){ l.innerHTML = '<div style="color:#f87171;font-size:11px;">não consegui carregar</div>'; return; }
+  var det = r.DETALHE || [];
+  var maxV = Math.max.apply(null, det.map(function(x){ return x.valor; }).concat([1]));
+  var per = [['dia','Hoje'],['semana','7 dias'],['mes','30 dias'],['ano','12 meses']];
+  l.innerHTML =
+    '<div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;">'
+    + per.map(function(p){
+        return '<button onclick="crPeriodo(\'' + p[0] + '\')" style="background:'
+          + (_crPer===p[0]?'rgba(167,139,250,.16)':'rgba(255,255,255,.03)') + ';border:1px solid '
+          + (_crPer===p[0]?'#a78bfa':'#1e2430') + ';border-radius:7px;padding:5px 11px;font-size:11px;'
+          + 'font-weight:700;color:' + (_crPer===p[0]?'#a78bfa':'#8b93a3') + ';cursor:pointer;">'
+          + p[1] + '</button>';
+      }).join('')
+    + '<span style="margin-left:auto;font-family:ui-monospace,monospace;font-size:12.5px;'
+      + 'font-weight:700;color:#f0f2f5;">R$ '
+      + Number(r.totalGasto||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span>'
+    + '</div>'
+    + (r.ALERTA_CLASSIFICACAO
+        ? '<div style="background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.3);'
+          + 'border-radius:9px;padding:9px 11px;font-size:11px;color:#fbbf24;line-height:1.6;'
+          + 'margin-bottom:10px;">' + String(r.ALERTA_CLASSIFICACAO).replace(/</g,'&lt;') + '</div>'
+        : '')
+    + (det.length ? det.map(function(x){
+        return '<div style="margin:7px 0;">'
+          + '<div style="display:flex;align-items:center;gap:8px;font-size:12px;">'
+            + '<span style="min-width:130px;font-weight:700;">' + String(x.rotulo).replace(/</g,'&lt;') + '</span>'
+            + '<span style="flex:1;height:9px;background:#161c26;border-radius:5px;overflow:hidden;">'
+              + '<i style="display:block;height:100%;width:' + Math.round(x.valor/maxV*100) + '%;'
+              + 'background:#a78bfa;border-radius:5px;"></i></span>'
+            + '<span style="font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;'
+              + 'min-width:88px;text-align:right;">R$ ' + x.valor.toFixed(2) + '</span>'
+            + '<span style="font-size:10.5px;color:#5a6270;min-width:34px;text-align:right;">'
+              + x.percentual + '%</span>'
+          + '</div>'
+          + '<div style="font-size:10px;color:#5a6270;margin-left:138px;margin-top:2px;">'
+            + x.itens + ' item(ns) · média R$ ' + x.media.toFixed(2)
+            + (x.fornecedorPrincipal ? ' · ' + String(x.fornecedorPrincipal[0]).replace(/</g,'&lt;') : '')
+            + '</div>'
+          + '</div>';
+      }).join('') : '<div style="color:#5a6270;font-size:11px;">nenhuma compra no período</div>')
+    + '<div style="font-size:10px;color:#5a6270;margin-top:10px;line-height:1.6;">'
+      + String(r.observacao||'').replace(/</g,'&lt;') + '</div>';
+}
+
 function ccExpandir(){
   _ccAberto = !_ccAberto;
   var l = document.getElementById('cc-lista');

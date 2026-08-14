@@ -1,3 +1,7 @@
+let _cat = { categoriaDe: () => 'outros', rotulo: (c) => c, ROTULOS: {} };
+try { _cat = require('./_categoria_peca'); } catch (e) {
+  try { _cat = require(require('path').join(__dirname, '_categoria_peca.js')); } catch (e2) {}
+}
 // compras-pecas.js — Gestão de Compra de Peças
 const UPSTASH_URL   = process.env.UPSTASH_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_TOKEN;
@@ -119,6 +123,83 @@ module.exports = async (req, res) => {
     // ─────────────────────────────────────────────────────────────
 
     return res.status(200).json({ ok:true, grupoId });
+  }
+
+  // ── 📊 GET relatorio-categorias: onde o dinheiro de peças está indo ──
+  // Agrupa por tipo de componente para responder o que a lista de compras não
+  // responde: gasta-se mais em magnetron ou em placa? A resposta muda o que
+  // vale a pena ter em estoque e o que negociar com fornecedor.
+  if (action === "relatorio-categorias") {
+    const per = String(req.query.periodo || 'mes');
+    const agora = Date.now();
+    const ini = req.query.de ? new Date(req.query.de + 'T00:00:00-03:00').getTime()
+      : per === 'dia' ? new Date(new Date(agora - 3 * 3600000).toISOString().slice(0, 10) + 'T00:00:00-03:00').getTime()
+      : per === 'semana' ? agora - 7 * 86400000
+      : per === 'ano' ? agora - 365 * 86400000
+      : agora - 30 * 86400000;
+    const fim = req.query.ate ? new Date(req.query.ate + 'T23:59:59-03:00').getTime() : agora;
+
+    const pecas = (db.pecas || []).filter(p => {
+      if (p.status !== 'pago' || !p.pagoEm) return false;
+      const t = new Date(p.pagoEm).getTime();
+      return t >= ini && t <= fim;
+    });
+
+    // 💰 o valor é da compra inteira: rateia entre os itens do grupo, senão
+    // uma peça barata dentro de um pedido grande herdaria o total
+    const porGrupo = {};
+    for (const p of pecas) {
+      const g = p.grupoId || ('_' + p.id);
+      porGrupo[g] = porGrupo[g] || { valor: Number(p.valor || p.preco || p.custo || 0), itens: [] };
+      porGrupo[g].itens.push(p);
+    }
+    const cats = {};
+    let totalGeral = 0;
+    for (const g of Object.values(porGrupo)) {
+      const rateio = g.itens.length ? g.valor / g.itens.length : 0;
+      totalGeral += g.valor;
+      for (const p of g.itens) {
+        const c = _cat.categoriaDe(p);
+        cats[c] = cats[c] || { valor: 0, itens: 0, exemplos: [], fornecedores: {} };
+        cats[c].valor += rateio;
+        cats[c].itens++;
+        if (cats[c].exemplos.length < 5) {
+          cats[c].exemplos.push(String(p.descricao || p.nome || '?').slice(0, 34));
+        }
+        const f = String(p.fornecedor || '(sem fornecedor)').slice(0, 24);
+        cats[c].fornecedores[f] = (cats[c].fornecedores[f] || 0) + rateio;
+      }
+    }
+    const lista = Object.entries(cats)
+      .map(([c, v]) => ({ categoria: c, rotulo: _cat.rotulo(c),
+        valor: +v.valor.toFixed(2), itens: v.itens,
+        media: +(v.valor / v.itens).toFixed(2),
+        percentual: totalGeral ? Math.round(v.valor / totalGeral * 100) : 0,
+        exemplos: v.exemplos,
+        fornecedorPrincipal: Object.entries(v.fornecedores)
+          .sort((a, b) => b[1] - a[1])[0] || null }))
+      .sort((a, b) => b.valor - a.valor);
+
+    const hh = d => new Date(d).toISOString().slice(0, 10);
+    const semClassificar = lista.find(x => x.categoria === 'outros');
+    return res.status(200).json({ ok: true,
+      periodo: per, de: hh(ini), ate: hh(fim),
+      totalGasto: +totalGeral.toFixed(2),
+      comprasContadas: Object.keys(porGrupo).length,
+      itensContados: pecas.length,
+      RANKING: lista.map((x, i) => String(i + 1).padStart(2) + '. ' +
+        x.rotulo.padEnd(20) + ' R$ ' + x.valor.toFixed(2).padStart(10) +
+        ' | ' + String(x.percentual).padStart(3) + '%' +
+        ' | ' + String(x.itens).padStart(3) + ' item(ns)' +
+        ' | média R$ ' + x.media.toFixed(2) +
+        (x.fornecedorPrincipal ? ' | ' + x.fornecedorPrincipal[0] : '')),
+      DETALHE: lista,
+      ALERTA_CLASSIFICACAO: semClassificar && semClassificar.percentual >= 20
+        ? '⚠️ ' + semClassificar.percentual + '% do gasto está em "Outros" — ' +
+          'vale acrescentar esses termos ao dicionário: ' + semClassificar.exemplos.join(', ')
+        : null,
+      observacao: 'em compra com vários itens o valor é rateado entre eles, ' +
+        'já que o sistema guarda o total do pedido e não o preço de cada peça' });
   }
 
   // ── 💰 GET painel-ciclo: quanto já se gastou na semana comercial ──
