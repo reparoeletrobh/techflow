@@ -140,6 +140,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .mt-fill{height:100%;border-radius:5px;transition:width .5s;}
 .mt-tec{background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:10px;
   font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:190px;overflow-y:auto;}
+
+/* 📊 painéis de origem, meta, técnicos e fila do setor técnico */
+.pq-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;}
+.pq-c{background:linear-gradient(165deg,rgba(255,255,255,.04),rgba(255,255,255,.01));
+  border:1px solid #1e2430;border-radius:13px;padding:13px 15px;}
+.pq-c .n{font-family:ui-monospace,monospace;font-size:23px;font-weight:700;line-height:1;letter-spacing:-.8px;}
+.pq-c .l{font-size:9.5px;color:#5a6270;font-weight:750;letter-spacing:.06em;text-transform:uppercase;margin-top:5px;}
+.pq-c .d{font-size:10.5px;color:#8b93a3;margin-top:5px;font-family:ui-monospace,monospace;}
+.pq-meta{background:#0d1117;border:1px solid #1e2430;border-radius:13px;padding:14px 16px;margin-bottom:12px;}
+.pq-barra{height:11px;background:#161c26;border-radius:6px;overflow:hidden;margin-top:8px;}
+.pq-barra i{display:block;height:100%;border-radius:6px;transition:width .4s;}
+.pq-sec{background:#0d1117;border:1px solid #1e2430;border-radius:13px;padding:14px 16px;margin-bottom:12px;}
+.pq-sec h4{font-size:12.5px;font-weight:800;margin:0 0 9px;}
+.pq-lin{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #151a22;font-size:12px;}
+.pq-lin:last-child{border-bottom:none;}
+.pq-col{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;
+  transition:background .15s;}
+.pq-col:hover{background:rgba(255,255,255,.03);}
+.pq-col .q{font-family:ui-monospace,monospace;font-size:16px;font-weight:700;min-width:32px;text-align:right;}
+.pq-fichas{display:none;padding:6px 0 10px 12px;font-family:ui-monospace,monospace;font-size:10.5px;
+  color:#8b93a3;line-height:1.9;border-left:2px solid #1e2430;margin-left:8px;}
+.pq-fichas.on{display:block;}
+.pq-atrasada{color:#f87171;font-weight:700;animation:pqPisca 1.4s ease-in-out infinite;}
+@keyframes pqPisca{0%,100%{opacity:1;}50%{opacity:.35;}}
+.pq-tag{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;margin-left:6px;}
 </style>
 </head>
 <body>
@@ -227,6 +252,111 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <script>
+// ── 📊 painéis: origem, meta de 25, técnicos e fila do setor técnico ──
+var _pq = null, _pqPer = 'hoje';
+function pqEsc(s){ return String(s==null?'':s).replace(/</g,'&lt;'); }
+function pqPeriodo(p){ _pqPer = p; carregarPainelQualidade(); }
+function pqAbrir(id){
+  var el = document.getElementById('pqf-' + id);
+  if(el) el.classList.toggle('on');
+}
+async function carregarPainelQualidade(){
+  var cx = document.getElementById('painel-meta');
+  if(!cx) return;
+  var r = null;
+  try { r = await fetch('/api/qualidade?action=painel&periodo=' + _pqPer)
+    .then(function(x){ return x.json(); }); } catch(e){}
+  if(!r || !r.ok){ cx.innerHTML = ''; return; }
+  _pq = r;
+  var m = r.META_DIARIA || {}, o = r.ORIGENS || {}, f = r.FILA_TECNICO || {};
+  var pct = Math.min(100, m.percentual || 0);
+  var corBarra = pct >= 100 ? '#34d399' : pct >= 60 ? '#fbbf24' : '#f87171';
+
+  var htmlMeta = '<div class="pq-meta">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<span style="font-size:12.5px;font-weight:800;">🎯 Meta do dia — setor técnico</span>'
+      + '<span style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;color:' + corBarra + ';">'
+        + (m.feitas||0) + '<span style="font-size:12px;color:#5a6270;"> / ' + (m.meta||25) + '</span></span>'
+      + '<div style="margin-left:auto;display:flex;gap:5px;">'
+        + ['hoje','semana','mes'].map(function(p){
+            return '<button onclick="pqPeriodo(\'' + p + '\')" style="background:'
+              + (_pqPer===p?'rgba(96,165,250,.16)':'rgba(255,255,255,.03)') + ';border:1px solid '
+              + (_pqPer===p?'#60a5fa':'#1e2430') + ';border-radius:7px;padding:5px 11px;font-size:11px;'
+              + 'font-weight:700;color:' + (_pqPer===p?'#60a5fa':'#8b93a3') + ';cursor:pointer;">'
+              + (p==='hoje'?'Hoje':p==='semana'?'7 dias':'30 dias') + '</button>';
+          }).join('')
+      + '</div></div>'
+    + '<div class="pq-barra"><i style="width:' + pct + '%;background:' + corBarra + ';"></i></div>'
+    + '<div style="font-size:10.5px;color:#5a6270;margin-top:6px;">'
+      + (m.faltam ? 'faltam ' + m.faltam + ' para a meta' : '✅ meta atingida')
+      + ' · garantia e avulsa contam para o técnico, mas não entram nesta barra</div>'
+    + '</div>';
+
+  var card = function(t, dados, cor, icone){
+    return '<div class="pq-c">'
+      + '<div class="n" style="color:' + cor + ';">' + (dados.entraram||0) + '</div>'
+      + '<div class="l">' + icone + ' ' + t + '</div>'
+      + '<div class="d">✅ ' + (dados.aprovadas||0) + ' · 🔧 ' + (dados.reprovadas||0)
+        + (dados.aguardando ? ' · ⏳ ' + dados.aguardando : '')
+        + (dados.taxaAprovacao != null ? ' · ' + dados.taxaAprovacao + '%' : '') + '</div>'
+      + '</div>';
+  };
+  var htmlOrigem = '<div class="pq-cards">'
+    + card('Setor técnico', o.tecnico||{}, '#60a5fa', '🔧')
+    + card('Garantia', o.garantia||{}, '#22d3ee', '🛡️')
+    + card('Avulsas', o.avulsa||{}, '#a78bfa', '📋')
+    + '</div>';
+
+  var tecs = r.TECNICOS || [];
+  var maxT = Math.max.apply(null, tecs.map(function(t){return t.total;}).concat([1]));
+  var htmlTec = tecs.length ? '<div class="pq-sec"><h4>👷 Produção por técnico</h4>'
+    + tecs.map(function(t){
+        return '<div class="pq-lin">'
+          + '<span style="min-width:96px;font-weight:700;">' + pqEsc(t.nome) + '</span>'
+          + '<span style="flex:1;height:7px;background:#161c26;border-radius:4px;overflow:hidden;">'
+            + '<i style="display:block;height:100%;width:' + Math.round(t.total/maxT*100) + '%;'
+            + 'background:#60a5fa;border-radius:4px;"></i></span>'
+          + '<span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#8b93a3;min-width:118px;">'
+            + 'téc ' + t.tecnico + ' · gar ' + t.garantia + ' · avl ' + t.avulsa + '</span>'
+          + '<span style="font-family:ui-monospace,monospace;font-weight:700;min-width:26px;text-align:right;">'
+            + t.total + '</span>'
+          + (t.taxaAprovacao != null ? '<span style="font-size:10px;color:'
+              + (t.taxaAprovacao>=90?'#34d399':t.taxaAprovacao>=70?'#fbbf24':'#f87171')
+              + ';min-width:34px;text-align:right;">' + t.taxaAprovacao + '%</span>' : '')
+          + '</div>';
+      }).join('') + '</div>' : '';
+
+  var fichas = r.FICHAS_POR_COLUNA || {};
+  var htmlFila = '<div class="pq-sec">'
+    + '<h4>🔧 Fila do setor técnico — ' + (f.total||0) + ' serviço(s) por concluir'
+      + (f.atrasadas ? '<span class="pq-tag pq-atrasada" style="background:rgba(248,113,113,.15);">'
+          + '🔴 ' + f.atrasadas + ' acima de ' + (r.limiteAtrasoHoras||48) + 'h</span>' : '')
+      + '</h4>'
+    + (f.colunas||[]).filter(function(c){ return c.quantas > 0; }).map(function(c){
+        var lista = fichas[c.id] || [];
+        return '<div class="pq-col" onclick="pqAbrir(\'' + c.id + '\')">'
+          + '<span style="flex:1;font-size:12.5px;">' + pqEsc(c.nome) + '</span>'
+          + '<span class="q">' + c.quantas + '</span>'
+          + '<span style="color:#5a6270;font-size:11px;">▾</span></div>'
+          + '<div class="pq-fichas" id="pqf-' + c.id + '">'
+          + (lista.length ? lista.map(function(x){
+              var t = x.horas != null
+                ? (x.horas >= 24 ? (x.horas/24).toFixed(1) + 'd' : x.horas.toFixed(0) + 'h')
+                : '—';
+              return '<div' + (x.atrasada ? ' class="pq-atrasada"' : '') + '>'
+                + pqEsc(x.cliente).slice(0,22) + ' ' + x.telefone
+                + ' | ' + pqEsc(x.equipamento)
+                + (x.tecnico ? ' | ' + pqEsc(x.tecnico) : '')
+                + ' | há ' + t
+                + (x.atrasada ? ' 🔴' : '') + '</div>';
+            }).join('') : '<div>sem fichas</div>')
+          + '</div>';
+      }).join('')
+    + '</div>';
+
+  cx.innerHTML = htmlMeta + htmlOrigem + htmlTec + htmlFila;
+}
+
 // ── 📅 data e hora legíveis, em horário de Brasília ──
 function fmtDH(d){
   if(!d) return '—';
@@ -836,8 +966,9 @@ function esc(s){return String(s||'').replace(/</g,'&lt;');}
 function fmtD(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
 
 load();
-carregarPainelMeta();
-setInterval(function(){carregarPainelMeta();},120000);
+// 📊 o painel completo substitui a barra simples: mesma área, muito mais informação
+carregarPainelQualidade();
+setInterval(function(){carregarPainelQualidade();},120000);
 setInterval(function(){if(!document.hidden)load();},120000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
 </script>

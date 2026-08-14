@@ -45,6 +45,112 @@ export default async function handler(req, res) {
 
   const action = req.query.action || '';
 
+  // ── 📊 PAINEL: origem, técnicos e fila do setor técnico ──
+  if (action === 'painel') {
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const per = String(req.query.periodo || 'hoje');
+    const iniPer = per === 'semana' ? Date.now() - 7 * 86400000
+      : per === 'mes' ? Date.now() - 30 * 86400000
+      : new Date(hoje + 'T00:00:00-03:00').getTime();
+    const dentro = d => d && new Date(d).getTime() >= iniPer;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+
+    const q = (await dbGet('reparoeletro_qualidade')) || { inspecoes: [] };
+    const insp = q.inspecoes || [];
+    const bd = (await dbGet('reparoeletro_board')) || { cards: [] };
+
+    const origemDe = i => (/garantia/i.test(String(i.origem || '') + ' ' + String(i.tipo || ''))
+      ? 'garantia' : (i.avulsa === true || String(i.origem || '') === 'avulsa') ? 'avulsa' : 'tecnico');
+
+    // ── 1) três blocos por origem ──
+    const bloco = (nome) => {
+      const meus = insp.filter(i => origemDe(i) === nome);
+      const entraram = meus.filter(i => dentro(i.criadoEm));
+      const aprovadas = meus.filter(i => i.status === 'aprovado' && dentro(i.aprovadoEm));
+      const reprovadas = meus.filter(i => i.status === 'reprovado' && dentro(i.reprovadoEm));
+      return { entraram: entraram.length, aprovadas: aprovadas.length,
+        reprovadas: reprovadas.length,
+        aguardando: meus.filter(i => i.status === 'aguardando').length,
+        taxaAprovacao: (aprovadas.length + reprovadas.length)
+          ? Math.round(aprovadas.length / (aprovadas.length + reprovadas.length) * 100) : null };
+    };
+    const ORIGENS = { tecnico: bloco('tecnico'), garantia: bloco('garantia'), avulsa: bloco('avulsa') };
+
+    // ── 2) a meta de 25 conta SÓ o que vem do setor técnico ──
+    const doTecnicoHoje = insp.filter(i => origemDe(i) === 'tecnico' &&
+      String(i.criadoEm || '').slice(0, 10) === hoje).length;
+    const META = 25;
+
+    // ── 3) produção por técnico, separada por categoria ──
+    const porTec = {};
+    for (const i of insp) {
+      const fim = i.aprovadoEm || i.reprovadoEm;
+      if (!dentro(fim)) continue;
+      const t = String(i.tecnico || '(sem técnico)');
+      porTec[t] = porTec[t] || { tecnico: 0, garantia: 0, avulsa: 0, aprov: 0, reprov: 0 };
+      porTec[t][origemDe(i)]++;
+      if (i.status === 'aprovado') porTec[t].aprov++;
+      if (i.status === 'reprovado') porTec[t].reprov++;
+    }
+    const TECNICOS = Object.entries(porTec)
+      .map(([nome, v]) => ({ nome, ...v, total: v.tecnico + v.garantia + v.avulsa,
+        taxa: (v.aprov + v.reprov) ? Math.round(v.aprov / (v.aprov + v.reprov) * 100) : null }))
+      .sort((a, b) => b.total - a.total);
+
+    // ── 4) fila do setor técnico, por coluna, com tempo de espera ──
+    const COLUNAS = [
+      ['aprovado', 'Aprovado'], ['producao', 'Produção'],
+      ['reforma_cliente', 'Reforma Cliente'], ['reforma_loja', 'Reforma Loja'],
+      ['os_atrasada', 'OS em Atraso'], ['comprar_peca', 'Comprar Peça'],
+      ['aguardando_peca', 'Aguardando Peça'], ['peca_disponivel', 'Peça Disponível'],
+    ];
+    const LIMITE_H = 48;
+    const fila = {}, fichasPorColuna = {};
+    let totalFila = 0, atrasadas = 0;
+    for (const [id] of COLUNAS) { fila[id] = 0; fichasPorColuna[id] = []; }
+    for (const c of (bd.cards || [])) {
+      const f = String(c.phaseId || '');
+      if (fila[f] === undefined) continue;
+      fila[f]++; totalFila++;
+      const desde = c.entrouTecnicoEm || c.movedAt || c.criadoEm;
+      const horas = desde ? (Date.now() - new Date(desde).getTime()) / 3600000 : null;
+      if (horas != null && horas > LIMITE_H) atrasadas++;
+      fichasPorColuna[f].push({
+        id: c.id, cliente: c.nomeContato || c.nome || '—',
+        telefone: String(c.telefone || '').slice(-4),
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 34),
+        tecnico: c.tecnico || c.tecnicoServico || null,
+        aprovadoEm: c.entrouTecnicoEm || null,
+        desde, horas: horas != null ? +horas.toFixed(1) : null,
+        atrasada: horas != null && horas > LIMITE_H,
+      });
+    }
+    for (const k of Object.keys(fichasPorColuna)) {
+      fichasPorColuna[k].sort((a, b) => (b.horas || 0) - (a.horas || 0));
+    }
+
+    return res.status(200).json({ ok: true,
+      periodo: per, limiteAtrasoHoras: LIMITE_H,
+      META_DIARIA: { feitas: doTecnicoHoje, meta: META,
+        percentual: Math.round(doTecnicoHoje / META * 100),
+        faltam: Math.max(0, META - doTecnicoHoje),
+        observacao: 'conta apenas o que veio do setor técnico; garantia e avulsa ' +
+          'são creditadas ao técnico mas ficam fora da meta' },
+      ORIGENS,
+      TECNICOS: TECNICOS.map(t => ({ nome: t.nome, total: t.total,
+        tecnico: t.tecnico, garantia: t.garantia, avulsa: t.avulsa,
+        taxaAprovacao: t.taxa })),
+      FILA_TECNICO: {
+        total: totalFila, atrasadas,
+        colunas: COLUNAS.map(([id, nome]) => ({ id, nome, quantas: fila[id] })),
+      },
+      FICHAS_POR_COLUNA: fichasPorColuna,
+      RESUMO_ATRASO: atrasadas
+        ? '🔴 ' + atrasadas + ' ficha(s) há mais de ' + LIMITE_H + 'h no setor técnico'
+        : '✅ nenhuma ficha acima de ' + LIMITE_H + 'h' });
+  }
+
   // ── 📈 REGISTRAR-RITMO: fotografia diária de entrada e vazão ──
   // Roda algumas vezes por dia e guarda o que entrou, o que saiu e quanto tempo
   // cada serviço levou. Sem uma semana de medição, qualquer previsão de prazo
