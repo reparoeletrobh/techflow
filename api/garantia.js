@@ -142,7 +142,9 @@ module.exports = async function handler(req, res) {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ')
       .replace(/\s+/g, ' ').trim();
 
-    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    // a constante da fila é declarada mais abaixo neste arquivo: usá-la aqui
+    // derrubaria a chamada, como o teste de execução apontou
+    const fdb = (await dbGet('reparoeletro_garantia_fila')) || { itens: [] };
     const naFila = (fdb.itens || []).filter(i => i.status !== 'resolvido');
     const q = (await dbGet('reparoeletro_qualidade')) || { inspecoes: [] };
     const inspecoes = q.inspecoes || [];
