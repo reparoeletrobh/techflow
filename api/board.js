@@ -2280,6 +2280,55 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, fechados, total: pipefyIds.length });
   }
 
+  // ── 🧹 analise-loja-travadas: cards presos na coluna Análise Loja ──
+  // O card sai desta coluna quando o diagnóstico é concluído no frente de loja.
+  // Se aquela chamada falhou, ele fica preso: a ficha seguiu adiante e o card
+  // continua ali, sem que ninguém consiga movê-lo pela tela.
+  if (action === 'analise-loja-travadas') {
+    const bdT = sanitizeBoard(await dbGet(BOARD_KEY));
+    const naColuna = (bdT.cards || []).filter(c => String(c.phaseId || '') === 'analise_loja');
+    let flT = null;
+    try { flT = await dbGet('reparoeletro_frenteloja'); } catch (e) {}
+    const fichasT = ((flT || {}).fichas) || [];
+    const d8t = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const travados = [], normais = [];
+    for (const c of naColuna) {
+      const f = fichasT.find(x => String(x.id) === String(c.flFichaId)) ||
+        fichasT.find(x => d8t(x.telefone) === d8t(c.telefone));
+      const faseFL = f ? String(f.phase || '') : null;
+      const jaAvancou = faseFL && faseFL !== 'analise_loja' && faseFL !== 'recebido';
+      const item = { id: c.id, nome: c.nomeContato || c.nome || '?', tel: d8t(c.telefone),
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 30),
+        dias: (c.movedAt || c.criadoEm)
+          ? Math.floor((Date.now() - new Date(c.movedAt || c.criadoEm).getTime()) / 86400000) : null,
+        faseNoFrenteLoja: faseFL || '(ficha não encontrada)' };
+      if (jaAvancou || !f) travados.push(item); else normais.push(item);
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: travados.length === 0,
+        naColuna: naColuna.length, travados: travados.length, emAndamento: normais.length,
+        TRAVADOS: travados.map(x => x.nome.slice(0, 22) + ' ' + x.tel.slice(-4) +
+          ' | ' + x.equipamento + ' | há ' + (x.dias != null ? x.dias + 'd' : '?') +
+          ' | no frente de loja está em: ' + x.faseNoFrenteLoja),
+        EM_ANDAMENTO: normais.map(x => x.nome.slice(0, 22) + ' ' + x.tel.slice(-4)),
+        oQueVaiAcontecer: 'os travados saem da coluna; a ficha do frente de loja não é tocada',
+        dica: 'para remover: &aplicar=1 — ou &tel=6437 para um caso específico' });
+    }
+    const soTel = String(req.query.tel || '').replace(/\D/g, '').slice(-4);
+    const alvo = soTel ? travados.filter(x => x.tel.slice(-4) === soTel) : travados;
+    if (!alvo.length) return res.status(200).json({ ok: false,
+      error: soTel ? 'não encontrei card travado com esse final' : 'nada a remover' });
+    const ids = new Set(alvo.map(x => String(x.id)));
+    bdT.cards = (bdT.cards || []).filter(c => !ids.has(String(c.id)));
+    await dbSet(BOARD_KEY, bdT);
+    const conf = sanitizeBoard(await dbGet(BOARD_KEY));
+    const ainda = (conf.cards || []).filter(c => ids.has(String(c.id)));
+    if (ainda.length) return res.status(200).json({ ok: false,
+      error: 'a remoção não persistiu — tente de novo' });
+    return res.status(200).json({ ok: true, removidos: alvo.length,
+      L: alvo.map(x => x.nome + ' ' + x.tel.slice(-4)) });
+  }
+
   if (action === 'balcao-load') {
       const balcao = (await dbGet('reparoeletro_balcao')) || [];
       return res.status(200).json({ ok: true, cards: balcao });
