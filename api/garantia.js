@@ -130,6 +130,78 @@ module.exports = async function handler(req, res) {
 
   const { action } = req.query;
 
+  // ── 🔎 CRUZAR-QUALIDADE: garantia na fila que já foi aprovada no CQ ──
+  // A inspeção pode ter sido criada de forma avulsa, sem vínculo com a garantia:
+  // nesse caso o serviço foi concluído e conferido, mas o item continua na fila
+  // esperando tratamento que já aconteceu.
+  if (action === 'cruzar-qualidade') {
+    const d8g = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const norm = s => String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const naFila = (fdb.itens || []).filter(i => i.status !== 'resolvido');
+    const q = (await dbGet('reparoeletro_qualidade')) || { inspecoes: [] };
+    const inspecoes = q.inspecoes || [];
+
+    const achados = [], semCruzamento = [];
+    for (const it of naFila) {
+      const tel = d8g(it.telefone);
+      const ult4 = tel.slice(-4);
+      const nomeIt = norm(it.nome || it.nomeContato);
+      const primeiro = nomeIt.split(' ')[0] || '';
+
+      const candidatas = inspecoes.filter(i => {
+        if (i.garantiaId && String(i.garantiaId) === String(it.id)) return true;
+        const telI = d8g(i.telefone);
+        const nomeI = norm(i.cliente);
+        // 🎯 o caso pedido: mesmo nome e os mesmos quatro dígitos no texto
+        const bate4 = ult4 && (telI.slice(-4) === ult4 || nomeI.includes(ult4) ||
+          norm(i.equipamentoTexto).includes(ult4));
+        const bateNome = primeiro.length > 2 &&
+          (nomeI.includes(primeiro) || nomeIt.includes(nomeI.split(' ')[0] || '#'));
+        return bate4 && bateNome;
+      });
+
+      const concluidas = candidatas.filter(i => i.status === 'aprovado' || i.status === 'reprovado');
+      if (!candidatas.length) { semCruzamento.push(it); continue; }
+      for (const i of concluidas) {
+        achados.push({
+          filaId: it.id, nome: it.nome || it.nomeContato, tel,
+          equipamentoFila: String(it.equipamento || it.descricao || '').slice(0, 30),
+          naFilaDesde: it.criadoEm || it.em,
+          inspOs: i.os, inspId: i.id, inspStatus: i.status,
+          inspTecnico: i.tecnico, inspCliente: i.cliente,
+          inspEquip: String(i.equipamentoTexto || i.equipamento || '').slice(0, 30),
+          concluidaEm: i.aprovadoEm || i.reprovadoEm,
+          avulsa: i.avulsa === true,
+          vinculada: !!i.garantiaId,
+        });
+      }
+    }
+    const avulsas = achados.filter(a => a.avulsa || !a.vinculada);
+    return res.status(200).json({ ok: achados.length === 0,
+      naFila: naFila.length,
+      inspecoesNoCq: inspecoes.length,
+      jaConcluidasNoCq: achados.length,
+      criadasDeFormaAvulsa: avulsas.length,
+      VEREDITO: achados.length
+        ? '⚠️ ' + achados.length + ' item(ns) na fila de garantia já foram concluídos ' +
+          'no controle de qualidade — a fila não foi baixada'
+        : '✅ nenhum item da fila já concluído no controle de qualidade',
+      JA_CONCLUIDAS: achados.map(a => a.nome.slice(0, 22) + ' ' + a.tel.slice(-4) +
+        ' | fila desde ' + hh(a.naFilaDesde) +
+        ' | ' + a.inspOs + ' ' + a.inspStatus + ' em ' + hh(a.concluidaEm) +
+        ' | téc: ' + (a.inspTecnico || '—') +
+        (a.avulsa ? ' | 🏷️ AVULSA' : '') + (a.vinculada ? '' : ' | sem vínculo com a garantia') +
+        ' | fila: ' + a.equipamentoFila + ' ↔ CQ: ' + a.inspEquip),
+      observacao: 'a inspeção avulsa não guarda vínculo com a garantia, por isso a fila ' +
+        'não é baixada automaticamente quando ela é aprovada' });
+  }
+
   try {
 
     // ── GET load ──────────────────────────────────────────────
