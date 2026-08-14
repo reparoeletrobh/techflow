@@ -484,7 +484,51 @@ export default async function handler(req,res){
   if(req.method==='POST'&&action==='excluir'){
     const{id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
-    const fx=db.fichas.find(x=>x.id===id);
+    let fx=db.fichas.find(x=>x.id===id);
+
+    // 🪞 A coluna Entrar em Contato é um ESPELHO de fichas_adm e fichas_tv:
+    // a ficha não vive aqui. Excluir apenas nesta base removia o reflexo, e no
+    // carregamento seguinte ele reaparecia — a ficha original nunca havia saído.
+    // Agora a exclusão alcança a ficha de verdade, onde quer que ela esteja.
+    let ondeEstava=null;
+    if(!fx){
+      for(const chave of ['fichas_adm','fichas_tv']){
+        const fdb=(await dbGet(chave))||{fichas:[]};
+        const alvo=(fdb.fichas||[]).find(x=>String(x.id)===String(id));
+        if(!alvo) continue;
+        fx=alvo; ondeEstava=chave;
+        alvo.status='prospeccao';
+        alvo.excluidoDaFilaEm=new Date().toISOString();
+        alvo.excluidoDaFilaPor='exclusão manual na prospecção';
+        await dbSet(chave,fdb);
+        // confirma que persistiu: sem isso a ficha volta no próximo carregamento
+        const conf=await dbGet(chave);
+        const ainda=(((conf||{}).fichas)||[])
+          .find(x=>String(x.id)===String(id)&&String(x.status||'')==='entrar_contato');
+        if(ainda) return res.status(200).json({ok:false,
+          error:'a exclusão não persistiu na ficha original — tente de novo'});
+        break;
+      }
+    } else {
+      // existe na prospecção, mas pode ter gêmea na base de fichas
+      const d8e=String(fx.telefone||'').replace(/\D/g,'').slice(-8);
+      if(d8e.length>=8){
+        for(const chave of ['fichas_adm','fichas_tv']){
+          const fdb=(await dbGet(chave))||{fichas:[]};
+          let mexeu=false;
+          for(const x of (fdb.fichas||[])){
+            if(String(x.status||'')!=='entrar_contato') continue;
+            if(String(x.telefone||'').replace(/\D/g,'').slice(-8)!==d8e) continue;
+            x.status='prospeccao';
+            x.excluidoDaFilaEm=new Date().toISOString();
+            x.excluidoDaFilaPor='exclusão manual na prospecção';
+            mexeu=true;
+          }
+          if(mexeu) await dbSet(chave,fdb);
+        }
+      }
+    }
+    if(!fx) return res.status(404).json({ok:false,error:'ficha não encontrada'});
     // grava o tombstone ANTES de remover (se o sync atropelar, a trava já existe)
     if(fx&&fx.telefone){
       try{

@@ -129,6 +129,69 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔬 CICLO-DE-VIDA: por que cada ficha da fila está lá agora ──
+  // Cruza o registro de passagens da ficha com as exclusões manuais, mostrando
+  // quando saiu, por quê, e o que a trouxe de volta.
+  if (action === 'ciclo-de-vida') {
+    const d8v = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    let excl = {};
+    try {
+      const ex = await dbGet('prospeccao_excluidos');
+      for (const [t, q] of Object.entries(((ex || {}).tels) || {})) {
+        const d = String(t).replace(/\D/g, '').slice(-8);
+        if (d.length >= 8 && (!excl[d] || q > excl[d])) excl[d] = q;
+      }
+    } catch (e) {}
+
+    const linhas = [];
+    for (const [chave, sis] of [[KEY_ADM, 'ADM'], [KEY_TV, 'TV']]) {
+      const db = await dbGet(chave);
+      for (const f of (((db || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'entrar_contato') continue;
+        const t = d8v(f.telefone);
+        const ps = f.passagensEntrarContato || [];
+        const ultima = ps.length ? ps[ps.length - 1] : null;
+        const excluidaEm = excl[t] || f.excluidoDaFilaEm || null;
+        // voltou DEPOIS de ter sido excluída?
+        const voltouDepois = excluidaEm && ultima &&
+          new Date(ultima.em).getTime() > new Date(excluidaEm).getTime();
+        linhas.push({ sis, nome: f.nome || '?', tel: t,
+          entradas: ps.length,
+          ultimaEntrada: ultima ? ultima.em : (f.entrarContatoEm || f.movedAt),
+          ultimaOrigem: ultima ? ultima.origem : '(sem registro)',
+          veioDe: ultima ? ultima.veioDe : null,
+          excluidaEm, voltouDepois,
+          sequencia: ps.map(p => p.origem + '@' + hh(p.em)).join(' → ') || '(sem registro)' });
+      }
+    }
+    const voltaram = linhas.filter(l => l.voltouDepois);
+    const nuncaExcluidas = linhas.filter(l => !l.excluidaEm);
+    const porOrigem = linhas.reduce((o, l) => {
+      o[l.ultimaOrigem] = (o[l.ultimaOrigem] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: voltaram.length === 0,
+      naFila: linhas.length,
+      RESUMO: {
+        voltaramDepoisDeExcluidas: voltaram.length,
+        nuncaForamExcluidas: nuncaExcluidas.length,
+        jaExcluidasAlgumaVez: linhas.length - nuncaExcluidas.length,
+      },
+      ULTIMA_ORIGEM: porOrigem,
+      VOLTARAM_APOS_EXCLUSAO: voltaram
+        .sort((a, b) => String(b.ultimaEntrada).localeCompare(String(a.ultimaEntrada)))
+        .map(l => l.sis + ' | ' + String(l.nome).slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
+          ' | excluída ' + hh(l.excluidaEm) +
+          ' | voltou ' + hh(l.ultimaEntrada) + ' por "' + l.ultimaOrigem + '"' +
+          (l.veioDe ? ' vindo de ' + l.veioDe : '')),
+      DETALHE: linhas
+        .sort((a, b) => String(b.ultimaEntrada).localeCompare(String(a.ultimaEntrada)))
+        .map(l => hh(l.ultimaEntrada) + ' | ' + l.sis + ' | ' +
+          String(l.nome).slice(0, 18).padEnd(18) + ' ' + l.tel.slice(-4) +
+          ' | ' + l.entradas + 'ª entrada por "' + l.ultimaOrigem + '"' +
+          (l.excluidaEm ? ' | ⚠️ foi excluída em ' + hh(l.excluidaEm) : '')) });
+  }
+
   // ── 🔥 IMPORTAR-ASSIM-MESMO: força a criação da ficha de quem foi barrado ──
   // O lead que preenche o formulário é o contato mais quente que existe: já
   // conhecia a loja e voltou por conta própria. Barrá-lo como duplicata o joga
@@ -1948,6 +2011,15 @@ export default async function handler(req, res) {
     // aprovado. Essas fichas não devem entrar na fila de ligação.
     const d8reg = t => String(t || '').replace(/\D/g, '').slice(-8);
     const emOperacaoAgora = new Set();
+    // 🗂️ telefones retirados da fila pela equipe
+    const excluidosDaFila = new Set();
+    try {
+      const ex = await dbGet('prospeccao_excluidos');
+      for (const t of Object.keys(((ex || {}).tels) || {})) {
+        const d = String(t).replace(/\D/g, '').slice(-8);
+        if (d.length >= 8) excluidosDaFila.add(d);
+      }
+    } catch (e) {}
     try {
       const FASES_ADIANTE = ['horario_marcado', 'motorista_parceiro', 'em_rota',
         'liberado_para_rota', 'orc_registrado', 'coleta_efetuada', 'recebido'];
@@ -1983,6 +2055,13 @@ export default async function handler(req, res) {
           // 🚫 o cliente já avançou no funil? então esta ficha é uma sobra: ele
           // não precisa de ligação, está em coleta, orçamento ou já aprovou.
           // Sem esta checagem a equipe ligava para quem já estava negociando.
+          // 🚫 quem foi retirado da fila à mão não volta pela régua: a equipe
+          // já decidiu que este caso não precisa de ligação
+          if (f.excluidoDaFilaEm || excluidosDaFila.has(d8reg(f.telefone))) {
+            f.status = 'prospeccao';
+            mudou = true;
+            continue;
+          }
           if (emOperacaoAgora.has(d8reg(f.telefone))) {
             f.status = 'prospeccao';
             f.encerradaPorAvanco = new Date().toISOString();

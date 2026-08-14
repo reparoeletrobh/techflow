@@ -919,6 +919,38 @@ function check(nome, cond, extra) {
       /doTecnicoHoje/.test(api));
   }
 
+  // ── 🪞 excluir da fila precisa alcançar a ficha de verdade ──
+  // A coluna Entrar em Contato é um espelho de fichas_adm e fichas_tv. Excluir
+  // apenas na base da prospecção removia o reflexo, e a ficha original — que
+  // nunca saiu — reaparecia no carregamento seguinte.
+  console.log('▶ Cenário EX2 — exclusão da fila não volta atrás');
+  {
+    const pr = carregarHandler('api/prospeccao.js');
+    const fi = carregarHandler('api/fichas.js');
+    KV['prospeccao_adm'] = { fichas: [] };
+    KV['prospeccao_excluidos'] = { tels: {} };
+    KV['fichas_adm'] = { fichas: [{ id: 'EX-1', nome: 'Excluída', telefone: '5531955551111',
+      status: 'entrar_contato', contatoFeitoEm: new Date(Date.now() - 5 * 3600000).toISOString(),
+      criadoEm: new Date().toISOString(), abordadoPorBot: true }] };
+    KV['fichas_tv'] = { fichas: [] };
+    KV['reparoeletro_logistica'] = { fichas: [] };
+    KV['tv_logistica'] = { fichas: [] };
+    KV['reparoeletro_pipe'] = { cards: [] };
+    KV['tv_pipe'] = { cards: [] };
+
+    await pr(req({ action: 'excluir', ...K }, { id: 'EX-1' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 150));
+    const dep = ((KV['fichas_adm'] || {}).fichas || [])[0] || {};
+    check('exclusão alcança a ficha original', dep.status !== 'entrar_contato', dep.status);
+
+    // a régua roda de novo: a ficha não pode voltar
+    await fi(req({ action: 'load', sistema: 'adm', ...K }), res());
+    await new Promise(s => setTimeout(s, 150));
+    const dep2 = ((KV['fichas_adm'] || {}).fichas || [])[0] || {};
+    check('a régua não traz de volta quem foi excluído',
+      dep2.status !== 'entrar_contato', dep2.status);
+  }
+
   console.log('▶ Cenário SD — sync limita-se ao dia corrente');
   {
     const fsS = require('fs');
