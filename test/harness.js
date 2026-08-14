@@ -872,6 +872,25 @@ function check(nome, cond, extra) {
   // Dezenas de fichas antigas reentravam no sistema e caíam na fila de ligação
   // junto com os contatos do dia, e a equipe ligava para gente de uma semana
   // atrás como se fosse contato novo.
+  // ── 🔬 o painel de meta e produção semanal não pode ser removido ──
+  // Ele foi substituído por engano ao acrescentar os blocos por origem, e com
+  // isso sumiu o histórico da semana e as OSs de cada técnico, que é a leitura
+  // usada no dia a dia.
+  console.log('▶ Cenário PQ — qualidade mantém meta semanal e painéis novos');
+  {
+    const fsQ = require('fs');
+    const t = fsQ.readFileSync('qualidade.html', 'utf8');
+    check('painel de meta continua sendo chamado', /\bcarregarPainelMeta\(\);/.test(t));
+    check('painel de origem e fila também é chamado', /\bcarregarPainelQualidade\(\);/.test(t));
+    check('cada painel tem o seu container',
+      /id="painel-meta"/.test(t) && /id="painel-origem"/.test(t));
+    check('produção por técnico da semana continua clicável', /verOssTecnico/.test(t));
+    const api = fsQ.readFileSync('api/qualidade.js', 'utf8');
+    check('meta conta apenas o que vem do setor técnico',
+      /origemDe\(i\) === 'tecnico' &&[\s\S]{0,120}META/.test(api) ||
+      /doTecnicoHoje/.test(api));
+  }
+
   console.log('▶ Cenário SD — sync limita-se ao dia corrente');
   {
     const fsS = require('fs');
