@@ -1297,10 +1297,6 @@
     {
       "source": "/tv-garantia-fila",
       "destination": "/tv-garantia-fila.html"
-    },
-    {
-      "source": "/bot-log",
-      "destination": "/bot-log.html"
     }
   ],
   "headers": [

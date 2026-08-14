@@ -104,6 +104,8 @@ main{flex:1;display:flex;overflow:hidden;}
 <header>
   <div class="h-title">🤖 Bot WhatsApp <span class="badge-fase">FASE 1 · COPILOTO</span></div>
   <div style="display:flex;gap:8px;">
+    <button class="btn" onclick="abrirNegociacao()" style="background:#15803d;color:#fff;">📊 Negociação</button>
+    <button class="btn" onclick="abrirConsumo()" style="background:#7c3aed;color:#fff;">💰 Consumo</button>
     <button class="btn" onclick="carregarConversas()">↻</button>
     <a href="/adm" class="btn">← ADM</a>
   </div>
@@ -152,6 +154,104 @@ main{flex:1;display:flex;overflow:hidden;}
 </main>
 
 <script>
+// ── 📊 painel de negociação e 💰 consumo da IA, em janela sobre a tela ──
+function _painelOv(titulo, corpo){
+  var ov = document.getElementById('ov-painel');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-painel';
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;backdrop-filter:blur(3px);';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+                : 'border-radius:16px;padding:20px 22px;')
+    + 'max-width:760px;width:100%;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+      + '<div style="font-size:16px;font-weight:900;">' + titulo + '</div>'
+      + '<button onclick="document.getElementById(\'ov-painel\').remove()" '
+        + 'style="margin-left:auto;background:#374151;border:none;border-radius:8px;padding:7px 14px;'
+        + 'color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">Fechar</button>'
+    + '</div>' + corpo + '</div>';
+  document.body.appendChild(ov);
+}
+function _e(s){ return String(s==null?'':s).replace(/</g,'&lt;'); }
+function _bloco(t,arr,cor){
+  if(!arr||!arr.length) return '';
+  return '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:800;color:'+(cor||'#f0f2f5')+';">'
+    + t + ' (' + arr.length + ')</div>'
+    + '<div style="background:#0b0e13;border:1px solid #1e2430;border-radius:9px;padding:10px 12px;'
+    + 'margin-top:6px;font-family:ui-monospace,monospace;font-size:10.5px;color:#8b93a3;line-height:1.8;'
+    + 'max-height:240px;overflow-y:auto;white-space:pre-wrap;">' + arr.map(_e).join('\n') + '</div></div>';
+}
+function _cartao(n,l,cor){
+  return '<div style="background:rgba(255,255,255,.03);border:1px solid #1e2430;border-radius:11px;padding:12px 14px;">'
+    + '<div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:700;color:'+cor+';line-height:1;">'+n+'</div>'
+    + '<div style="font-size:9.5px;color:#5a6270;font-weight:750;letter-spacing:.06em;text-transform:uppercase;margin-top:5px;">'+l+'</div></div>';
+}
+async function abrirNegociacao(){
+  _painelOv('📊 Negociação', '<div style="padding:30px;text-align:center;color:#5a6270;">⏳ carregando…</div>');
+  var r=null;
+  try{ r=await fetch('/api/wa-bot?action=painel-negociacao').then(function(x){return x.json();}); }catch(e){}
+  if(!r||!r.ok){ _painelOv('📊 Negociação','<div style="padding:20px;color:#f87171;">não consegui carregar</div>'); return; }
+  var s=r.RESUMO||{}, f=r.POR_FASE_DE_VENDA||{};
+  var maxF=Math.max.apply(null,Object.values(f).concat([1]));
+  var corpo =
+    (s.naoRecebemHa3DiasOuMais ? '<div style="background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.3);'
+      + 'border-radius:10px;padding:11px 13px;font-size:12px;color:#fbbf24;line-height:1.6;margin-bottom:12px;">⚠️ '
+      + s.naoRecebemHa3DiasOuMais + ' cliente(s) em negociação sem contato há 3 dias ou mais, '
+      + 'com a sequência ainda ativa</div>' : '')
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;">'
+    + _cartao(s.emNegociacao||0,'em negociação','#60a5fa')
+    + _cartao(s.receberamMensagemHoje||0,'receberam hoje','#34d399')
+    + _cartao(s.naoRecebemHa3DiasOuMais||0,'parados 3+ dias','#fbbf24')
+    + _cartao(s.semNenhumContatoDoBot||0,'sem contato do bot','#f87171')
+    + _cartao(s.sequenciaEsgotada||0,'sequência esgotada','#f87171')
+    + _cartao('R$ '+Number(s.valorEmJogo||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),'valor em jogo','#34d399')
+    + '</div>'
+    + '<div style="margin-top:16px;"><div style="font-size:12px;font-weight:800;">Fase da venda</div>'
+    + Object.keys(f).map(function(k){
+        var v=f[k]||0;
+        return '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;">'
+          + '<span style="font-size:11px;color:#8b93a3;min-width:145px;">'+_e(k)+'</span>'
+          + '<span style="flex:1;height:8px;background:#161c26;border-radius:4px;overflow:hidden;">'
+          + '<i style="display:block;height:100%;width:'+Math.round(v/maxF*100)+'%;background:#60a5fa;border-radius:4px;"></i></span>'
+          + '<span style="font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;min-width:30px;text-align:right;">'+v+'</span></div>';
+      }).join('') + '</div>'
+    + _bloco('Disparos da sequência', Object.entries(r.POR_DISPARO||{}).sort().map(function(p){return p[0]+': '+p[1];}), '#a78bfa')
+    + _bloco('⏳ Sem contato há 3 dias ou mais', r.SEM_CONTATO_HA_3_DIAS, '#fbbf24')
+    + _bloco('👤 Sem nenhum contato do bot', r.SEM_NENHUM_CONTATO, '#f87171')
+    + _bloco('✅ Receberam mensagem hoje', r.RECEBERAM_HOJE, '#34d399')
+    + _bloco('⚠️ Sequência esgotada', r.SEQUENCIA_ESGOTADA, '#f87171')
+    + _bloco('Todos em negociação', r.TODOS, '#8b93a3');
+  _painelOv('📊 Negociação', corpo);
+}
+async function abrirConsumo(){
+  _painelOv('💰 Consumo da IA', '<div style="padding:30px;text-align:center;color:#5a6270;">⏳ carregando…</div>');
+  var r=null;
+  try{ r=await fetch('/api/wa-bot?action=consumo-ia&dias=7').then(function(x){return x.json();}); }catch(e){}
+  if(!r||!r.ok){ _painelOv('💰 Consumo da IA','<div style="padding:20px;color:#f87171;">não consegui carregar</div>'); return; }
+  var t=r.TOTAIS||{};
+  var alerta=String(r.LEITURA||'').indexOf('⚠️')===0;
+  var corpo =
+    '<div style="background:rgba('+(alerta?'251,191,36':'52,211,153')+',.09);border:1px solid rgba('
+      +(alerta?'251,191,36':'52,211,153')+',.3);border-radius:10px;padding:11px 13px;font-size:12px;color:'
+      +(alerta?'#fbbf24':'#34d399')+';line-height:1.6;margin-bottom:12px;">'+_e(r.LEITURA||'')+'</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;">'
+    + _cartao(t.chamadas||0,'mensagens','#60a5fa')
+    + _cartao(t.mediaTokensPorMensagem||0,'tokens por mensagem','#a78bfa')
+    + _cartao(_e(t.aproveitamentoDoCache||'0%'),'cache aproveitado','#34d399')
+    + _cartao('R$ '+Number(t.custoBRL||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),'custo no período','#fbbf24')
+    + _cartao(Number(t.tokensEntrada||0).toLocaleString('pt-BR'),'tokens de entrada','#8b93a3')
+    + _cartao(Number(t.tokensSaida||0).toLocaleString('pt-BR'),'tokens de saída','#8b93a3')
+    + '</div>'
+    + _bloco('Consumo por dia', r.POR_DIA, '#60a5fa')
+    + _bloco('Por origem', r.POR_ORIGEM, '#8b93a3')
+    + '<div style="font-size:11px;color:#5a6270;margin-top:12px;line-height:1.6;">'+_e(r.observacao||'')+'</div>';
+  _painelOv('💰 Consumo da IA', corpo);
+}
+
 var _tel=null,_acaoSug='nenhuma';
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function fdt(ts){
