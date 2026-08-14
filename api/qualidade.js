@@ -305,7 +305,11 @@ export default async function handler(req, res) {
       equipamento: tipo,
       equipamentoTexto: descricao.slice(0, 120),
       tecnico,
-      categoria: String(b.categoria || 'producao_interna'),   // venda · reforma · producao_interna
+      categoria: String(b.categoria || 'producao_interna'),   // venda · reforma · producao_interna · garantia
+      // 🔗 quando o serviço é de garantia, o vínculo permite baixar a fila
+      // automaticamente ao aprovar — sem ele o item fica esperando algo já feito
+      garantiaId: b.garantiaId ? String(b.garantiaId) : null,
+      origem: b.categoria === 'garantia' ? 'garantia' : undefined,
       obsTecnica: String(b.obs || '').slice(0, 400) || null,
       valor: Number(b.valor || 0) || 0,
       avulsa: true,
@@ -322,7 +326,7 @@ export default async function handler(req, res) {
     const conf = (await dbGet(KEY)) || {};
     const ok2 = ((conf.inspecoes) || []).some(x => x.id === insp.id);
     if (!ok2) return res.status(200).json({ ok: false, error: 'a gravação não persistiu — tente de novo' });
-    return res.status(200).json({ ok: true, inspecao: insp,
+    return res.status(200).json({ ok: true, inspecao: insp, filaGarantia,
       aviso: 'ficha avulsa criada — nenhum comunicado será enviado' });
   }
 
@@ -594,6 +598,26 @@ export default async function handler(req, res) {
     // ── 🏪 FRENTE DE LOJA: aprovado no CQ → conserto realizado lá também ──
     // Antes o técnico marcava Loja Feito e a ficha ia direto para conserto realizado.
     // Agora ela passa pelo Controle de Qualidade, então quem move é a aprovação daqui.
+    // 🛡️ inspeção de garantia aprovada: baixa o item da fila de tratamento
+    let filaGarantia = null;
+    if (insp.garantiaId || insp.origem === 'garantia') {
+      try {
+        const fl2 = (await dbGet('reparoeletro_garantia_fila')) || { itens: [] };
+        const d8f2 = t => String(t || '').replace(/\D/g, '').slice(-8);
+        const it = (fl2.itens || []).find(x => x.status !== 'resolvido' &&
+          (String(x.id) === String(insp.garantiaId) ||
+           (d8f2(x.telefone) && d8f2(x.telefone) === d8f2(insp.telefone))));
+        if (it) {
+          it.status = 'resolvido';
+          it.destino = 'qc';
+          it.resolvidoEm = new Date().toISOString();
+          it.resolvidoPor = 'aprovação no controle de qualidade';
+          it.inspecaoOs = insp.os || insp.id;
+          await dbSet('reparoeletro_garantia_fila', fl2);
+          filaGarantia = { baixado: true, item: it.nome || it.id };
+        } else { filaGarantia = { baixado: false, motivo: 'item não encontrado na fila' }; }
+      } catch (e) { filaGarantia = { baixado: false, erro: e.message }; }
+    }
     let frenteLoja = null;
     try {
       const d8q = String(insp.telefone || '').replace(/\D/g, '').slice(-8);

@@ -130,6 +130,45 @@ module.exports = async function handler(req, res) {
 
   const { action } = req.query;
 
+  // ── ✅ BAIXAR-CONCLUIDAS: tira da fila o que já foi aprovado no CQ ──
+  if (action === 'baixar-concluidas') {
+    const K3 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    let cruz = null;
+    try {
+      cruz = await fetch('https://reparoeletroadm.com/api/garantia?action=cruzar-qualidade&k=' + K3)
+        .then(x => x.json());
+    } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui cruzar' }); }
+    const linhas = (cruz && cruz.JA_CONCLUIDAS) || [];
+    if (!linhas.length) return res.status(200).json({ ok: true, nada: 'nenhuma a baixar' });
+    const fdb = (await dbGet('reparoeletro_garantia_fila')) || { itens: [] };
+    const d8b2 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const alvo = [];
+    for (const l of linhas) {
+      const m2 = String(l).match(/^(.+?)\s(\d{4})\s\|.*\|\s(\S+)\s(aprovado|reprovado)/);
+      if (!m2) continue;
+      const tel4 = m2[2], os = m2[3];
+      const it = (fdb.itens || []).find(x => x.status !== 'resolvido' &&
+        d8b2(x.telefone).slice(-4) === tel4);
+      if (it) alvo.push({ it, os });
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSerBaixadas: alvo.length,
+        L: alvo.map(a => String(a.it.nome || '?').slice(0, 24) + ' | ' + a.os),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    for (const a of alvo) {
+      a.it.status = 'resolvido';
+      a.it.destino = 'qc';
+      a.it.resolvidoEm = new Date().toISOString();
+      a.it.resolvidoPor = 'cruzamento com o controle de qualidade';
+      a.it.inspecaoOs = a.os;
+    }
+    if (alvo.length) await dbSet('reparoeletro_garantia_fila', fdb);
+    return res.status(200).json({ ok: true, baixadas: alvo.length,
+      L: alvo.map(a => String(a.it.nome || '?').slice(0, 24) + ' → ' + a.os) });
+  }
+
   // ── 🔎 CRUZAR-QUALIDADE: garantia na fila que já foi aprovada no CQ ──
   // A inspeção pode ter sido criada de forma avulsa, sem vínculo com a garantia:
   // nesse caso o serviço foi concluído e conferido, mas o item continua na fila
