@@ -143,17 +143,36 @@ module.exports = async (req, res) => {
       const t = new Date(p.pagoEm).getTime();
       return t >= iniMs && t < fimMs;
     });
-    const gasto = noCiclo.reduce((s, p) =>
-      s + Number(p.valor || p.preco || p.custo || 0), 0);
+    // 💰 o valor gravado é o da COMPRA INTEIRA, repetido em cada peça do grupo.
+    // Somar peça a peça multiplicava o total pelo número de itens: cinco peças
+    // de uma compra de R$ 313,60 viravam R$ 1.568.
+    const somar = (lista) => {
+      const gruposVistos = new Set();
+      let total = 0;
+      for (const p of lista) {
+        const v = Number(p.valor || p.preco || p.custo || 0);
+        if (!v) continue;
+        if (p.grupoId) {
+          if (gruposVistos.has(p.grupoId)) continue;   // já contei esta compra
+          gruposVistos.add(p.grupoId);
+        }
+        total += v;
+      }
+      return total;
+    };
+    const gasto = somar(noCiclo);
     const aguardando = pecas.filter(p => p.status === 'aguardando_pagamento');
-    const aguardandoValor = aguardando.reduce((s, p) =>
-      s + Number(p.valor || p.preco || p.custo || 0), 0);
+    const aguardandoValor = somar(aguardando);
 
     // por dia, para ver onde o dinheiro saiu
     const porDia = {};
+    const gruposDia = new Set();
     for (const p of noCiclo) {
+      const v = Number(p.valor || p.preco || p.custo || 0);
+      if (!v) continue;
+      if (p.grupoId) { if (gruposDia.has(p.grupoId)) continue; gruposDia.add(p.grupoId); }
       const d = new Date(new Date(p.pagoEm).getTime() - 3 * 3600000).toISOString().slice(0, 10);
-      porDia[d] = (porDia[d] || 0) + Number(p.valor || p.preco || p.custo || 0);
+      porDia[d] = (porDia[d] || 0) + v;
     }
     const hh = d => new Date(d).toISOString().slice(0, 16).replace('T', ' ');
     return res.status(200).json({ ok: true,
@@ -168,12 +187,33 @@ module.exports = async (req, res) => {
         estouraria: (gasto + aguardandoValor) > TETO },
       POR_DIA: Object.entries(porDia).sort()
         .map(([d, v]) => d + ' · R$ ' + v.toFixed(2)),
-      MAIORES: noCiclo
-        .sort((a, b) => Number(b.valor || b.preco || 0) - Number(a.valor || a.preco || 0))
-        .slice(0, 12)
-        .map(p => 'R$ ' + Number(p.valor || p.preco || p.custo || 0).toFixed(2).padStart(9) +
-          ' | ' + String(p.nome || p.descricao || '?').slice(0, 32) +
-          ' | ' + hh(p.pagoEm)) });
+      // 📋 tudo que foi comprado, item a item. Quando vários itens vieram na
+      // mesma compra, o valor aparece só na primeira linha do grupo, para que
+      // a soma visual bata com o total.
+      ITENS: (() => {
+        const vistos = new Set();
+        return noCiclo
+          .sort((a, b) => String(a.pagoEm).localeCompare(String(b.pagoEm)))
+          .map(p => {
+            const v = Number(p.valor || p.preco || p.custo || 0);
+            const primeiroDoGrupo = !p.grupoId || !vistos.has(p.grupoId);
+            if (p.grupoId) vistos.add(p.grupoId);
+            const rotulo = p.grupoId
+              ? (primeiroDoGrupo ? 'R$ ' + v.toFixed(2).padStart(9) : '   (mesma compra)')
+              : 'R$ ' + v.toFixed(2).padStart(9);
+            return rotulo +
+              ' | ' + String(p.descricao || p.nome || '?').slice(0, 34).padEnd(34) +
+              (p.os ? ' | OS ' + String(p.os).slice(0, 10) : '') +
+              (p.quantidade > 1 ? ' | ' + p.quantidade + 'un' : '') +
+              (p.fornecedor ? ' | ' + String(p.fornecedor).slice(0, 16) : '') +
+              ' | ' + hh(p.pagoEm).slice(0, 10);
+          });
+      })(),
+      AGUARDANDO_ITENS: aguardando.map(p =>
+        'R$ ' + Number(p.valor || p.preco || 0).toFixed(2).padStart(9) +
+        (p.grupoId ? ' (compra com outros itens)' : '') +
+        ' | ' + String(p.descricao || p.nome || '?').slice(0, 34) +
+        (p.fornecedor ? ' | ' + String(p.fornecedor).slice(0, 16) : '')) });
   }
 
   // ── POST confirmar-pagamento ───────────────────────────────────
@@ -183,6 +223,7 @@ module.exports = async (req, res) => {
     const agoraPg = new Date().toISOString();
     let somaPg = 0;
     const pagas = [];
+    const gruposSomados = new Set();
     for (const id of ids) {
       const p = db.pecas.find(x => x.id === id);
       if (!p) continue;
@@ -192,7 +233,11 @@ module.exports = async (req, res) => {
       p.status = "pago";
       p.pagoEm = agoraPg;
       const v = Number(p.valor || p.preco || p.custo || 0);
-      somaPg += v;
+      // o valor é o da compra inteira: só conta uma vez por grupo
+      if (!p.grupoId || !gruposSomados.has(p.grupoId)) {
+        somaPg += v;
+        if (p.grupoId) gruposSomados.add(p.grupoId);
+      }
       pagas.push({ nome: p.nome || p.descricao || '?', valor: v });
     }
     await dbSet(KEY, db);
