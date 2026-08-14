@@ -548,7 +548,15 @@ export default async function handler(req, res) {
     const feitos = [], erros = [];
     const controle3 = (await dbGet('wa_recuperacao_7d')) || { clientes: {} };
     const hoje3 = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    // ⏱️ a função tem tempo limitado: envia em lotes e para antes de estourar,
+    // informando quantos faltam. Como o registro é gravado a cada envio, a
+    // chamada seguinte continua de onde parou, sem repetir ninguém.
+    const LIMITE_MS = 45000;
+    const t0Lote = Date.now();
+    const porLote = Math.min(fila.length, Math.max(1, parseInt(req.query.lote || '15', 10)));
+    let enviadosNesteLote = 0;
     for (const a of fila) {
+      if (enviadosNesteLote >= porLote || (Date.now() - t0Lote) > LIMITE_MS) break;
       // 🔁 relê o card imediatamente antes de enviar: ele pode ter sido movido
       // ou aprovado enquanto a lista era percorrida
       try {
@@ -582,14 +590,21 @@ export default async function handler(req, res) {
             tipo: 'template', via: 'orcamento-pendente', msgId: r.messages[0].id }); } catch (e) {}
           feitos.push(a.sis + ' | ' + a.nome.slice(0, 20) + ' ' + a.d.slice(-4) +
             ' | R$ ' + a.valor.toFixed(2));
+          enviadosNesteLote++;
         } else {
           erros.push(a.nome + ': ' + ((r && r.error && r.error.message) || 'falha no envio'));
         }
       } catch (e) { erros.push(a.nome + ': ' + e.message); }
-      await new Promise(s => setTimeout(s, 900));
+      await new Promise(s => setTimeout(s, 350));
     }
+    const restantes = fila.length - feitos.length - erros.length;
     return res.status(200).json({ ok: erros.length === 0,
-      enviados: feitos.length, L: feitos, erros });
+      enviados: feitos.length,
+      faltam: Math.max(0, restantes),
+      proximoPasso: restantes > 0
+        ? 'rode o mesmo endereço de novo para continuar — quem já recebeu não repete'
+        : 'todos avisados',
+      L: feitos, erros });
   }
 
   // ── 🔍 POR-QUE-SEM-FASE: explica cada card sem fase e sem disparo ──
