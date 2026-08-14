@@ -417,6 +417,93 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 🔍 POR-QUE-SEM-FASE: explica cada card sem fase e sem disparo ──
+  if (action === 'por-que-sem-fase') {
+    const d8s = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const MARCAS_S = [
+      { n: 5, re: /interesse em nos vender|comprar (o )?seu equipamento|vender o seu/i },
+      { n: 4, re: /na troca|seminovo|trade|equipamento na troca/i },
+      { n: 3, re: /aqui na loja|trazendo (o|seu)|retirar o frete|balc[ãa]o/i },
+      { n: 2, re: /no pix|pelo pix|sendo no pix/i },
+      { n: 1, re: /or[çc]amento|ficou pronto|valor do conserto/i },
+    ];
+    const [ppA, ppT, ctrl] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const clientes7 = ((ctrl || {}).clientes) || {};
+    let evts = [];
+    try {
+      const r = await fetch(`${U}/lrange/${EVT_LIST}/-8000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) { try { evts.push(JSON.parse(s)); } catch (e) {} }
+    } catch (e) {}
+    const porTel = {};
+    for (const e of evts) {
+      const d = d8s(e.tel); if (!d) continue;
+      (porTel[d] = porTel[d] || []).push(e);
+    }
+    const grupos = { nuncaFalamos: [], falamosSemOrcamento: [], textoNaoReconhecido: [],
+      comFase: [], foraDaJanelaDeEventos: [] };
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        if (fase !== 'aguardando_aprovacao' && fase !== 'ultima_chamada') continue;
+        const d = d8s(c.telefone);
+        const meus = (porTel[d] || []);
+        const nossas = meus.filter(e => e.dir === 'out');
+        let nf = 0;
+        for (const mk of MARCAS_S) {
+          if (nossas.some(e => mk.re.test(String(e.texto || '')))) { nf = mk.n; break; }
+        }
+        const rec = clientes7[d] || {};
+        const base = sis + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 20) +
+          ' ' + d.slice(-4) + ' | R$ ' + Number(c.valor || 0).toFixed(2) +
+          ' | criado ' + hh(c.criadoEm) +
+          ' | ' + nossas.length + ' msg(s) nossas · ' +
+          meus.filter(e => e.dir === 'in').length + ' dele' +
+          ' | disparos: ' + (rec.tentativas || 0);
+        if (nf > 0) { grupos.comFase.push(base + ' | F' + nf); continue; }
+        if (!meus.length) {
+          // nunca apareceu no registro de eventos
+          const idade = c.criadoEm
+            ? Math.floor((Date.now() - new Date(c.criadoEm).getTime()) / 86400000) : null;
+          if (idade != null && idade > 20) grupos.foraDaJanelaDeEventos.push(base + ' | ' + idade + ' dias');
+          else grupos.nuncaFalamos.push(base);
+          continue;
+        }
+        if (!nossas.length) { grupos.nuncaFalamos.push(base + ' | só mensagens dele'); continue; }
+        // falamos, mas nenhuma mensagem bate com as marcas de fase
+        const ultima = nossas[nossas.length - 1];
+        const amostra = String(ultima.texto || '').replace(/\s+/g, ' ').slice(0, 70);
+        const pareceOrcamento = /R\$|valor|pre[çc]o|fica|sai por/i.test(String(ultima.texto || ''));
+        if (pareceOrcamento) grupos.textoNaoReconhecido.push(base + ' | "' + amostra + '"');
+        else grupos.falamosSemOrcamento.push(base + ' | última: "' + amostra + '"');
+      }
+    }
+    const semFase = grupos.nuncaFalamos.length + grupos.falamosSemOrcamento.length +
+      grupos.textoNaoReconhecido.length + grupos.foraDaJanelaDeEventos.length;
+    return res.status(200).json({ ok: true,
+      RESUMO: {
+        comFaseIdentificada: grupos.comFase.length,
+        semFase, 
+        'nunca-falamos-com-o-cliente': grupos.nuncaFalamos.length,
+        'falamos-mas-sem-orcamento': grupos.falamosSemOrcamento.length,
+        'texto-parece-orcamento-mas-nao-foi-reconhecido': grupos.textoNaoReconhecido.length,
+        'antigos-fora-do-registro-de-conversas': grupos.foraDaJanelaDeEventos.length,
+      },
+      EXPLICACAO: {
+        semFase: 'a fase vem do TEXTO que enviamos: sem mensagem nossa reconhecível, não há fase',
+        zeroDisparos: 'o contador de disparos vem da sequência de recuperação de 7 dias, ' +
+          'que só inclui quem foi inscrito nela — quem está negociando normalmente marca zero',
+      },
+      NUNCA_FALAMOS: grupos.nuncaFalamos.slice(0, 40),
+      FALAMOS_SEM_ORCAMENTO: grupos.falamosSemOrcamento.slice(0, 40),
+      TEXTO_NAO_RECONHECIDO: grupos.textoNaoReconhecido.slice(0, 40),
+      ANTIGOS_SEM_REGISTRO: grupos.foraDaJanelaDeEventos.slice(0, 40) });
+  }
+
   // ── 📊 PAINEL-NEGOCIACAO: quem está em cada fase e quem recebeu disparo ──
   // Responde a pergunta operacional: de todos que estão negociando, quantos o
   // bot alcançou hoje, em que disparo cada um está, e quem ficou sem contato.
