@@ -417,6 +417,169 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 📊 PAINEL-NEGOCIACAO: quem está em cada fase e quem recebeu disparo ──
+  // Responde a pergunta operacional: de todos que estão negociando, quantos o
+  // bot alcançou hoje, em que disparo cada um está, e quem ficou sem contato.
+  if (action === 'painel-negociacao') {
+    const d8n = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const MARCAS_N = [
+      { n: 5, re: /interesse em nos vender|comprar (o )?seu equipamento|vender o seu/i },
+      { n: 4, re: /na troca|seminovo|trade|equipamento na troca/i },
+      { n: 3, re: /aqui na loja|trazendo (o|seu)|retirar o frete|balc[ãa]o/i },
+      { n: 2, re: /no pix|pelo pix|sendo no pix/i },
+      { n: 1, re: /or[çc]amento|ficou pronto|valor do conserto/i },
+    ];
+    const [ppA, ppT, ctrl] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const clientes7 = ((ctrl || {}).clientes) || {};
+    let evts = [];
+    try {
+      const r = await fetch(`${U}/lrange/${EVT_LIST}/-8000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) { try { evts.push(JSON.parse(s)); } catch (e) {} }
+    } catch (e) {}
+    const porTel = {};
+    for (const e of evts) {
+      const d = d8n(e.tel); if (!d) continue;
+      (porTel[d] = porTel[d] || []).push(e);
+    }
+
+    const linhas = [];
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        if (fase !== 'aguardando_aprovacao' && fase !== 'ultima_chamada') continue;
+        const d = d8n(c.telefone);
+        const meus = (porTel[d] || []).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+        const nossas = meus.filter(e => e.dir === 'out');
+        const delas = meus.filter(e => e.dir === 'in');
+        const hojeEnviadas = nossas.filter(e => String(e.ts || '').slice(0, 10) === hoje);
+        const rec = clientes7[d] || {};
+        let nf = 0;
+        for (const mk of MARCAS_N) {
+          if (nossas.some(e => mk.re.test(String(e.texto || '')))) { nf = mk.n; break; }
+        }
+        const ultimaNossa = nossas.length ? nossas[nossas.length - 1] : null;
+        const ultimaDele = delas.length ? delas[delas.length - 1] : null;
+        const diasSemContato = ultimaNossa
+          ? Math.floor((Date.now() - new Date(ultimaNossa.ts).getTime()) / 86400000) : null;
+        linhas.push({ sis, id: c.id, nome: c.nomeContato || c.nome || '?', tel: d,
+          fase, faseVenda: nf, valor: Number(c.valor || 0),
+          disparos: Number(rec.tentativas || 0),
+          recebeuHoje: hojeEnviadas.length,
+          tipoHoje: hojeEnviadas.map(e => e.tipo || 'texto').join(','),
+          ultimoNosso: ultimaNossa ? ultimaNossa.ts : null,
+          ultimoDele: ultimaDele ? ultimaDele.ts : null,
+          diasSemContato, respostas: delas.length, semBot: nossas.length === 0,
+          encerrado: !!rec.encerrado });
+      }
+    }
+
+    const porFase = {};
+    for (let i = 0; i <= 5; i++) porFase['F' + i] = linhas.filter(l => l.faseVenda === i).length;
+    const semBot = linhas.filter(l => l.semBot);
+    const esgotados = linhas.filter(l => l.disparos >= 7 || l.encerrado);
+    const receberamHoje = linhas.filter(l => l.recebeuHoje > 0);
+    const semContatoHa3 = linhas.filter(l => l.diasSemContato != null && l.diasSemContato >= 3 &&
+      !l.semBot && l.disparos < 7);
+    const valorEmJogo = linhas.reduce((s, l) => s + l.valor, 0);
+
+    return res.status(200).json({ ok: true,
+      RESUMO: {
+        emNegociacao: linhas.length,
+        adm: linhas.filter(l => l.sis === 'ADM').length,
+        tv: linhas.filter(l => l.sis === 'TV').length,
+        valorEmJogo: +valorEmJogo.toFixed(2),
+        receberamMensagemHoje: receberamHoje.length,
+        naoRecebemHa3DiasOuMais: semContatoHa3.length,
+        semNenhumContatoDoBot: semBot.length,
+        sequenciaEsgotada: esgotados.length,
+      },
+      POR_FASE_DE_VENDA: {
+        'F1 orçamento': porFase.F1, 'F2 desconto Pix': porFase.F2,
+        'F3 retirar na loja': porFase.F3, 'F4 troca': porFase.F4,
+        'F5 compra do equipamento': porFase.F5,
+        'sem fase identificada': porFase.F0,
+      },
+      POR_DISPARO: linhas.reduce((o, l) => {
+        const k = l.disparos + 'º disparo'; o[k] = (o[k] || 0) + 1; return o; }, {}),
+      RECEBERAM_HOJE: receberamHoje.map(l => l.sis + ' | ' + l.nome.slice(0, 20).padEnd(20) +
+        ' ' + l.tel.slice(-4) + ' | F' + l.faseVenda + ' · ' + l.disparos + 'D' +
+        ' | ' + l.recebeuHoje + ' msg(s) [' + l.tipoHoje + ']' +
+        ' | R$ ' + l.valor.toFixed(2)),
+      SEM_CONTATO_HA_3_DIAS: semContatoHa3.map(l => l.sis + ' | ' + l.nome.slice(0, 20) +
+        ' ' + l.tel.slice(-4) + ' | F' + l.faseVenda + ' · ' + l.disparos + 'D' +
+        ' | último contato há ' + l.diasSemContato + ' dia(s) em ' + hh(l.ultimoNosso) +
+        ' | R$ ' + l.valor.toFixed(2)),
+      SEM_NENHUM_CONTATO: semBot.map(l => l.sis + ' | ' + l.nome.slice(0, 20) +
+        ' ' + l.tel.slice(-4) + ' | R$ ' + l.valor.toFixed(2) + ' — precisa de atendimento humano'),
+      SEQUENCIA_ESGOTADA: esgotados.map(l => l.sis + ' | ' + l.nome.slice(0, 20) +
+        ' ' + l.tel.slice(-4) + ' | F' + l.faseVenda + ' · ' + l.disparos + 'D' +
+        ' | ' + l.respostas + ' resposta(s) | R$ ' + l.valor.toFixed(2)),
+      TODOS: linhas.sort((a, b) => (b.valor || 0) - (a.valor || 0))
+        .map(l => l.sis + ' | ' + l.nome.slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
+          ' | F' + l.faseVenda + ' · ' + l.disparos + 'D' +
+          ' | R$ ' + String(l.valor.toFixed(2)).padStart(8) +
+          ' | ' + (l.recebeuHoje ? '✅ hoje' : (l.diasSemContato != null
+            ? '⏳ há ' + l.diasSemContato + 'd' : '— sem contato')) +
+          ' | ' + l.respostas + ' resposta(s)') });
+  }
+
+  // ── 💰 CONSUMO: quanto a inteligência custou, por dia e por origem ──
+  if (action === 'consumo-ia') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    // preços por milhão de tokens (Sonnet)
+    const P_ENT = 3, P_SAI = 15, P_CACHE_W = 3.75, P_CACHE_R = 0.30;
+    const linhas = [], totais = { chamadas: 0, entrada: 0, saida: 0, cw: 0, cr: 0, usd: 0 };
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const reg = await dbGet('ia_uso_' + d);
+      if (!reg) continue;
+      const usd = ((reg.entrada || 0) * P_ENT + (reg.saida || 0) * P_SAI +
+        (reg.cacheCriado || 0) * P_CACHE_W + (reg.cacheLido || 0) * P_CACHE_R) / 1e6;
+      totais.chamadas += reg.chamadas || 0;
+      totais.entrada += reg.entrada || 0; totais.saida += reg.saida || 0;
+      totais.cw += reg.cacheCriado || 0; totais.cr += reg.cacheLido || 0;
+      totais.usd += usd;
+      const porChamada = reg.chamadas ? Math.round(
+        ((reg.entrada || 0) + (reg.cacheCriado || 0) + (reg.cacheLido || 0)) / reg.chamadas) : 0;
+      linhas.push({ dia: d, ...reg, usd: +usd.toFixed(2), porChamada,
+        segMedio: reg.chamadas ? +((reg.ms || 0) / reg.chamadas / 1000).toFixed(1) : 0 });
+    }
+    const aproveitamento = (totais.cr + totais.cw)
+      ? Math.round(totais.cr / (totais.cr + totais.cw) * 100) : 0;
+    return res.status(200).json({ ok: true,
+      periodo: dias + ' dia(s)',
+      TOTAIS: { chamadas: totais.chamadas,
+        tokensEntrada: totais.entrada, tokensSaida: totais.saida,
+        cacheGravado: totais.cw, cacheAproveitado: totais.cr,
+        custoUSD: +totais.usd.toFixed(2),
+        custoBRL: +(totais.usd * 5.4).toFixed(2),
+        mediaTokensPorMensagem: totais.chamadas
+          ? Math.round((totais.entrada + totais.cw + totais.cr) / totais.chamadas) : 0,
+        aproveitamentoDoCache: aproveitamento + '%' },
+      LEITURA: aproveitamento < 60
+        ? '⚠️ o cache está sendo pouco aproveitado: boa parte das mensagens paga o roteiro inteiro de novo'
+        : '✅ o cache está sendo bem aproveitado',
+      POR_DIA: linhas.map(l => l.dia + ' | ' + String(l.chamadas).padStart(4) + ' chamada(s)' +
+        ' | ' + String(l.porChamada).padStart(6) + ' tokens/msg' +
+        ' | entrada ' + String(l.entrada).padStart(7) +
+        ' | saída ' + String(l.saida).padStart(6) +
+        ' | cache ' + String(l.cacheLido || 0).padStart(8) + ' lido / ' +
+        String(l.cacheCriado || 0).padStart(7) + ' gravado' +
+        ' | US$ ' + l.usd.toFixed(2) +
+        ' | ' + l.segMedio + 's por resposta'),
+      POR_ORIGEM: linhas.length && linhas[0].porOrigem
+        ? Object.entries(linhas[0].porOrigem).map(([k, v]) =>
+            k + ': ' + v.n + ' chamada(s), ' + (v.ent + v.cw + v.cr) + ' tokens')
+        : [],
+      observacao: 'valores estimados pelos preços de tabela; o faturamento real pode variar' });
+  }
+
   // ── ➡️ MOVER-AVISADOS: leva para Aguardando Retirada quem já foi avisado ──
   if (action === 'condenados-mover-avisados') {
     const bd = (await dbGet('tv_board')) || { cards: [] };
