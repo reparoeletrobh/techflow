@@ -876,6 +876,34 @@ function check(nome, cond, extra) {
   // Ele foi substituído por engano ao acrescentar os blocos por origem, e com
   // isso sumiu o histórico da semana e as OSs de cada técnico, que é a leitura
   // usada no dia a dia.
+  // ── 🧾 o JavaScript de toda tela precisa ser válido ──
+  // Uma tela com erro de sintaxe não carrega NADA: nenhum botão funciona.
+  // O harness validava só os arquivos da API, e um 'async async' chegou a subir.
+  console.log('▶ Cenário JS — telas sem erro de sintaxe');
+  {
+    const fsJ = require('fs');
+    const { execFileSync } = require('child_process');
+    const quebradas = [];
+    for (const arq of fsJ.readdirSync('.').filter(f => f.endsWith('.html'))) {
+      const c = fsJ.readFileSync(arq, 'utf8');
+      const blocos = c.match(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g) || [];
+      for (const b of blocos) {
+        const js = b.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
+        if (!js.trim()) continue;
+        try {
+          fsJ.writeFileSync('/tmp/_chk.js', js);
+          execFileSync('node', ['--check', '/tmp/_chk.js'], { stdio: 'pipe' });
+        } catch (e) {
+          const m = String(e.stderr || '').split('\n').filter(l => l.trim())[1] || '';
+          quebradas.push(arq + ': ' + m.slice(0, 60));
+          break;
+        }
+      }
+    }
+    check('nenhuma tela com JavaScript inválido',
+      quebradas.length === 0, quebradas.slice(0, 5).join(' | '));
+  }
+
   console.log('▶ Cenário PQ — qualidade mantém meta semanal e painéis novos');
   {
     const fsQ = require('fs');

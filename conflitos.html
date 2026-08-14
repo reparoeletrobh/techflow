@@ -794,7 +794,7 @@ function desvincularFicha(){
   document.getElementById('f-ficha').value='';
   var v=document.getElementById('f-vinculo'); if(v)v.style.display='none';
 }
-async async function relatarCliente(id){
+async function relatarCliente(id){
   var c=(_dados||[]).find(function(x){return x.id===id;});
   if(!c)return;
   // ✍️ o texto vai ser escrito pela IA a partir do caso: o que a equipe
