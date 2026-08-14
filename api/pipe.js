@@ -163,6 +163,32 @@ export default async function handler(req, res) {
     var arqC = null;
     try { arqC = await dbGet('reparoeletro_arquivo'); } catch (e) {}
     var todos = (dbC.cards || []).concat((((arqC || {}).cards) || []));
+    // 💳 o pagamento não fica no card: vive no financeiro. Procurar só nos
+    // campos do card marcava como não pago quem tinha recebimento registrado.
+    var pagosFin = {};
+    try {
+      var fin = await dbGet('reparoeletro_financeiro');
+      var regs = ((fin || {}).registros) || ((fin || {}).fichas) || [];
+      for (var f1 = 0; f1 < regs.length; f1++) {
+        var rf = regs[f1];
+        var tf = String(rf.telefone || '').replace(/\D/g, '').slice(-8);
+        var pagoF = !!(rf.pagoEm || rf.temComprovante ||
+          String(rf.status || '') === 'pago' ||
+          String(rf.phaseId || '') === 'pago' ||
+          String(rf.phaseId || '') === 'conciliado');
+        if (tf && pagoF) pagosFin[tf] = rf.pagoEm || rf.status || 'pago';
+      }
+    } catch (e) {}
+    // o balcão também quita na hora
+    var pagosBalcao = {};
+    try {
+      var bal = await dbGet('reparoeletro_balcao');
+      var itens = Array.isArray(bal) ? bal : ((bal || {}).itens || []);
+      for (var b1 = 0; b1 < itens.length; b1++) {
+        var tb = String(itens[b1].telefone || '').replace(/\D/g, '').slice(-8);
+        if (tb) pagosBalcao[tb] = true;
+      }
+    } catch (e) {}
     var hhC = function (d) { return d ? new Date(new Date(d).getTime() - 3*3600000)
       .toISOString().slice(5,16).replace('T',' ') : '—'; };
     var saidas = [];
@@ -180,8 +206,12 @@ export default async function handler(req, res) {
       var t = saiuEm ? new Date(saiuEm).getTime() : 0;
       if (!(t >= iniC && t <= fimC)) continue;
       var valor = Number(c.valor || 0);
+      var telC = String(c.telefone || '').replace(/\D/g, '').slice(-8);
       var pago = !!(c.pagoEm || c.pagamentoConfirmado === true || c.temComprovante === true ||
-        (c.formaPagamento && String(c.formaPagamento).trim()));
+        (c.formaPagamento && String(c.formaPagamento).trim()) ||
+        pagosFin[telC] || pagosBalcao[telC]);
+      var ondePago = c.pagoEm ? 'no card' : pagosFin[telC] ? 'no financeiro'
+        : pagosBalcao[telC] ? 'no balcão' : null;
       var alerta = null;
       if (faseAtual === 'erp' && valor > 0 && !pago) {
         alerta = 'foi para ERP com R$ ' + valor.toFixed(2) + ' e sem pagamento registrado';
@@ -189,6 +219,9 @@ export default async function handler(req, res) {
         alerta = 'está em Receber mas consta pagamento — pode já estar quitado';
       } else if (faseAtual === 'receber' && valor <= 0) {
         alerta = 'está em Receber sem valor definido';
+      } else if (faseAtual === 'finalizado' && valor > 0 && !pago) {
+        alerta = 'encerrado como finalizado com R$ ' + valor.toFixed(2) +
+          ' em aberto — confira se era para receber ou se o serviço não saiu';
       } else if (faseAtual === 'garantia') {
         alerta = 'foi para Garantia — confira se o serviço retornou mesmo';
       } else if (faseAtual === 'aguardando_aprovacao' || faseAtual === 'ultima_chamada' ||
@@ -198,7 +231,8 @@ export default async function handler(req, res) {
       saidas.push({ id: c.id, nome: c.nomeContato || c.nome || '?',
         tel: String(c.telefone || '').slice(-4),
         equipamento: String(c.equipamento || c.descricao || '').slice(0, 26),
-        valor: valor, pago: pago, para: faseAtual, saiuEm: saiuEm, alerta: alerta });
+        valor: valor, pago: pago, ondePago: ondePago,
+        para: faseAtual, saiuEm: saiuEm, alerta: alerta });
     }
     var comAlerta = [];
     var porDestino = {};
@@ -222,7 +256,8 @@ export default async function handler(req, res) {
           return String(b.saiuEm).localeCompare(String(a.saiuEm)); })
         .map(function (x) { return hhC(x.saiuEm) + ' | ' +
           String(x.nome).slice(0,20) + ' ' + x.tel +
-          ' | R$ ' + x.valor.toFixed(2) + ' | → ' + x.para + (x.pago ? ' | pago' : ''); }) });
+          ' | R$ ' + x.valor.toFixed(2) + ' | → ' + x.para +
+          (x.pago ? ' | pago ' + (x.ondePago || '') : ''); }) });
   }
 
   if (action === 'reset-pipe') {
