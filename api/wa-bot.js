@@ -467,9 +467,12 @@ export default async function handler(req, res) {
     for (const e of evts2) {
       const t = d8d(e.tel); if (!t) continue;
       const q = new Date(e.ts || 0).getTime();
-      if (!conversaViva[t] || q > conversaViva[t].ts) conversaViva[t] = { ts: q };
-      conversaViva[t].total = (conversaViva[t].total || 0) + 1;
-      if (e.dir === 'in') conversaViva[t].dele = (conversaViva[t].dele || 0) + 1;
+      // acumula sem recriar o registro: recriá-lo apagava a contagem de
+      // respostas do cliente sempre que a última mensagem era nossa
+      const cvv = conversaViva[t] || (conversaViva[t] = { ts: 0, total: 0, dele: 0, ultimaDele: 0 });
+      if (q > cvv.ts) cvv.ts = q;
+      cvv.total++;
+      if (e.dir === 'in') { cvv.dele++; if (q > cvv.ultimaDele) cvv.ultimaDele = q; }
     }
     // conflitos já abertos na prospecção
     try {
@@ -484,14 +487,16 @@ export default async function handler(req, res) {
     const porCliente = {}, comConversa = [], comConflito = [];
     for (const a of alvo) {
       const cv = conversaViva[a.d];
-      const recente = cv && (Date.now() - cv.ts) < DIAS_CONVERSA * 86400000 && (cv.dele || 0) > 0;
+      // o que importa é quando o CLIENTE falou pela última vez
+      const recente = cv && (cv.dele || 0) > 0 &&
+        (Date.now() - (cv.ultimaDele || 0)) < DIAS_CONVERSA * 86400000;
       if (conflitoAberto[a.d]) {
         comConflito.push({ ...a, status: conflitoAberto[a.d] });
         continue;
       }
       if (recente) {
         comConversa.push({ ...a, msgs: cv.dele + ' resposta(s)',
-          ultima: new Date(cv.ts).toISOString() });
+          ultima: new Date(cv.ultimaDele).toISOString() });
         continue;
       }
       if (!porCliente[a.d] || a.valor > porCliente[a.d].valor) porCliente[a.d] = a;
