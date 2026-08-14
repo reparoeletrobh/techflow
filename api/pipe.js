@@ -151,6 +151,80 @@ export default async function handler(req, res) {
 
 
   // ── POST reset-pipe: limpa todos os dados do pipe (dados corrompidos) ──────
+  // ── 🔍 conferir-saidas: o que saiu de Entrega Solicitada e para onde ──
+  // Da entrega o card segue para Receber quando há valor a cobrar, ou para ERP
+  // quando já está pago. Trocar um pelo outro esconde dinheiro a receber ou
+  // cobra quem já pagou — e nenhum dos dois casos aparece sozinho depois.
+  if (action === 'conferir-saidas') {
+    var diaC = String(req.query.dia || new Date(Date.now() - 3*3600000).toISOString().slice(0,10));
+    var iniC = new Date(diaC + 'T00:00:00-03:00').getTime();
+    var fimC = iniC + 86400000 - 1;
+    var dbC = (await dbGet(PIPE_KEY)) || { cards: [] };
+    var arqC = null;
+    try { arqC = await dbGet('reparoeletro_arquivo'); } catch (e) {}
+    var todos = (dbC.cards || []).concat((((arqC || {}).cards) || []));
+    var hhC = function (d) { return d ? new Date(new Date(d).getTime() - 3*3600000)
+      .toISOString().slice(5,16).replace('T',' ') : '—'; };
+    var saidas = [];
+    for (var i = 0; i < todos.length; i++) {
+      var c = todos[i];
+      var hist = c.history || [];
+      var esteve = false;
+      for (var j = 0; j < hist.length; j++) {
+        if (String(hist[j].phase || hist[j].phaseId || '') === 'entrega_solicitada') esteve = true;
+      }
+      var faseAtual = String(c.phaseId || c.phase || '');
+      if (faseAtual === 'entrega_solicitada') continue;
+      if (!esteve) continue;
+      var saiuEm = c.movedAt || null;
+      var t = saiuEm ? new Date(saiuEm).getTime() : 0;
+      if (!(t >= iniC && t <= fimC)) continue;
+      var valor = Number(c.valor || 0);
+      var pago = !!(c.pagoEm || c.pagamentoConfirmado === true || c.temComprovante === true ||
+        (c.formaPagamento && String(c.formaPagamento).trim()));
+      var alerta = null;
+      if (faseAtual === 'erp' && valor > 0 && !pago) {
+        alerta = 'foi para ERP com R$ ' + valor.toFixed(2) + ' e sem pagamento registrado';
+      } else if (faseAtual === 'receber' && pago) {
+        alerta = 'está em Receber mas consta pagamento — pode já estar quitado';
+      } else if (faseAtual === 'receber' && valor <= 0) {
+        alerta = 'está em Receber sem valor definido';
+      } else if (faseAtual === 'garantia') {
+        alerta = 'foi para Garantia — confira se o serviço retornou mesmo';
+      } else if (faseAtual === 'aguardando_aprovacao' || faseAtual === 'ultima_chamada' ||
+                 faseAtual === 'aprovados') {
+        alerta = 'voltou para ' + faseAtual + ' depois da entrega — movimento incomum';
+      }
+      saidas.push({ id: c.id, nome: c.nomeContato || c.nome || '?',
+        tel: String(c.telefone || '').slice(-4),
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 26),
+        valor: valor, pago: pago, para: faseAtual, saiuEm: saiuEm, alerta: alerta });
+    }
+    var comAlerta = [];
+    var porDestino = {};
+    for (var k = 0; k < saidas.length; k++) {
+      if (saidas[k].alerta) comAlerta.push(saidas[k]);
+      porDestino[saidas[k].para] = (porDestino[saidas[k].para] || 0) + 1;
+    }
+    var somaSe = function (f) { var s = 0;
+      for (var n = 0; n < saidas.length; n++) if (f(saidas[n])) s += saidas[n].valor;
+      return +s.toFixed(2); };
+    return res.status(200).json({ ok: comAlerta.length === 0,
+      dia: diaC, saidas: saidas.length,
+      PARA_ONDE: porDestino,
+      valorEmReceber: somaSe(function (x) { return x.para === 'receber'; }),
+      valorFoiParaErpSemPagamento: somaSe(function (x) {
+        return x.para === 'erp' && x.valor > 0 && !x.pago; }),
+      CONFERIR: comAlerta.map(function (x) { return hhC(x.saiuEm) + ' | ' +
+        String(x.nome).slice(0,20) + ' ' + x.tel + ' | ' + x.equipamento +
+        ' | R$ ' + x.valor.toFixed(2) + ' | → ' + x.para + ' | ⚠️ ' + x.alerta; }),
+      TODAS: saidas.sort(function (a, b) {
+          return String(b.saiuEm).localeCompare(String(a.saiuEm)); })
+        .map(function (x) { return hhC(x.saiuEm) + ' | ' +
+          String(x.nome).slice(0,20) + ' ' + x.tel +
+          ' | R$ ' + x.valor.toFixed(2) + ' | → ' + x.para + (x.pago ? ' | pago' : ''); }) });
+  }
+
   if (action === 'reset-pipe') {
     const fresh = { cards: [], syncedPipefyIds: [], lastSync: null };
     await safeWritePipe( fresh);
