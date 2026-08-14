@@ -44,6 +44,124 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || '';
+
+  // ── 📈 REGISTRAR-RITMO: fotografia diária de entrada e vazão ──
+  // Roda algumas vezes por dia e guarda o que entrou, o que saiu e quanto tempo
+  // cada serviço levou. Sem uma semana de medição, qualquer previsão de prazo
+  // seria chute — este log é o que vai permitir calcular com base em fato.
+  if (action === 'registrar-ritmo') {
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const agora = new Date().toISOString();
+    const q = (await dbGet('reparoeletro_qualidade')) || { inspecoes: [] };
+    const insp = q.inspecoes || [];
+    const bd = (await dbGet('reparoeletro_board')) || { cards: [] };
+    const cards = bd.cards || [];
+
+    const origemDe = i => (/garantia/i.test(String(i.origem || '') + ' ' + String(i.tipo || ''))
+      ? 'garantia' : (i.avulsa === true || String(i.origem || '') === 'avulsa') ? 'avulsa' : 'tecnico');
+    const doDia = (d) => String(d || '').slice(0, 10) === hoje;
+
+    // ── entradas de hoje, por origem ──
+    const entradas = { tecnico: 0, garantia: 0, avulsa: 0 };
+    const saidas = { tecnico: 0, garantia: 0, avulsa: 0 };
+    const tempos = [];
+    for (const i of insp) {
+      const o = origemDe(i);
+      if (doDia(i.criadoEm)) entradas[o]++;
+      const fim = i.aprovadoEm || i.reprovadoEm;
+      if (doDia(fim)) {
+        saidas[o]++;
+        if (i.criadoEm) {
+          const h = (new Date(fim).getTime() - new Date(i.criadoEm).getTime()) / 3600000;
+          if (h >= 0 && h < 24 * 30) tempos.push({ origem: o, horas: +h.toFixed(1),
+            tecnico: i.tecnico || '?' });
+        }
+      }
+    }
+
+    // ── fila do técnico agora, por coluna ──
+    const FASES = ['aprovado', 'producao', 'reforma_cliente', 'reforma_loja',
+      'comprar_peca', 'aguardando_peca', 'peca_disponivel', 'os_atrasada'];
+    const fila = {};
+    for (const f of FASES) fila[f] = 0;
+    let aprovadosHoje = 0;
+    for (const c of cards) {
+      const f = String(c.phaseId || '');
+      if (fila[f] !== undefined) fila[f]++;
+      if (f === 'aprovado' && doDia(c.movedAt || c.criadoEm)) aprovadosHoje++;
+    }
+
+    // ── produção por técnico hoje ──
+    const porTecnico = {};
+    for (const i of insp) {
+      const fim = i.aprovadoEm || i.reprovadoEm;
+      if (!doDia(fim)) continue;
+      const t = String(i.tecnico || '?');
+      porTecnico[t] = porTecnico[t] || { tecnico: 0, garantia: 0, avulsa: 0 };
+      porTecnico[t][origemDe(i)]++;
+    }
+
+    const foto = { em: agora, dia: hoje,
+      entradas, saidas, porTecnico,
+      naFila: { ...fila, total: Object.values(fila).reduce((a, b) => a + b, 0) },
+      aguardandoInspecao: insp.filter(i => i.status === 'aguardando').length,
+      aprovadosHojeNoTecnico: aprovadosHoje,
+      tempoMedioHoras: tempos.length
+        ? +(tempos.reduce((s, t) => s + t.horas, 0) / tempos.length).toFixed(1) : null,
+      amostraTempos: tempos.slice(0, 40) };
+
+    // guarda uma linha por leitura, sem sobrescrever: o histórico é o valor
+    const kR = 'qualidade_ritmo';
+    const log = (await dbGet(kR)) || { fotos: [] };
+    log.fotos = (log.fotos || []).concat([foto]).slice(-400);   // ~2 meses de leituras
+    await dbSet(kR, log);
+    return res.status(200).json({ ok: true, registrado: hoje,
+      leiturasGuardadas: log.fotos.length, foto });
+  }
+
+  // ── 📊 RITMO: o que a medição já mostra ──
+  if (action === 'ritmo') {
+    const log = (await dbGet('qualidade_ritmo')) || { fotos: [] };
+    const fotos = log.fotos || [];
+    if (!fotos.length) return res.status(200).json({ ok: false,
+      error: 'ainda não há medição — a coleta roda automaticamente e leva alguns dias' });
+    // uma linha por dia: a última leitura de cada dia
+    const porDia = {};
+    for (const f of fotos) porDia[f.dia] = f;
+    const dias = Object.keys(porDia).sort();
+    const linhas = dias.map(d => {
+      const f = porDia[d];
+      const ent = Object.values(f.entradas || {}).reduce((a, b) => a + b, 0);
+      const sai = Object.values(f.saidas || {}).reduce((a, b) => a + b, 0);
+      return { dia: d, entrou: ent, saiu: sai, saldo: ent - sai,
+        fila: (f.naFila || {}).total || 0, tempoMedio: f.tempoMedioHoras,
+        tecnico: (f.entradas || {}).tecnico || 0,
+        garantia: (f.entradas || {}).garantia || 0,
+        avulsa: (f.entradas || {}).avulsa || 0 };
+    });
+    const comDados = linhas.filter(l => l.entrou || l.saiu);
+    const mediaEnt = comDados.length
+      ? +(comDados.reduce((s, l) => s + l.entrou, 0) / comDados.length).toFixed(1) : 0;
+    const mediaSai = comDados.length
+      ? +(comDados.reduce((s, l) => s + l.saiu, 0) / comDados.length).toFixed(1) : 0;
+    const filaAtual = linhas.length ? linhas[linhas.length - 1].fila : 0;
+    return res.status(200).json({ ok: true,
+      diasMedidos: comDados.length,
+      maduro: comDados.length >= 5,
+      aviso: comDados.length < 5
+        ? '⏳ medição em andamento: com menos de 5 dias úteis qualquer previsão é frágil'
+        : null,
+      MEDIA_POR_DIA: { entram: mediaEnt, saem: mediaSai, saldo: +(mediaEnt - mediaSai).toFixed(1) },
+      filaAtual,
+      previsaoDias: (mediaSai > mediaEnt && filaAtual)
+        ? +(filaAtual / (mediaSai - mediaEnt)).toFixed(1) : null,
+      POR_DIA: linhas.map(l => l.dia + ' | entrou ' + String(l.entrou).padStart(3) +
+        ' (téc ' + l.tecnico + ' · gar ' + l.garantia + ' · avl ' + l.avulsa + ')' +
+        ' | saiu ' + String(l.saiu).padStart(3) +
+        ' | saldo ' + (l.saldo > 0 ? '+' : '') + l.saldo +
+        ' | fila ' + l.fila +
+        (l.tempoMedio != null ? ' | ' + l.tempoMedio + 'h médias' : '')) });
+  }
   let db = (await dbGet(KEY)) || defaultDB();
   if (!Array.isArray(db.inspecoes)) db.inspecoes = [];
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };

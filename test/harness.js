@@ -868,17 +868,24 @@ function check(nome, cond, extra) {
       semRegistro.length === 0, semRegistro.join(', '));
   }
 
-  console.log('▶ Cenário OD — funções auxiliares definidas antes do uso');
+  console.log('▶ Cenário OD — a rotina não usa variável antes de declarar');
   {
     const fsO = require('fs');
-    const arq = fsO.readFileSync('api/tv-logistica.js', 'utf8');
-    const decl = arq.indexOf('const regiaoLocal =');
-    const usos = [];
-    let p = arq.indexOf('regiaoLocal(');
-    while (p > -1) { if (p !== decl + 6) usos.push(p); p = arq.indexOf('regiaoLocal(', p + 1); }
-    const antes = usos.filter(u => u < decl && u !== arq.indexOf('const regiaoLocal ='));
-    check('regiaoLocal é declarada antes de todo uso', antes.length === 0,
-      'usos antes da declaração: ' + antes.length);
+    // Três vezes uma variável foi usada antes da declaração e derrubou a
+    // requisição inteira em produção. A verificação por texto em todo o código
+    // dava falso positivo demais (mesmo nome em escopos diferentes), então ela
+    // é feita por EXECUÇÃO: a rotina é chamada e não pode lançar erro.
+    const rot = carregarHandler('api/rotina.js');
+    let erro = null;
+    const rR = res();
+    try { await rot(req({ tipo: 'de-hora-em-hora', ...K }), rR); }
+    catch (e) { if (/Cannot access|is not defined/.test(e.message)) erro = e.message; }
+    check('rotina de hora em hora executa sem erro de declaração', !erro, erro || '');
+    const rF = res();
+    let erro2 = null;
+    try { await rot(req({ tipo: 'frequente', ...K }), rF); }
+    catch (e) { if (/Cannot access|is not defined/.test(e.message)) erro2 = e.message; }
+    check('rotina frequente executa sem erro de declaração', !erro2, erro2 || '');
   }
 
   console.log('▶ Cenário AV — regras dos avisos automáticos');

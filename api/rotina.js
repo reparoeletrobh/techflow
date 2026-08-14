@@ -47,6 +47,11 @@ module.exports = async function handler(req, res) {
 
   // ── 🕐 de hora em hora: rede de segurança ──
   else if (action === 'de-hora-em-hora') {
+    // 🕐 hora e dia de Brasília, usados pelas rotinas com horário próprio.
+    // Declarados no início do bloco: usá-los antes derruba a rotina inteira.
+    const agoraBR2 = new Date(Date.now() - 3 * 3600000);
+    const horaBR = agoraBR2.getUTCHours(), diaSem = agoraBR2.getUTCDay();
+
     feitos.push(await chamar('trazer fichas da planilha',
       'fichas?action=sync-completo&dias=3&aplicar=1'));
     feitos.push(await chamar('devoluções pendentes do remarcar',
@@ -56,10 +61,14 @@ module.exports = async function handler(req, res) {
     // a régua o dá por atendido e ninguém o cobra. Confere sem aplicar nada.
     feitos.push(await chamar('disparos sem prova de envio',
       'wa-bot?action=conferir-disparos-fantasma'));
+    // 📈 fotografia do ritmo do controle de qualidade: três leituras por dia
+    // bastam para medir entrada, vazão e tempo de atendimento sem inflar o log
+    if ([9, 14, 19].includes(horaBR)) {
+      feitos.push(await chamar('ritmo da qualidade', 'qualidade?action=registrar-ritmo'));
+    }
     // 🏪 lembrete de retirada: só às 10h, uma vez por dia (o limite de crons
     // da Vercel está esgotado, então a rotina de hora em hora faz o papel)
-    const agoraBR2 = new Date(Date.now() - 3 * 3600000);
-    const horaBR = agoraBR2.getUTCHours(), diaSem = agoraBR2.getUTCDay();
+
     // segunda a sábado, às 10h: no domingo a loja não atende
     if (horaBR === 10 && diaSem >= 1 && diaSem <= 6) {
       feitos.push(await chamar('lembrete de retirada na loja',
