@@ -198,7 +198,10 @@ async function abrirNegociacao(){
   var s=r.RESUMO||{}, f=r.POR_FASE_DE_VENDA||{};
   var maxF=Math.max.apply(null,Object.values(f).concat([1]));
   var corpo =
-    (s.naoRecebemHa3DiasOuMais ? '<div style="background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.3);'
+    (r.ALERTA_SEM_DISPARO ? '<div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);'
+      + 'border-radius:10px;padding:11px 13px;font-size:12px;color:#f87171;line-height:1.6;margin-bottom:10px;">'
+      + _e(r.ALERTA_SEM_DISPARO) + '</div>' : '')
+    + (s.naoRecebemHa3DiasOuMais ? '<div style="background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.3);'
       + 'border-radius:10px;padding:11px 13px;font-size:12px;color:#fbbf24;line-height:1.6;margin-bottom:12px;">⚠️ '
       + s.naoRecebemHa3DiasOuMais + ' cliente(s) em negociação sem contato há 3 dias ou mais, '
       + 'com a sequência ainda ativa</div>' : '')
@@ -224,7 +227,11 @@ async function abrirNegociacao(){
     + _bloco('👤 Sem nenhum contato do bot', r.SEM_NENHUM_CONTATO, '#f87171')
     + _bloco('✅ Receberam mensagem hoje', r.RECEBERAM_HOJE, '#34d399')
     + _bloco('⚠️ Sequência esgotada', r.SEQUENCIA_ESGOTADA, '#f87171')
-    + _bloco('Todos em negociação', r.TODOS, '#8b93a3');
+    + _bloco('🚨 Com orçamento mas SEM disparo — não entram na negociação',
+        r.SEM_DISPARO_DE_ORCAMENTO, '#f87171')
+    + _bloco('Todos em negociação', r.TODOS, '#8b93a3')
+    + '<div style="font-size:10.5px;color:#5a6270;margin-top:12px;line-height:1.6;">'
+    + _e(r.criterio || '') + '</div>';
   _painelOv('📊 Negociação', corpo);
 }
 async function abrirConsumo(){

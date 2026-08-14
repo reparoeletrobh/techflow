@@ -547,12 +547,36 @@ export default async function handler(req, res) {
       (porTel[d] = porTel[d] || []).push(e);
     }
 
-    const linhas = [];
+    // 🎯 QUEM ENTRA NESTE PAINEL: apenas quem recebeu o disparo de orçamento —
+    // o modelo enviado quando o valor é registrado, que abre a janela de conversa.
+    // Estar na coluna não basta: há cliente que só tirou dúvida, atendimento de
+    // balcão e ficha já encerrada, e misturá-los distorce a leitura da negociação.
+    const recebeuOrcamento = new Set();
+    for (const e of evts) {
+      if (e.dir !== 'out') continue;
+      const t = String(e.texto || '');
+      const ehOrc = /orcamento_pronto/i.test(t) ||
+        String(e.via || '') === 'recuperacao-7d' ||
+        String(e.via || '') === 'bot-auto-orcamento' ||
+        (e.tipo === 'template' && /reativa[çc][ãa]o/i.test(t));
+      if (ehOrc) recebeuOrcamento.add(d8n(e.tel));
+    }
+    // quem consta no controle da sequência também recebeu o disparo
+    for (const t of Object.keys(clientes7)) recebeuOrcamento.add(t);
+
+    const linhas = [], foraDoPainel = [];
     for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
       for (const c of (((db || {}).cards) || [])) {
         const fase = String(c.phaseId || c.phase || '');
         if (fase !== 'aguardando_aprovacao' && fase !== 'ultima_chamada') continue;
         const d = d8n(c.telefone);
+        if (!recebeuOrcamento.has(d)) {
+          foraDoPainel.push({ sis, nome: c.nomeContato || c.nome || '?', tel: d,
+            valor: Number(c.valor || 0), criadoEm: c.criadoEm,
+            dias: c.criadoEm
+              ? Math.floor((Date.now() - new Date(c.criadoEm).getTime()) / 86400000) : null });
+          continue;
+        }
         const meus = (porTel[d] || []).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
         const nossas = meus.filter(e => e.dir === 'out');
         const delas = meus.filter(e => e.dir === 'in');
@@ -587,9 +611,21 @@ export default async function handler(req, res) {
       !l.semBot && l.disparos < 7);
     const valorEmJogo = linhas.reduce((s, l) => s + l.valor, 0);
 
+    const semDisparoValor = foraDoPainel.reduce((s, x) => s + x.valor, 0);
     return res.status(200).json({ ok: true,
+      criterio: 'apenas quem recebeu o disparo de orçamento entra nesta contagem',
+      ALERTA_SEM_DISPARO: foraDoPainel.length
+        ? '🚨 ' + foraDoPainel.length + ' card(s) com orçamento registrado NUNCA receberam ' +
+          'o disparo — R$ ' + semDisparoValor.toFixed(2) + ' parados sem o cliente ser avisado'
+        : null,
+      SEM_DISPARO_DE_ORCAMENTO: foraDoPainel
+        .sort((a, b) => (b.dias || 0) - (a.dias || 0))
+        .map(x => x.sis + ' | ' + String(x.nome).slice(0, 20).padEnd(20) + ' ' + x.tel.slice(-4) +
+          ' | R$ ' + String(x.valor.toFixed(2)).padStart(8) +
+          (x.dias != null ? ' | parado há ' + x.dias + ' dia(s)' : '')),
       RESUMO: {
         emNegociacao: linhas.length,
+        cardsSemDisparoDeOrcamento: foraDoPainel.length,
         adm: linhas.filter(l => l.sis === 'ADM').length,
         tv: linhas.filter(l => l.sis === 'TV').length,
         valorEmJogo: +valorEmJogo.toFixed(2),
