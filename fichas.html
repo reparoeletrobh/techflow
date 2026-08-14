@@ -262,6 +262,7 @@ function detalheConferencia(){
   var r = window._conf; if(!r) return;
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
   var ov = document.createElement('div');
+  ov.id = 'ov-conferencia';       // permite fechar a caixa após importar
   // 📱 no iPad e no celular a caixa encostava no rodapé e o botão ficava fora
   var estreito = window.innerWidth < 900;
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;display:flex;'
