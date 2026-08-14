@@ -483,21 +483,21 @@ export default async function handler(req, res) {
       }
     } catch (e) {}
 
-    const DIAS_CONVERSA = 7;
-    const porCliente = {}, comConversa = [], comConflito = [];
+    // 🎯 O CRITÉRIO É ESTE: está em aguardando aprovação e nunca recebeu o
+    // disparo de orçamento. Nada além disso decide quem entra.
+    // Duas ressalvas apenas: conflito aberto (o caso já está com a equipe) e
+    // telefones que você indicar em &excluir=, para tratar caso a caso.
+    const excluirManual = new Set(String(req.query.excluir || '')
+      .split(',').map(x => x.replace(/\D/g, '').slice(-8)).filter(Boolean));
+    const porCliente = {}, comConversa = [], comConflito = [], excluidosManual = [];
     for (const a of alvo) {
+      if (conflitoAberto[a.d]) { comConflito.push({ ...a, status: conflitoAberto[a.d] }); continue; }
+      if (excluirManual.has(a.d)) { excluidosManual.push(a); continue; }
+      // informativo: quem está conversando ENTRA, mas fica sinalizado
       const cv = conversaViva[a.d];
-      // o que importa é quando o CLIENTE falou pela última vez
-      const recente = cv && (cv.dele || 0) > 0 &&
-        (Date.now() - (cv.ultimaDele || 0)) < DIAS_CONVERSA * 86400000;
-      if (conflitoAberto[a.d]) {
-        comConflito.push({ ...a, status: conflitoAberto[a.d] });
-        continue;
-      }
-      if (recente) {
+      if (cv && (cv.dele || 0) > 0 && (Date.now() - (cv.ultimaDele || 0)) < 7 * 86400000) {
         comConversa.push({ ...a, msgs: cv.dele + ' resposta(s)',
           ultima: new Date(cv.ultimaDele).toISOString() });
-        continue;
       }
       if (!porCliente[a.d] || a.valor > porCliente[a.d].valor) porCliente[a.d] = a;
     }
@@ -509,10 +509,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, modo: 'prévia',
         cardsEncontrados: alvo.length,
         clientesQueSeriamAvisados: fila.length,
-        FORA_POR_CONVERSA_ATIVA: comConversa.map(x => x.sis + ' | ' +
+        ENTRAM_MAS_ESTAO_CONVERSANDO: comConversa.map(x => x.sis + ' | ' +
           x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
           ' | ' + x.msgs + ' | última em ' + hhx(x.ultima) +
-          ' — a equipe conduz'),
+          ' — confira se quer excluir com &excluir=' + x.d),
+        EXCLUIDOS_POR_VOCE: excluidosManual.map(x => x.sis + ' | ' +
+          x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2)),
         FORA_POR_CONFLITO_ABERTO: comConflito.map(x => x.sis + ' | ' +
           x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
           ' | ' + x.status + ' — já está com a equipe'),
