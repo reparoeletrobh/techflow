@@ -958,6 +958,18 @@ export default async function handler(req, res) {
       },
       POR_DISPARO: linhas.reduce((o, l) => {
         const k = l.disparos + 'º disparo'; o[k] = (o[k] || 0) + 1; return o; }, {}),
+      // 🔢 zero disparos não significa esquecido: significa que o cliente não
+      // está na sequência de recuperação, seja por já ter respondido, seja por
+      // ter entrado por outro caminho
+      ZERO_DISPAROS_EXPLICADO: linhas.filter(l => l.disparos === 0).map(l => {
+        const motivo = l.respostas > 0
+          ? 'cliente respondeu — a conversa segue pelo cérebro, sem régua'
+          : l.recebeuHoje > 0 ? 'recebeu hoje, entra na régua a partir de amanhã'
+          : l.semBot ? 'nunca recebeu mensagem do bot'
+          : 'recebeu mensagem mas não está inscrito na sequência';
+        return l.sis + ' | ' + l.nome.slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
+          ' | R$ ' + String(l.valor.toFixed(2)).padStart(8) + ' | ' + motivo;
+      }),
       RECEBERAM_HOJE: receberamHoje.map(l => l.sis + ' | ' + l.nome.slice(0, 20).padEnd(20) +
         ' ' + l.tel.slice(-4) + ' | F' + l.faseVenda + ' · ' + l.disparos + 'D' +
         ' | ' + l.recebeuHoje + ' msg(s) [' + l.tipoHoje + ']' +
