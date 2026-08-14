@@ -285,6 +285,67 @@ async function carregarPainelQualidade(){
         }).join('')
     + '</div></div>';
 
+  var card = function(t, dados, cor, icone){
+    return '<div class="pq-c">'
+      + '<div class="n" style="color:' + cor + ';">' + (dados.entraram||0) + '</div>'
+      + '<div class="l">' + icone + ' ' + t + '</div>'
+      + '<div class="d">✅ ' + (dados.aprovadas||0) + ' · 🔧 ' + (dados.reprovadas||0)
+        + (dados.aguardando ? ' · ⏳ ' + dados.aguardando : '')
+        + (dados.taxaAprovacao != null ? ' · ' + dados.taxaAprovacao + '%' : '') + '</div>'
+      + '</div>';
+  };
+  var htmlOrigem = '<div class="pq-cards">'
+    + card('Setor técnico', o.tecnico||{}, '#60a5fa', '🔧')
+    + card('Garantia', o.garantia||{}, '#22d3ee', '🛡️')
+    + card('Avulsas', o.avulsa||{}, '#a78bfa', '📋')
+    + '</div>';
+
+  var tecs = r.TECNICOS || [];
+  var maxT = Math.max.apply(null, tecs.map(function(t){ return t.total; }).concat([1]));
+  var htmlTec = tecs.length ? '<div class="pq-sec"><h4>👷 Por categoria — ' + (_pqPer==='hoje'?'hoje':_pqPer==='semana'?'7 dias':'30 dias') + '</h4>'
+    + tecs.map(function(t){
+        return '<div class="pq-lin">'
+          + '<span style="min-width:92px;font-weight:700;">' + pqEsc(t.nome) + '</span>'
+          + '<span style="flex:1;height:7px;background:#161c26;border-radius:4px;overflow:hidden;">'
+            + '<i style="display:block;height:100%;width:' + Math.round(t.total/maxT*100) + '%;'
+            + 'background:#60a5fa;border-radius:4px;"></i></span>'
+          + '<span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#8b93a3;min-width:116px;">'
+            + 'téc ' + t.tecnico + ' · gar ' + t.garantia + ' · avl ' + t.avulsa + '</span>'
+          + '<span style="font-family:ui-monospace,monospace;font-weight:700;min-width:24px;text-align:right;">'
+            + t.total + '</span>'
+          + (t.taxaAprovacao != null ? '<span style="font-size:10px;color:'
+              + (t.taxaAprovacao>=90?'#34d399':t.taxaAprovacao>=70?'#fbbf24':'#f87171')
+              + ';min-width:32px;text-align:right;">' + t.taxaAprovacao + '%</span>' : '')
+          + '</div>';
+      }).join('') + '</div>' : '';
+
+  var fichas = r.FICHAS_POR_COLUNA || {};
+  var htmlFila = '<div class="pq-sec">'
+    + '<h4>🔧 Fila do setor técnico — ' + (f.total||0) + ' serviço(s) por concluir'
+      + (f.atrasadas ? '<span class="pq-tag pq-atrasada" style="background:rgba(248,113,113,.15);">'
+          + '🔴 ' + f.atrasadas + ' acima de ' + (r.limiteAtrasoHoras||48) + 'h</span>' : '')
+      + '</h4>'
+    + (f.colunas||[]).filter(function(c){ return c.quantas > 0; }).map(function(c){
+        var lista = fichas[c.id] || [];
+        return '<div class="pq-col" onclick="pqAbrir(\'' + c.id + '\')">'
+          + '<span style="flex:1;font-size:12.5px;">' + pqEsc(c.nome) + '</span>'
+          + '<span class="q">' + c.quantas + '</span>'
+          + '<span style="color:#5a6270;font-size:11px;">▾</span></div>'
+          + '<div class="pq-fichas" id="pqf-' + c.id + '">'
+          + (lista.length ? lista.map(function(x){
+              var tt = x.horas != null
+                ? (x.horas >= 24 ? (x.horas/24).toFixed(1) + 'd' : Math.round(x.horas) + 'h')
+                : '—';
+              return '<div' + (x.atrasada ? ' class="pq-atrasada"' : '') + '>'
+                + pqEsc(x.cliente).slice(0,22) + ' ' + x.telefone
+                + ' | ' + pqEsc(x.equipamento)
+                + (x.tecnico ? ' | ' + pqEsc(x.tecnico) : '')
+                + ' | há ' + tt + (x.atrasada ? ' 🔴' : '') + '</div>';
+            }).join('') : '<div>sem fichas</div>')
+          + '</div>';
+      }).join('')
+    + '</div>';
+
   cx.innerHTML = htmlMeta + htmlOrigem + htmlTec + htmlFila;
 }
 
