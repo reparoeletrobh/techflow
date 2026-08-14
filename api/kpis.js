@@ -296,6 +296,110 @@ module.exports = async function handler(req, res) {
   // Existe para conferir o número do painel contra a realidade: se o painel diz
   // sete e o diagnóstico do dia mostra dois, esta lista revela quais cinco
   // entraram indevidamente e por qual data foram contados.
+  
+  // ── 🔍 AUDITORIA: cada número do painel contra as fontes ──
+  // O painel soma de mais de uma fonte — pipe, balcão, livro-razão — e quando
+  // divergem não há como saber qual está certa. Esta conferência mostra o que
+  // cada fonte diz, item por item, e aponta o que aparece em duas delas.
+  if ((req.query || {}).action === 'auditoria-kpi') {
+    const per = String(req.query.periodo || 'semana');
+    const frente = String(req.query.frente || 'adm').toLowerCase();
+    const agora = Date.now();
+    // ciclo comercial: sábado 13h a sábado 13h
+    const aBR = new Date(agora - 3 * 3600000);
+    let voltar = (aBR.getUTCDay() - 6 + 7) % 7;
+    if (aBR.getUTCDay() === 6 && aBR.getUTCHours() < 13) voltar = 7;
+    const iniSem = new Date(aBR.getTime() - voltar * 86400000);
+    iniSem.setUTCHours(13, 0, 0, 0);
+    const ini = per === 'hoje'
+      ? new Date(new Date(agora - 3 * 3600000).toISOString().slice(0, 10) + 'T00:00:00-03:00').getTime()
+      : per === 'mes' ? agora - 30 * 86400000
+      : iniSem.getTime() + 3 * 3600000;
+    const dentro = d => { const t = new Date(d || 0).getTime(); return t >= ini && t <= agora; };
+    const d8a = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+
+    const bancoPipe = frente === 'tv' ? 'tv_pipe' : 'reparoeletro_pipe';
+    const [pipeDb, flDb, arqDb] = await Promise.all([
+      dbGet(bancoPipe), dbGet('reparoeletro_frenteloja'), dbGet('reparoeletro_arquivo'),
+    ]);
+
+    // ── fonte 1: cards do pipe com data de orçamento ──
+    const doPipe = [];
+    for (const c of (((pipeDb || {}).cards) || [])) {
+      const q = c.orcamentoEm || (((c.history || [])
+        .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
+          .includes(String(x.phase || x.phaseId || '')))
+        .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort()[0]) || null);
+      if (!q || !dentro(q)) continue;
+      doPipe.push({ fonte: 'pipe', id: c.id, nome: c.nomeContato || c.nome || '?',
+        tel: d8a(c.telefone), valor: Number(c.valor || 0), quando: q,
+        balcao: String(c.origem || '') === 'frenteloja' || c.aprovadoNoBalcao === true ||
+          String(c.id || '').includes('-loja') });
+    }
+    // ── fonte 2: fichas do balcão com orçamento ──
+    const doBalcao = [];
+    if (frente !== 'tv') {
+      for (const f of (((flDb || {}).fichas) || [])) {
+        const q = f.orcamentoEm || f.orcamentoCadastradoEm || null;
+        if (!q || !dentro(q)) continue;
+        doBalcao.push({ fonte: 'balcão', id: f.id, nome: f.nomeContato || f.nome || '?',
+          tel: d8a(f.telefone), valor: Number(f.valor || 0), quando: q });
+      }
+    }
+    // ── fonte 3: livro-razão ──
+    let doLivro = [];
+    try {
+      doLivro = (await _funil.ler(ini, agora))
+        .filter(e => e.etapa === 'orcamento' && (e.frente || 'adm') === frente)
+        .map(e => ({ fonte: 'livro', nome: e.nome || '?', tel: d8a(e.tel),
+          valor: Number(e.valor || 0), quando: e.ts, canal: e.canal }));
+    } catch (e) {}
+
+    // ── cruzamento: quem aparece em mais de uma fonte ──
+    const chave = x => x.tel + '|' + Math.round(x.valor);
+    const vistos = {};
+    for (const lista of [doPipe, doBalcao, doLivro]) {
+      for (const x of lista) {
+        const k = chave(x);
+        vistos[k] = vistos[k] || { nome: x.nome, tel: x.tel, valor: x.valor, fontes: [] };
+        if (!vistos[k].fontes.includes(x.fonte)) vistos[k].fontes.push(x.fonte);
+      }
+    }
+    const emDuas = Object.values(vistos).filter(v => v.fontes.length > 1);
+    const unicos = Object.keys(vistos).length;
+
+    return res.status(200).json({ ok: true,
+      frente: frente.toUpperCase(), periodo: per,
+      de: hh(ini), ate: hh(agora),
+      POR_FONTE: {
+        pipe: doPipe.length,
+        pipeOnline: doPipe.filter(x => !x.balcao).length,
+        pipeBalcao: doPipe.filter(x => x.balcao).length,
+        fichasDoBalcao: doBalcao.length,
+        livroRazao: doLivro.length,
+      },
+      clientesDistintos: unicos,
+      SOMA_SIMPLES: doPipe.length + doBalcao.length,
+      VEREDITO: emDuas.length
+        ? '⚠️ ' + emDuas.length + ' registro(s) aparecem em mais de uma fonte — ' +
+          'somar as fontes conta esses duas vezes'
+        : '✅ nenhum registro repetido entre as fontes',
+      EM_DUAS_FONTES: emDuas.slice(0, 40).map(v => String(v.nome).slice(0, 22) + ' ' +
+        v.tel.slice(-4) + ' | R$ ' + v.valor.toFixed(2) + ' | ' + v.fontes.join(' + ')),
+      SO_NO_PIPE: doPipe.filter(x => !Object.values(vistos)
+        .find(v => v.tel === x.tel && v.fontes.includes('livro')))
+        .slice(0, 40).map(x => hh(x.quando) + ' | ' + String(x.nome).slice(0, 20) +
+          ' ' + x.tel.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
+          (x.balcao ? ' | 🏪 balcão' : ' | 💻 online')),
+      SO_NO_LIVRO: doLivro.filter(x => !doPipe.find(p => p.tel === x.tel))
+        .slice(0, 40).map(x => hh(x.quando) + ' | ' + String(x.nome).slice(0, 20) +
+          ' ' + x.tel.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
+          (x.canal ? ' | ' + x.canal : '')),
+      comoLer: 'o painel deve mostrar clientesDistintos, não a soma das fontes' });
+  }
+
   if ((req.query || {}).action === 'quem-orcou') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
     const frente = String(req.query.frente || '').toLowerCase();
