@@ -1291,7 +1291,16 @@ export default async function handler(req, res) {
   // receber linha no meio, ou o cursor avançar sem gravar, as linhas puladas se
   // perdem para sempre. Esta rotina compara por TELEFONE e não pula nada.
   if (action === 'sync-completo') {
-    const JANELA_DIAS = Math.min(90, Math.max(1, parseInt(req.query.dias || '3', 10)));
+    // 🔒 SÓ O DIA DE HOJE. Trazer linhas antigas fazia dezenas de fichas velhas
+    // reentrarem no sistema e caírem na fila de ligação, misturadas com os
+    // contatos do dia. O que ficou para trás já passou: se a ficha não entrou na
+    // hora, entra pela conferência do próprio dia — nunca dias depois.
+    // Para um resgate deliberado, informe &dias= explicitamente.
+    const pediuDias = req.query.dias !== undefined && String(req.query.dias) !== '';
+    const JANELA_DIAS = pediuDias
+      ? Math.min(90, Math.max(1, parseInt(req.query.dias, 10))) : 1;
+    const SO_HOJE = !pediuDias;
+    const hojeSync = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
     const REENTRADA_DIAS = 30;   // mesma ficha pode voltar depois de 30 dias
     const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
     let rows;
@@ -1370,6 +1379,16 @@ export default async function handler(req, res) {
         quando = new Date(ano + '-' + mm[2] + '-' + mm[1] + 'T12:00:00-03:00').getTime();
       }
       if (quando && quando < corte) continue;          // fora da janela pedida
+      // 🔒 no modo padrão, só linhas do DIA DE HOJE entram. Ficha de dias
+      // anteriores que não entrou na época não deve reaparecer agora: ela cairia
+      // na fila de ligação junto com os contatos do dia, e a equipe passaria a
+      // ligar para gente de uma semana atrás como se fosse contato novo.
+      if (SO_HOJE) {
+        const diaLinha = mm
+          ? (mm[3].length === 2 ? '20' + mm[3] : mm[3]) + '-' + mm[2] + '-' + mm[1]
+          : null;
+        if (diaLinha !== hojeSync) continue;
+      }
       const t8 = d8f(tel);
       // 🔒 já marcada para criar nesta mesma execução? o cliente com duas linhas
       // na planilha gerava duas fichas, porque a lista de existentes era montada
@@ -1400,6 +1419,8 @@ export default async function handler(req, res) {
     }
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
+        janela: SO_HOJE ? 'somente linhas de hoje (' + hojeSync + ')'
+          : 'últimos ' + JANELA_DIAS + ' dia(s), por pedido explícito',
         janelaDias: JANELA_DIAS, linhasNaPlanilha: rows.length - 1,
         vaoSerCriadas: criar.length, jaExistem: jaExistem.length,
         reentradasApos30Dias: reentradas.length,

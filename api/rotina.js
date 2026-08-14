@@ -66,6 +66,12 @@ module.exports = async function handler(req, res) {
     if ([9, 14, 19].includes(horaBR)) {
       feitos.push(await chamar('ritmo da qualidade', 'qualidade?action=registrar-ritmo'));
     }
+    // 🌙 fechamento do dia: última chance de trazer o que ficou para trás, e
+    // somente do próprio dia. Depois da meia-noite aquela linha não entra mais.
+    if (horaBR === 23) {
+      feitos.push(await chamar('fechamento do dia — fichas de hoje',
+        'fichas?action=sync-completo&aplicar=1'));
+    }
     // 🏪 lembrete de retirada: só às 10h, uma vez por dia (o limite de crons
     // da Vercel está esgotado, então a rotina de hora em hora faz o papel)
 

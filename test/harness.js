@@ -868,6 +868,23 @@ function check(nome, cond, extra) {
       semRegistro.length === 0, semRegistro.join(', '));
   }
 
+  // ── 📅 o sync só traz o que é do dia, salvo pedido explícito ──
+  // Dezenas de fichas antigas reentravam no sistema e caíam na fila de ligação
+  // junto com os contatos do dia, e a equipe ligava para gente de uma semana
+  // atrás como se fosse contato novo.
+  console.log('▶ Cenário SD — sync limita-se ao dia corrente');
+  {
+    const fsS = require('fs');
+    const c = fsS.readFileSync('api/fichas.js', 'utf8');
+    check('sync tem trava de dia corrente', /const SO_HOJE = !pediuDias/.test(c));
+    check('a trava é aplicada no laço das linhas',
+      /if \(SO_HOJE\) \{[\s\S]{0,260}diaLinha !== hojeSync\) continue/.test(c));
+    check('janela padrão é de um dia', /\? Math\.min\(90[\s\S]{0,80}: 1;/.test(c));
+    const rot = fsS.readFileSync('api/rotina.js', 'utf8');
+    check('há fechamento do dia na rotina noturna',
+      /horaBR === 23[\s\S]{0,200}sync-completo/.test(rot));
+  }
+
   console.log('▶ Cenário OD — a rotina não usa variável antes de declarar');
   {
     const fsO = require('fs');
