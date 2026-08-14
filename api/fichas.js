@@ -129,6 +129,66 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 📅 QUANDO-NASCERAM: data de criação e última aparição na planilha ──
+  if (action === 'quando-nasceram') {
+    const sis = String(req.query.sistema || 'tv');
+    const chave = sis === 'tv' ? KEY_TV : KEY_ADM;
+    const d8q = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(0, 16).replace('T', ' ') : '—';
+    const db = await dbGet(chave);
+    const naColuna = (((db || {}).fichas) || [])
+      .filter(f => String(f.status || '') === 'entrar_contato');
+
+    // última aparição de cada telefone na planilha
+    const naPlanilha = {};
+    try {
+      const rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text()));
+      const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+      const iH = cab.findIndex(x => /hora|data/.test(x));
+      const iT = cab.findIndex(x => /numero|telefone|whats/.test(x));
+      const iE = cab.findIndex(x => /^equipamento$/.test(x));
+      rows.slice(1).forEach((r, ix) => {
+        const t = d8q(r[iT]);
+        if (t.length < 8) return;
+        const dt = String(r[iH] || '');
+        const iso = dt.length >= 8
+          ? '20' + dt.slice(6, 8) + '-' + dt.slice(3, 5) + '-' + dt.slice(0, 2) + ' ' + dt.slice(9, 14)
+          : '';
+        if (!naPlanilha[t] || iso > naPlanilha[t].quando) {
+          naPlanilha[t] = { quando: iso, linha: ix + 2, equipamento: String(r[iE] || '') };
+        }
+      });
+    } catch (e) {}
+
+    const linhas = naColuna.map(f => {
+      const t = d8q(f.telefone);
+      const pl = naPlanilha[t];
+      const criada = f.criadoEm || f.registradoEm;
+      const diasParada = criada
+        ? Math.floor((Date.now() - new Date(criada).getTime()) / 86400000) : null;
+      return { nome: f.nome || '?', tel: t, criada, diasParada,
+        naPlanilhaEm: pl ? pl.quando : null, linhaPlanilha: pl ? pl.linha : null,
+        equipPlanilha: pl ? pl.equipamento : null,
+        origem: String(f.id || '').startsWith('sc_') ? 'sync'
+          : String(f.id || '').startsWith('fsh_') ? 'planilha'
+          : String(f.id || '').startsWith('fic_reag_') ? 'remarcar' : 'outra' };
+    }).sort((a, b) => String(a.criada || '').localeCompare(String(b.criada || '')));
+
+    return res.status(200).json({ ok: true, sistema: sis.toUpperCase(),
+      naFila: linhas.length,
+      maisAntiga: linhas[0] ? hh(linhas[0].criada) : '—',
+      maisRecente: linhas.length ? hh(linhas[linhas.length - 1].criada) : '—',
+      semRegistroNaPlanilha: linhas.filter(l => !l.naPlanilhaEm).length,
+      L: linhas.map(l => 'criada ' + hh(l.criada) +
+        (l.diasParada != null ? ' (há ' + l.diasParada + 'd)' : '') +
+        ' | ' + String(l.nome).slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
+        ' | origem: ' + l.origem +
+        ' | planilha: ' + (l.naPlanilhaEm || 'não encontrada') +
+        (l.linhaPlanilha ? ' (linha ' + l.linhaPlanilha + ')' : '')) });
+  }
+
   // ── 🧹 LIMPAR-JA-ADIANTE: tira da fila quem já avançou no funil ──
   if (action === 'limpar-ja-adiante') {
     const d8l = t => String(t || '').replace(/\D/g, '').slice(-8);
