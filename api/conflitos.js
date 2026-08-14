@@ -311,6 +311,155 @@ module.exports = async function handler(req,res){
       lista:achados.slice(0,30),dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── 📣 AVISAR-CLIENTE: disparo automático de abertura e de resolução ──
+  // O cliente que gerou um conflito está insatisfeito e em silêncio. Saber que
+  // um chamado foi aberto — e depois que foi resolvido — muda a percepção mais
+  // do que a solução em si, que ele nem sempre enxerga.
+  if(action==='avisar-clientes'){
+    const aplicar=String(req.query.aplicar||'')==='1';
+    const d8c=t=>String(t||'').replace(/\D/g,'').slice(-8);
+    const lista=db.conflitos||[];
+
+    const pendentes={abertura:[],resolucao:[]};
+    for(const c of lista){
+      const tel=String(c.telefone||c.tel||'').replace(/\D/g,'');
+      if(tel.length<10) continue;
+      // 1) conflito aberto e cliente ainda não avisado
+      if(!c.avisoAberturaEm && ['aberto','andamento'].includes(String(c.status||''))){
+        pendentes.abertura.push(c);
+      }
+      // 2) conflito resolvido e cliente ainda não avisado do desfecho
+      if(!c.avisoResolucaoEm && String(c.status||'')==='resolvido' && c.solucao){
+        pendentes.resolucao.push(c);
+      }
+    }
+
+    if(!aplicar){
+      return res.status(200).json({ok:true,modo:'prévia',
+        aberturaPendente:pendentes.abertura.length,
+        resolucaoPendente:pendentes.resolucao.length,
+        ABERTURA:pendentes.abertura.map(c=>String(c.cliente||c.ficha||'?').slice(0,22)+' '
+          +String(c.telefone||c.tel||'').slice(-4)+' | '+String(c.motivo||'').slice(0,40)),
+        RESOLUCAO:pendentes.resolucao.map(c=>String(c.cliente||c.ficha||'?').slice(0,22)+' '
+          +String(c.telefone||c.tel||'').slice(-4)+' | '+String(c.solucao||'').slice(0,40)),
+        dica:'para enviar: &aplicar=1'});
+    }
+
+    // ⏰ assunto delicado: não sai de madrugada nem no domingo
+    const agoraBR=new Date(Date.now()-3*3600000);
+    const hBR=agoraBR.getUTCHours(), dBR=agoraBR.getUTCDay();
+    const expediente=(dBR>=1&&dBR<=5&&hBR>=8&&hBR<19)||(dBR===6&&hBR>=8&&hBR<13);
+    if(!expediente&&String(req.query.forcar||'')!=='1'){
+      return res.status(200).json({ok:true,adiado:true,
+        motivo:'fora do expediente — os avisos saem no próximo horário comercial'});
+    }
+
+    const cfg=(await dbGet('wa_credenciais'))||{};
+    const pid=cfg.phoneId||process.env.WA_PHONE_ID;
+    const tk=cfg.token||process.env.WA_TOKEN;
+    if(!pid||!tk) return res.status(200).json({ok:false,error:'credenciais do WhatsApp ausentes'});
+    const CHAVE=(process.env.ANTHROPIC_API_KEY||'').trim();
+
+    // janela de 24h: fora dela só modelo aprovado
+    const ultimaIn={};
+    try{
+      const U2=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const T2=(process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
+      const r=await fetch(U2+'/lrange/wa_evt_list/-6000/-1',
+        {headers:{Authorization:'Bearer '+T2}}).then(x=>x.json());
+      for(const s of (r.result||[])){
+        try{const e=JSON.parse(s); if(e.dir!=='in')continue;
+          const d=d8c(e.tel); if(!d)continue;
+          const q=new Date(e.ts||0).getTime();
+          if(!ultimaIn[d]||q>ultimaIn[d]) ultimaIn[d]=q;
+        }catch(x){}
+      }
+    }catch(e){}
+
+    const enviar=async(c,tipo)=>{
+      let tel=String(c.telefone||c.tel||'').replace(/\D/g,'');
+      if(tel.length===10||tel.length===11) tel='55'+tel;
+      if(tel.length<12) return {ok:false,erro:'telefone inválido'};
+      const primeiro=String(c.cliente||c.ficha||'').trim().split(/\s+/)[0]||'';
+      const janelaAberta=ultimaIn[d8c(tel)]&&(Date.now()-ultimaIn[d8c(tel)])<24*3600000;
+
+      if(janelaAberta){
+        // texto livre, escrito a partir do caso
+        let texto=tipo==='abertura'
+          ? 'Oi'+(primeiro?' '+primeiro:'')+'! Aqui é da Reparo Eletro.\n\n'
+            +'Abrimos um chamado prioritário para tratar da sua situação. '
+            +'Nossa equipe já está cuidando disso e te dá um retorno em breve.\n\n'
+            +'Se quiser falar com a gente, é só responder aqui.'
+          : 'Oi'+(primeiro?' '+primeiro:'')+'! Voltando para te dar um retorno.\n\n'
+            +'Sua situação foi resolvida. Qualquer dúvida é só chamar. 😊';
+        if(CHAVE){
+          try{
+            const ctx=[c.motivo?('Motivo: '+c.motivo):'',c.descricao?('Descrição: '+c.descricao):'',
+              (tipo==='resolucao'&&c.solucao)?('O que foi feito: '+c.solucao):''].filter(Boolean).join('\n');
+            const rr=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+              headers:{'x-api-key':CHAVE,'anthropic-version':'2023-06-01','content-type':'application/json'},
+              body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:350,temperature:0.4,
+                system:'Você escreve mensagens de WhatsApp de uma assistência técnica ao cliente, '
+                  +'em português do Brasil, máximo 4 linhas curtas.\n'
+                  +(tipo==='abertura'
+                    ? 'Avise que um chamado prioritário foi aberto para tratar da situação dele e '
+                      +'que a equipe já está cuidando. Tom acolhedor, sem prometer prazo.'
+                    : 'Avise que a situação foi resolvida, explicando em linguagem simples o que '
+                      +'foi feito. Tom tranquilizador.')
+                  +'\nNUNCA cite custo interno, nome de peça, culpa de funcionário ou fornecedor. '
+                  +'Não invente o que não está no registro. Responda só com a mensagem.',
+                messages:[{role:'user',content:'Cliente: '+(primeiro||'(sem nome)')+'\n\n'+ctx}]}),
+            }).then(x=>x.json());
+            const t=((rr.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')||'').trim();
+            if(t) texto=t;
+          }catch(e){}
+        }
+        const r=await fetch('https://graph.facebook.com/v20.0/'+pid+'/messages',{method:'POST',
+          headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},
+          body:JSON.stringify({messaging_product:'whatsapp',to:tel,type:'text',text:{body:texto}}),
+        }).then(x=>x.json());
+        return (r&&r.messages&&r.messages[0])
+          ? {ok:true,via:'mensagem',texto}
+          : {ok:false,erro:(r&&r.error&&r.error.message)||'falha no envio'};
+      }
+
+      // janela fechada: modelo aprovado
+      const modelo=tipo==='abertura'?'chamado_aberto':'chamado_resolvido';
+      const r=await fetch('https://graph.facebook.com/v20.0/'+pid+'/messages',{method:'POST',
+        headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},
+        body:JSON.stringify({messaging_product:'whatsapp',to:tel,type:'template',
+          template:{name:modelo,language:{code:'pt_BR'},
+            components:[{type:'body',parameters:[{type:'text',text:primeiro||'tudo bem'}]}]}}),
+      }).then(x=>x.json());
+      return (r&&r.messages&&r.messages[0])
+        ? {ok:true,via:'modelo '+modelo}
+        : {ok:false,erro:(r&&r.error&&r.error.message)||'modelo recusado'};
+    };
+
+    const feitos=[],erros=[];
+    let mudou=false;
+    for(const tipo of ['abertura','resolucao']){
+      for(const c of pendentes[tipo]){
+        if(feitos.length>=12) break;         // lote curto: a função tem tempo limitado
+        const r=await enviar(c,tipo);
+        if(r.ok){
+          if(tipo==='abertura'){ c.avisoAberturaEm=new Date().toISOString(); c.avisoAberturaVia=r.via; }
+          else { c.avisoResolucaoEm=new Date().toISOString(); c.avisoResolucaoVia=r.via;
+                 if(r.texto) c.textoEnviadoAoCliente=String(r.texto).slice(0,600); }
+          mudou=true;
+          feitos.push(tipo+' | '+String(c.cliente||'?').slice(0,20)+' | '+r.via);
+        } else {
+          erros.push(tipo+' | '+String(c.cliente||'?').slice(0,20)+': '+r.erro);
+        }
+        await new Promise(s=>setTimeout(s,700));
+      }
+    }
+    if(mudou) await dbSet(KEY,db);
+    const faltam=(pendentes.abertura.length+pendentes.resolucao.length)-feitos.length-erros.length;
+    return res.status(200).json({ok:erros.length===0,enviados:feitos.length,
+      faltam:Math.max(0,faltam),L:feitos,erros});
+  }
+
   // ── ✍️ POST mensagem-cliente: transforma a solução técnica em recado cordial ──
   // O que a equipe escreve na resolução é registro interno: cita peça, custo,
   // culpa e prazo em linguagem de bastidor. Enviar isso ao cliente soa seco e

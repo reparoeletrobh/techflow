@@ -43,6 +43,10 @@ module.exports = async function handler(req, res) {
     // 📺 TV condenada: avisa quem foi para retirada e recolhe a escolha do cliente
     feitos.push(await chamar('avisar TV condenada', 'wa-bot?action=tv-condenada-avisar&aplicar=1'));
     feitos.push(await chamar('escolhas da TV condenada', 'wa-bot?action=tv-condenada-respostas'));
+    // 📣 cliente com conflito aberto fica no escuro: avisa quando o chamado
+    // é aberto e de novo quando é resolvido
+    feitos.push(await chamar('avisos de conflito ao cliente',
+      'conflitos?action=avisar-clientes&aplicar=1'));
   }
 
   // ── 🕐 de hora em hora: rede de segurança ──
