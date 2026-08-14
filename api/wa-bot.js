@@ -487,12 +487,15 @@ export default async function handler(req, res) {
     // disparo de orçamento. Nada além disso decide quem entra.
     // Duas ressalvas apenas: conflito aberto (o caso já está com a equipe) e
     // telefones que você indicar em &excluir=, para tratar caso a caso.
+    // aceita 4 ou 8 dígitos: a lista mostra os quatro finais, e comparar com
+    // oito fazia a exclusão nunca casar
     const excluirManual = new Set(String(req.query.excluir || '')
-      .split(',').map(x => x.replace(/\D/g, '').slice(-8)).filter(Boolean));
+      .split(',').map(x => x.replace(/\D/g, '')).filter(Boolean)
+      .map(x => x.slice(-4)));
     const porCliente = {}, comConversa = [], comConflito = [], excluidosManual = [];
     for (const a of alvo) {
       if (conflitoAberto[a.d]) { comConflito.push({ ...a, status: conflitoAberto[a.d] }); continue; }
-      if (excluirManual.has(a.d)) { excluidosManual.push(a); continue; }
+      if (excluirManual.has(a.d.slice(-4))) { excluidosManual.push(a); continue; }
       // informativo: quem está conversando ENTRA, mas fica sinalizado
       const cv = conversaViva[a.d];
       if (cv && (cv.dele || 0) > 0 && (Date.now() - (cv.ultimaDele || 0)) < 7 * 86400000) {
@@ -512,7 +515,7 @@ export default async function handler(req, res) {
         ENTRAM_MAS_ESTAO_CONVERSANDO: comConversa.map(x => x.sis + ' | ' +
           x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2) +
           ' | ' + x.msgs + ' | última em ' + hhx(x.ultima) +
-          ' — confira se quer excluir com &excluir=' + x.d),
+          ' — para excluir: &excluir=' + x.d.slice(-4)),
         EXCLUIDOS_POR_VOCE: excluidosManual.map(x => x.sis + ' | ' +
           x.nome.slice(0, 20) + ' ' + x.d.slice(-4) + ' | R$ ' + x.valor.toFixed(2)),
         FORA_POR_CONFLITO_ABERTO: comConflito.map(x => x.sis + ' | ' +
