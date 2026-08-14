@@ -458,9 +458,14 @@ export default async function handler(req, res) {
           if (nossas.some(e => mk.re.test(String(e.texto || '')))) { nf = mk.n; break; }
         }
         const rec = clientes7[d] || {};
+        // 🔎 de onde veio o card? balcão e importação não passam pelo bot
+        const origem = c.origem || (c.flFichaId ? 'frente de loja' : null) ||
+          (String(c.id || '').startsWith('PIPE-FL-') ? 'frente de loja' : null) ||
+          (c.localId ? 'local' : null) || (c.pipefyId ? 'pipefy' : null) || 'desconhecida';
         const base = sis + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 20) +
           ' ' + d.slice(-4) + ' | R$ ' + Number(c.valor || 0).toFixed(2) +
           ' | criado ' + hh(c.criadoEm) +
+          ' | origem: ' + origem +
           ' | ' + nossas.length + ' msg(s) nossas · ' +
           meus.filter(e => e.dir === 'in').length + ' dele' +
           ' | disparos: ' + (rec.tentativas || 0);
@@ -482,6 +487,12 @@ export default async function handler(req, res) {
         else grupos.falamosSemOrcamento.push(base + ' | última: "' + amostra + '"');
       }
     }
+    const porOrigemSem = {};
+    for (const l of grupos.nuncaFalamos) {
+      const m3 = String(l).match(/origem: ([^|]+)/);
+      const o = m3 ? m3[1].trim() : '?';
+      porOrigemSem[o] = (porOrigemSem[o] || 0) + 1;
+    }
     const semFase = grupos.nuncaFalamos.length + grupos.falamosSemOrcamento.length +
       grupos.textoNaoReconhecido.length + grupos.foraDaJanelaDeEventos.length;
     return res.status(200).json({ ok: true,
@@ -498,7 +509,8 @@ export default async function handler(req, res) {
         zeroDisparos: 'o contador de disparos vem da sequência de recuperação de 7 dias, ' +
           'que só inclui quem foi inscrito nela — quem está negociando normalmente marca zero',
       },
-      NUNCA_FALAMOS: grupos.nuncaFalamos.slice(0, 40),
+      ORIGEM_DOS_QUE_NUNCA_FALAMOS: porOrigemSem,
+      NUNCA_FALAMOS: grupos.nuncaFalamos.slice(0, 70),
       FALAMOS_SEM_ORCAMENTO: grupos.falamosSemOrcamento.slice(0, 40),
       TEXTO_NAO_RECONHECIDO: grupos.textoNaoReconhecido.slice(0, 40),
       ANTIGOS_SEM_REGISTRO: grupos.foraDaJanelaDeEventos.slice(0, 40) });
