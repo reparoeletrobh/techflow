@@ -775,9 +775,12 @@ module.exports = async function handler(req, res) {
     // registrado. Usar a criação do card como substituto contava como orçamento
     // do dia todo card que nasceu hoje e em algum momento ganhou valor, mesmo
     // que o valor tenha sido definido depois — por isso o número vinha inflado.
+    // 📄 ORÇAMENTO = diagnóstico registrado no pipe + cadastro no frente de loja.
+    // O card do balcão vira registro nas duas fontes: sem excluí-lo de um lado,
+    // o mesmo atendimento é contado duas vezes.
     const orcs = cards.filter(c => {
+      if (ehBalcao(c)) return false;          // o balcão é contado pela ficha, não pelo card
       if (c.orcamentoEm) return dentro(c.orcamentoEm);
-      // sem carimbo, só conta pelo histórico: entrada em aguardando aprovação
       const h2 = (c.history || [])
         .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
           .includes(String(x.phase || x.phaseId || '')))
@@ -801,7 +804,20 @@ module.exports = async function handler(req, res) {
     });
     const aprovBot = aprov.filter(c => /bot/i.test(String(c.aprovadoPor || '')));
     const faturamento = aprov.reduce((s, c) => s + (Number(c.valor || 0) || 0), 0);
-    const orcBalcao = orcs.filter(ehBalcao).length;
+    // 🏪 o balcão vem das FICHAS do frente de loja, não dos cards: é lá que o
+    // atendimento presencial é registrado, e contar pelos dois lados duplica
+    let orcBalcao = 0;
+    const balcaoJaContado = new Set();
+    for (const f of ((extraBalcao && extraBalcao.fichasFL) || [])) {
+      const q = f.orcamentoEm || f.orcamentoCadastradoEm || null;
+      if (!q) continue;
+      const t2 = new Date(q).getTime();
+      if (!(t2 >= J.ini && t2 <= J.fim)) continue;
+      const t = d8(f.telefone);
+      if (t && balcaoJaContado.has(t)) continue;   // mesma ficha em duplicidade
+      if (t) balcaoJaContado.add(t);
+      orcBalcao++;
+    }
     let aprovBalcao = aprov.filter(ehBalcao);
     // a seção Balcão registra toda aprovação presencial: se ela tem mais do que
     // encontramos nos cards, o número dela prevalece
@@ -811,8 +827,11 @@ module.exports = async function handler(req, res) {
       fichas: fichas.length,
       logistica: { total: logs.length, bot: porBot.length, manual: logs.length - porBot.length,
         pctBot: logs.length ? Math.round(porBot.length / logs.length * 100) : 0 },
-      orcamentos: { total: orcs.length, balcao: orcBalcao, online: orcs.length - orcBalcao,
-        pctBalcao: orcs.length ? Math.round(orcBalcao / orcs.length * 100) : 0 },
+      orcamentos: { total: orcs.length + orcBalcao,
+        online: orcs.length, balcao: orcBalcao,
+        pctBalcao: (orcs.length + orcBalcao)
+          ? Math.round(orcBalcao / (orcs.length + orcBalcao) * 100) : 0,
+        comoEContado: 'diagnóstico registrado no pipe + cadastro no frente de loja' },
       aprovados: { total: Math.max(aprov.length, pisoBalcao + (aprov.length - aprovBalcao.length)),
         bot: aprovBot.length, manual: aprov.length - aprovBot.length,
         balcao: Math.max(aprovBalcao.length, pisoBalcao),
@@ -880,7 +899,7 @@ module.exports = async function handler(req, res) {
   };
   const adm = usaLivro ? doLivro('adm') : montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm),
     { cards: (((ppA || {}).cards) || []).concat(arqAdm.cards).concat(fichasFL) },
-    { telsBalcao, totalBalcao: doBalcao.length });
+    { telsBalcao, totalBalcao: doBalcao.length, fichasFL });
   const tv = usaLivro ? doLivro('tv')
     : montar(juntarFichas(fT, arqTv), juntarFichas(lgT, arqTv), juntarCards(ppT, arqTv));
   const temMeta = inv.convTotal > 0 || !!TOKEN;
