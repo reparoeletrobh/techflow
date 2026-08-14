@@ -656,6 +656,37 @@ function check(nome, cond, extra) {
   }
 
   // ── 🛡️ garantia: cadastro, fila e envio ao controle de qualidade ──
+  // ── 📺 os sistemas replicados para TV não podem tocar os bancos do ADM ──
+  console.log('▶ Cenário TV — almoxarifado e garantia de TV são independentes');
+  {
+    const gTv = carregarHandler('api/tv-garantia-v2.js');
+    KV['tv_garantia_v2'] = { fichas: [] };
+    KV['tv_garantia_fila'] = { itens: [] };
+    delete KV['reparoeletro_garantia_v2'];
+    delete KV['reparoeletro_garantia_fila'];
+    const rTv = res();
+    await gTv(req({ action: 'cadastrar', ...K }, { nome: 'Cliente TV',
+      telefone: '5531933332222', defeito: 'voltou a falhar', tipo: 'loja_acompanhamento',
+      tecnico: 'Arthur', equipamento: 'TV 50' }, 'POST'), rTv);
+    check('garantia TV: cadastro aceito', rTv.dado && rTv.dado.ok);
+    check('garantia TV: gravou no banco de TV',
+      ((KV['tv_garantia_v2'] || {}).fichas || []).length === 1);
+    check('garantia TV: entrou na fila de TV',
+      ((KV['tv_garantia_fila'] || {}).itens || []).length === 1);
+    check('garantia TV: não escreveu no banco do ADM',
+      KV['reparoeletro_garantia_v2'] === undefined);
+    // nenhum arquivo de TV pode apontar para banco do ADM
+    const fsT = require('fs');
+    const sujos = [];
+    for (const arq of ['api/tv-almoxarifado.js', 'api/tv-garantia-v2.js']) {
+      const c = fsT.readFileSync(arq, 'utf8');
+      const refs = (c.match(/reparoeletro_\w+/g) || []);
+      if (refs.length) sujos.push(arq + ': ' + [...new Set(refs)].join(', '));
+    }
+    check('módulos de TV não referenciam bancos da linha branca',
+      sujos.length === 0, sujos.join(' | '));
+  }
+
   console.log('▶ Cenário GQ — garantia exige técnico e credita a inspeção');
   {
     const gr = carregarHandler('api/garantia.js');

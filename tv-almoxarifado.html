@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  // Papel TV: acesso restrito às telas do sistema TV
+  if(localStorage.getItem('tf_role')==='tv'&&location.pathname.indexOf('/tv')!==0){
+    location.replace('/tv-adm');return;
+  }
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    var isApi=false;
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        isApi=true;o=o||{};
+        var kk=localStorage.getItem('tf_key')||'';
+        if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
+        else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
+      }
+    }catch(e){}
+    var p=_f.call(this,u,o);
+    if(isApi){
+      p=p.then(function(r){
+        if(r&&r.status===401&&!window.__tfHealed){
+          window.__tfHealed=true;
+          localStorage.removeItem('tf_key');
+          location.replace('/login?next='+encodeURIComponent(location.pathname));
+        }
+        return r;
+      });
+    }
+    return p;
+  };
+  // Navegação/downloads para /api/ (links e window.open) também levam a chave
+  document.addEventListener('click',function(ev){
+    var a=ev.target&&ev.target.closest?ev.target.closest('a'):null;
+    if(a){
+      var hu=a.getAttribute('href')||'';
+      if(hu.indexOf('/api/')>-1&&hu.indexOf('k=')===-1){
+        a.setAttribute('href',hu+(hu.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||''));
+      }
+    }
+  },true);
+  var _wo=window.open;
+  window.open=function(u){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('k=')===-1){
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+        arguments[0]=u;
+      }
+    }catch(e){}
+    return _wo.apply(window,arguments);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Almoxarifado TV</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;padding:14px;padding-bottom:40px;}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.top h1{font-size:19px;font-weight:900;}
+.beta{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fbbf24;font-size:10px;font-weight:900;padding:3px 8px;border-radius:20px;}
+.who{display:flex;gap:8px;margin-bottom:12px;}
+.who input{flex:1;background:#12161d;border:1px solid #242b39;border-radius:10px;padding:12px;color:#f0f2f5;font-size:15px;}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.kpi{background:#101318;border:1px solid #1d2330;border-radius:12px;padding:10px;text-align:center;}
+.kpi .v{font-size:20px;font-weight:900;}
+.kpi .l{font-size:10px;color:#8b93a3;margin-top:1px;}
+.tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;}
+.tab{padding:9px 14px;border-radius:10px;background:#101318;border:1px solid #1d2330;font-size:13px;font-weight:800;cursor:pointer;color:#aab2c0;white-space:nowrap;}
+.tab.on{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.5);color:#fbbf24;}
+.card{background:#101318;border:1px solid #1d2330;border-radius:14px;padding:14px;margin-bottom:10px;}
+.card.receber{border-left:4px solid #3b82f6;}
+.card.mover{border-left:4px solid #fbbf24;}
+.card.falha-c{border-left:4px solid #ef4444;opacity:.9;}
+.card.feito-c{border-left:4px solid #22c55e;opacity:.85;}
+.tt{font-size:11px;font-weight:900;letter-spacing:.5px;color:#8b93a3;text-transform:uppercase;}
+.nm{font-size:16px;font-weight:900;margin-top:3px;}
+.eq{font-size:13px;color:#aab2c0;margin-top:2px;}
+.rota-mov{display:flex;align-items:center;gap:8px;margin-top:10px;background:#0c0f14;border:1px solid #1d2330;border-radius:10px;padding:10px;font-size:13px;font-weight:800;}
+.rota-mov .de{color:#8b93a3;}
+.rota-mov .seta{color:#fbbf24;font-size:16px;}
+.rota-mov .para{color:#4ade80;}
+.meta{font-size:11px;color:#6b7383;margin-top:8px;}
+.acts{display:flex;gap:8px;margin-top:12px;}
+.btn{padding:13px;border-radius:12px;border:none;font-weight:900;font-size:14px;cursor:pointer;flex:1;}
+.btn:disabled{opacity:.5;}
+.b-ok{background:#22c55e;color:#04110a;}
+.b-no{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.35);}
+.b-foto{background:#3b82f6;color:#fff;}
+.b-re{background:rgba(250,204,21,.12);color:#fbbf24;border:1px solid rgba(250,204,21,.35);}
+.fld{margin-top:10px;}
+.fld input,.fld textarea{width:100%;background:#12161d;border:1px solid #242b39;border-radius:10px;padding:12px;color:#f0f2f5;font-size:15px;font-family:inherit;}
+.foto-ok{color:#4ade80;font-size:12px;font-weight:800;margin-top:8px;}
+.thumb{max-width:100%;border-radius:10px;margin-top:8px;max-height:180px;object-fit:cover;}
+.empty{color:#5b6373;font-size:14px;padding:36px 10px;text-align:center;}
+.inv-item{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.loc{font-size:11px;font-weight:900;padding:4px 10px;border-radius:20px;background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3);white-space:nowrap;}
+.search{width:100%;background:#12161d;border:1px solid #242b39;border-radius:10px;padding:12px;color:#f0f2f5;font-size:15px;margin-bottom:10px;}
+@keyframes alm-novo{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.75);border-color:#f59e0b;}50%{box-shadow:0 0 0 10px rgba(245,158,11,0);border-color:#f59e0b;}}
+.card.novo{animation:alm-novo 1.1s ease infinite;}
+.sec-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;}
+.sec-toggle .seta{transition:transform .2s;}
+.sec-toggle.aberto .seta{transform:rotate(90deg);}
+@keyframes sec-blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+.sec-toggle.tem-novo{animation:sec-blink .8s ease infinite;}
+</style>
+</head>
+<body>
+<div class="top"><h1>📦 Almoxarifado</h1><span class="beta">BETA</span></div>
+
+<div class="who"><input id="operador" style="display:none" placeholder="👷 Seu nome (quem está operando)" onchange="localStorage.setItem('alm_op',this.value)"></div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v" id="k-p" style="color:#fbbf24;">0</div><div class="l">📋 Pendentes</div></div>
+  <div class="kpi"><div class="v" id="k-f" style="color:#4ade80;">0</div><div class="l">✅ Feitas hoje</div></div>
+  <div class="kpi"><div class="v" id="k-x" style="color:#f87171;">0</div><div class="l">⚠️ Não consegui</div></div>
+</div>
+
+<div style="display:flex;gap:8px;margin-bottom:10px;">
+  <input id="rastro" placeholder="🔎 Rastrear ficha (nome, telefone, equipamento...)" oninput="render()" style="flex:1;background:#16191e;border:1px solid #262b33;border-radius:10px;padding:10px 13px;color:#f0f2f5;font-size:13.5px;outline:none;">
+  <a href="/almoxarifado-arquivo" style="display:flex;align-items:center;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:0 14px;color:#f59e0b;font-weight:800;font-size:12.5px;text-decoration:none;white-space:nowrap;">📦🔎 Arquivo</a>
+</div>
+<div class="tabs">
+  <div class="tab on" data-v="pend" onclick="setTab(this)">📋 Operação</div>
+  <div class="tab" data-v="ml" onclick="setTab(this)">📬 Mercado Livre</div>
+</div>
+
+<div id="lista"></div>
+
+<script>
+var _db={tarefas:[],inventario:{},faseLbl:{}};
+var _tab='pend';
+document.getElementById('operador').value=localStorage.getItem('alm_op')||'';
+
+function lbl(f){return (_db.faseLbl&&_db.faseLbl[f])||f||'—';}
+function op(){return document.getElementById('operador').value.trim();}
+function exigeOp(){return true;} // login futuro cuidará da identidade
+
+async function load(){
+  try{
+    var rs=await Promise.all([
+      fetch('/api/tv-almoxarifado?action=sync').then(function(x){return x.json();}),
+      fetch('/api/tv-almoxarifado?action=rota-list').then(function(x){return x.json();})
+    ]);
+    if(rs[0].ok){_db=rs[0];}
+    if(rs[1].ok){_rotas=rs[1].rotas;}
+    if(_tab==='pend')render();
+  }catch(e){}
+}
+
+function hoje(iso){if(!iso)return false;var d=new Date(iso),h=new Date();return d.toDateString()===h.toDateString();}
+
+var _rotas=[];
+var _vistos=[];try{_vistos=JSON.parse(localStorage.getItem('alm_vistos')||'[]');}catch(e){}
+function ehNovo(id){return _vistos.indexOf(id)===-1;}
+function marcarVisto(id,ev){
+  if(ev&&ev.target&&(ev.target.tagName==='BUTTON'||ev.target.tagName==='A'||ev.target.tagName==='INPUT'))return;
+  if(_vistos.indexOf(id)===-1){_vistos.push(id);if(_vistos.length>400)_vistos=_vistos.slice(-400);
+    localStorage.setItem('alm_vistos',JSON.stringify(_vistos));
+    var el=document.getElementById('c-'+id);if(el)el.classList.remove('novo');
+    atualizaSecRotas();}
+}
+var _rotasAberto=localStorage.getItem('alm_rotas_aberto')!=='0';
+function toggleRotasSec(){_rotasAberto=!_rotasAberto;localStorage.setItem('alm_rotas_aberto',_rotasAberto?'1':'0');render();}
+var _rotaExp={};try{_rotaExp=JSON.parse(localStorage.getItem('alm_rota_exp')||'{}');}catch(e){}
+function toggleRota(rid){
+  _rotaExp[rid]=_rotaExp[rid]===false?true:false;
+  localStorage.setItem('alm_rota_exp',JSON.stringify(_rotaExp));
+  render();
+}
+function rotaExpandida(rid){return _rotaExp[rid]!==false;}
+function atualizaSecRotas(){
+  var st=document.getElementById('sec-rotas-t');
+  if(st&&!(_rotas||[]).some(function(r){return r.status!=='finalizada'&&ehNovo(r.id);}))st.classList.remove('tem-novo');
+}
+async function loadRotas(){
+  try{var r=await fetch('/api/tv-almoxarifado?action=rota-list').then(function(x){return x.json();});
+  if(r.ok){_rotas=r.rotas;renderRotas();}}catch(e){}
+}
+function renderRotas(){load();}
+function htmlRotas(lista){
+  return lista.map(function(rt){
+    var rotaNova=rt.status!=='finalizada'&&ehNovo(rt.id);
+    var pend=rt.itens.filter(function(i){return i.status==='pendente';}).length;
+    var sep=rt.itens.filter(function(i){return i.status==='separado';}).length;
+    var head='🚚 ROTA '+rt.num+' — '+rt.dia.split('-').reverse().slice(0,2).join('/')+' · '+
+      (rt.status==='finalizada'?('✅ SAIU ('+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+') com '+esc(rt.motorista||'')
+        +(rt.placa?' · 🚗 '+esc(rt.placa):'')+(rt.telMotorista?' · 📱 '+esc(rt.telMotorista):'')):'📦 SEPARAÇÃO ('+sep+'/'+rt.itens.length+')');
+    var aberta=rotaExpandida(rt.id);
+    var html='<div class="card '+(rt.status==='finalizada'?'feito-c':'receber')+(rotaNova?' novo':'')+'" id="c-'+rt.id+'">'+
+      '<div class="tt sec-toggle'+(aberta?' aberto':'')+'" style="cursor:pointer;" onclick="marcarVisto(\''+rt.id+'\',event);toggleRota(\''+rt.id+'\')"><span class="seta">▶</span> '+head+'</div>';
+    if(!aberta){return html+'</div>';}
+    html+=rt.itens.map(function(i){
+      var st=i.status==='separado'?'✅':i.status==='negado'?'🚫':i.status==='nao_saiu'?'↩️':'⬜';
+      var linha='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">'+
+        '<span style="font-size:16px;">'+st+'</span>'+
+        '<div style="flex:1;"><b style="font-size:13px;">'+esc(i.cliente)+'</b>'+(i.qtd>1?' <span style="color:#f59e0b;font-weight:800;">×'+i.qtd+'</span>':'')+
+        '<div style="font-size:11px;color:#8b93a3;">'+esc((i.equipamento||'').substring(0,38))+(i.motivo?' · <span style="color:#ef4444;">'+esc(i.motivo)+'</span>':'')+'</div></div>';
+      if(rt.status!=='finalizada'&&i.status==='pendente'){
+        linha+='<button class="btn b-no" style="padding:6px 8px;font-size:11px;" onclick="rotaNegar(\''+rt.id+'\',\''+i.cardId+'\')">🚫</button>'+
+          '<button class="btn b-ok" style="padding:6px 10px;font-size:11px;" onclick="rotaSeparar(\''+rt.id+'\',\''+i.cardId+'\')">✔ '+((i.separado||0))+'/'+i.qtd+'</button>';
+      }
+      return linha+'</div>';
+    }).join('');
+    if(rt.status!=='finalizada'){
+      html+='<div class="acts" style="margin-top:8px;">'+
+        '<button class="btn b-ok" onclick="rotaSaida(\''+rt.id+'\')">🚛 Motorista chegou — confirmar saída</button></div>'+
+        (pend?'<div style="font-size:11px;color:#f59e0b;margin-top:4px;">⚠️ '+pend+' pendente(s): confirmar agora = saída PARCIAL, eles voltam p/ Solicitar Entrega</div>':'');
+    }else{
+      html+='<div class="meta">'+fmtD(rt.saidaEm)+(rt.saidaPor?' · por '+esc(rt.saidaPor):'')
+        +' · <a href="#" onclick="verFotoRota(\''+rt.id+'\');return false;" style="color:#60a5fa;font-weight:700;">📸 ver foto do motorista</a></div>';
+    }
+    return html+'</div>';
+  }).join('');
+}
+async function rotaSeparar(rotaId,cardId){
+  if(!exigeOp())return;
+  var r=await fetch('/api/tv-almoxarifado?action=rota-separar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rotaId:rotaId,cardId:cardId,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function rotaNegar(rotaId,cardId){
+  if(!exigeOp())return;
+  var motivo=prompt('🚫 Por que essa ficha NÃO pode ser separada?');
+  if(!motivo)return;
+  var r=await fetch('/api/tv-almoxarifado?action=rota-negar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rotaId:rotaId,cardId:cardId,motivo:motivo,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    await fetch('/api/tv-pipe?action=rota-devolver',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:cardId,motivo:motivo})}).catch(function(){});
+    load();
+  }else alert('Erro: '+(r.error||'falha'));
+}
+var _rotaSaidaId=null;
+function rotaSaida(rotaId){
+  if(!exigeOp())return;
+  _rotaSaidaId=rotaId;
+  document.getElementById('file-rota').click();
+}
+async function fotoRotaSelecionada(inp){
+  var file=inp.files&&inp.files[0];inp.value='';
+  if(!file||!_rotaSaidaId)return;
+  var motorista=prompt('🚛 NOME COMPLETO do motorista');
+  if(!motorista||motorista.trim().length<3){_rotaSaidaId=null;if(motorista!==null)alert('Nome do motorista é obrigatório');return;}
+  var placa=prompt('🚗 PLACA do veículo\n(ex: ABC1D23)');
+  if(!placa){_rotaSaidaId=null;if(placa!==null)alert('Placa é obrigatória');return;}
+  if(placa.toUpperCase().replace(/[^A-Z0-9]/g,'').length<7){alert('Placa inválida — precisa ter 7 caracteres');_rotaSaidaId=null;return;}
+  var tel=prompt('📱 TELEFONE do motorista com DDD\n(ex: 31988336530)');
+  if(!tel){_rotaSaidaId=null;if(tel!==null)alert('Telefone é obrigatório');return;}
+  if(tel.replace(/\D/g,'').length<10){alert('Telefone inválido — informe com DDD');_rotaSaidaId=null;return;}
+  var b64=await comprimirImg(file,700,.62);
+  var r=await fetch('/api/tv-almoxarifado?action=rota-saida',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rotaId:_rotaSaidaId,motorista:motorista.trim(),placa:placa,telMotorista:tel,fotoB64:b64,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    if(r.sairam&&r.sairam.length)await fetch('/api/tv-pipe?action=rota-saiu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:r.sairam})}).catch(function(){});
+    for(var i=0;i<(r.naoSairam||[]).length;i++){
+      await fetch('/api/tv-pipe?action=rota-devolver',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:r.naoSairam[i].cardId,motivo:r.naoSairam[i].motivo||'não saiu na rota'})}).catch(function(){});
+    }
+    alert('🚛 Saída '+(r.tipo==='parcial'?'PARCIAL':'COMPLETA')+' registrada!'+((r.naoSairam||[]).length?' '+r.naoSairam.length+' ficha(s) voltaram p/ Solicitar Entrega.':''));
+    load();
+  }else alert('Erro: '+(r.error||'falha'));
+  _rotaSaidaId=null;
+}
+async function verFotoRota(rotaId){
+  // mostra a foto DENTRO da tela, sem abrir aba nova (bloqueada em muitos celulares)
+  var ov=document.getElementById('ov-foto-rota');
+  if(ov)ov.remove();
+  ov=document.createElement('div');
+  ov.id='ov-foto-rota';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;';
+  ov.innerHTML='<div style="color:#8b93a3;font-size:13px;">📸 carregando a foto…</div>';
+  ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  document.body.appendChild(ov);
+  var r=await fetch('/api/tv-almoxarifado?action=rota-foto&rota='+encodeURIComponent(rotaId)).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r&&r.ok&&r.b64){
+    var quando=r.em?new Date(r.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    ov.innerHTML='<div style="color:#f0f2f5;font-size:13px;font-weight:700;margin-bottom:8px;">📸 '+rotaId+(quando?' · '+quando:'')+'</div>'
+      +'<img src="'+r.b64+'" style="max-width:100%;max-height:76vh;border-radius:10px;border:1px solid #2a2f38;">'
+      +'<div style="display:flex;gap:8px;margin-top:12px;">'
+        +'<a href="'+r.b64+'" download="rota-'+rotaId+'.jpg" style="background:#242b39;border-radius:9px;padding:9px 16px;color:#f0f2f5;font-size:12px;font-weight:800;text-decoration:none;">⬇ baixar</a>'
+        +'<button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="background:#242b39;border:none;border-radius:9px;padding:9px 16px;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">fechar</button>'
+      +'</div>';
+  } else {
+    ov.innerHTML='<div style="color:#fca5a5;font-size:13px;text-align:center;">Foto não encontrada para esta rota.<br>'
+      +'<button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="margin-top:12px;background:#242b39;border:none;border-radius:9px;padding:9px 16px;color:#f0f2f5;font-weight:800;cursor:pointer;">fechar</button></div>';
+  }
+}
+var _ml={pendentes:[],chegadas:[]};
+async function loadML(){
+  try{
+    var r=await fetch('/api/tv-almoxarifado?action=ml-pendentes').then(function(x){return x.json();});
+    if(r.ok){_ml=r;renderML();}
+  }catch(e){}
+}
+function renderML(){
+  var el=document.getElementById('lista');
+  var stLbl={aguardando_pagamento:'💳 Aguardando pagamento',pago:'✅ Pago — a caminho',a_caminho:'🚚 A caminho'};
+  var html='<div style="font-size:12px;font-weight:900;color:#8b93a3;margin:4px 0 8px;">📦 AGUARDANDO CHEGADA ('+_ml.pendentes.length+')</div>';
+  if(!_ml.pendentes.length)html+='<div class="empty">Nenhuma encomenda pendente</div>';
+  html+=_ml.pendentes.map(function(p){
+    return '<div class="card '+(p.urgente?'falha-c':'receber')+'">'
+      +'<div class="tt">'+(p.sistema==='tv'?'📺 TV':'🔧 ADM')+(p.urgente?' · 🔴 URGENTE':'')+' · '+(stLbl[p.status]||p.status)+'</div>'
+      +'<div class="nm" style="font-size:14px;">'+esc(p.descricao)+'</div>'
+      +'<div class="eq">OS: '+esc(p.os||'—')+' · Qtd: '+p.qtd+(p.previsao?' · Previsão: '+esc(String(p.previsao)).slice(0,10):'')+'</div>'
+      +'<div class="acts"><button class="btn b-ok" onclick="mlChegou(\''+p.id+'\',\''+p.sistema+'\')">📦 Chegou!</button></div>'
+    +'</div>';
+  }).join('');
+  html+='<div style="font-size:12px;font-weight:900;color:#8b93a3;margin:16px 0 8px;">✅ CHEGADAS RECENTES</div>';
+  if(!_ml.chegadas.length)html+='<div class="empty" style="padding:16px;">Nenhuma ainda</div>';
+  html+=_ml.chegadas.map(function(c){
+    return '<div class="card feito-c"><div class="nm" style="font-size:13px;">'+esc(c.descricao)+'</div>'
+      +'<div class="meta">OS '+esc(c.os||'—')+' · → técnico <b>'+esc(c.tecnico)+'</b> · '+fmtD(c.em)+(c.feitoPor?' · por '+esc(c.feitoPor):'')+'</div></div>';
+  }).join('');
+  el.innerHTML=html;
+}
+async function mlChegou(id,sistema){
+  if(!exigeOp())return;
+  var tecnico=prompt('📦 Chegou! Para QUAL TÉCNICO vai essa peça?');
+  if(!tecnico)return;
+  var r=await fetch('/api/tv-almoxarifado?action=ml-chegou',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,sistema:sistema,tecnico:tecnico,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)loadML();else alert('Erro: '+(r.error||'falha'));
+}
+function render(){
+  var p=0,f=0,x=0;
+  _db.tarefas.forEach(function(t){
+    if(t.status==='pendente')p++;
+    if(t.status==='feito'&&hoje(t.feitoEm))f++;
+    if(t.status==='falha')x++;
+  });
+  document.getElementById('k-p').textContent=p;
+  document.getElementById('k-f').textContent=f;
+  document.getElementById('k-x').textContent=x;
+
+  var el=document.getElementById('lista');
+  if(_tab==='ml'){return;}
+  var _q=((document.getElementById('rastro')||{}).value||'').toLowerCase().trim();
+  function bate(s){return String(s||'').toLowerCase().indexOf(_q)>-1;}
+  var rotasAtivas=(_rotas||[]).filter(function(r){return r.status!=='finalizada';})
+    .filter(function(r){return !_q||bate(r.motorista)||r.itens.some(function(i){return bate(i.cliente)||bate(i.tel)||bate(i.equipamento);});});
+  var rotasTemNovo=rotasAtivas.some(function(r){return ehNovo(r.id);});
+  var rotasHtml=rotasAtivas.length?(
+    '<div id="sec-rotas-t" class="sec-toggle'+(_rotasAberto?' aberto':'')+(rotasTemNovo?' tem-novo':'')+'" onclick="toggleRotasSec()" style="font-size:12px;font-weight:900;color:#f97316;margin:4px 0 8px;">'+
+      '<span class="seta">▶</span> 🚚 ROTAS EM SEPARAÇÃO ('+rotasAtivas.length+')'+(rotasTemNovo?' · <span style="color:#fbbf24;">NOVA!</span>':'')+'</div>'+
+    (_rotasAberto?htmlRotas(rotasAtivas):'')
+  ):'';
+  var list=_db.tarefas.filter(function(t){
+    if(_q&&!(bate(t.cliente)||bate(t.tel)||bate(t.equipamento)||bate(t.modelo)))return false;
+    if(_tab==='pend')return t.status==='pendente'||t.status==='falha';
+    return t.status==='feito';
+  });
+  var tarefasTitulo='<div style="font-size:12px;font-weight:900;color:#8b93a3;margin:12px 0 8px;">📋 TAREFAS PENDENTES ('+list.length+')</div>';
+  if(!list.length&&!rotasAtivas.length){el.innerHTML='<div class="empty">Nenhuma tarefa pendente 🎉<br><small>Tudo nasce sozinho conforme o sistema se move — sincronização automática ligada</small></div>'+htmlFeitasHoje()+htmlRotasFinalizadas();return;}
+  el.innerHTML=rotasHtml+tarefasTitulo+(list.length?'':'<div class="empty" style="padding:14px;">Nenhuma 🎉</div>')+list.map(function(t){
+    var cls=t.status==='falha'?'falha-c':t.status==='feito'?'feito-c':t.tipo;
+    var heads={receber:'📥 COLETA CHEGOU — decidir destino','loja-reprovado':'🔴 CLIENTE LOJA REPROVADO → Aguardando Retirada',venda:'💰 VENDA — preparar equipamento','avaliar-compra':'🧐 AVALIAR COMPRA — vale a pena?','levar-area':'📦 EQUIPAMENTO COMPRADO → levar p/ área correta'};
+    var head=heads[t.tipo]||(t.destino==='aprovados'?'🔧 LEVAR PARA PRODUÇÃO (confirma e move no sistema técnico)':'📦 MOVER EQUIPAMENTO');
+    var t4=String(t.tel||'').replace(/\D/g,'').slice(-4);
+    var nomeExib=esc(t.cliente)+(t4&&t.cliente.indexOf(t4)===-1?' '+t4:'');
+    var tNovo=t.status==='pendente'&&ehNovo(t.id);
+    var html='<div class="card '+cls+(tNovo?' novo':'')+'" id="c-'+t.id+'" onclick="marcarVisto(\''+t.id+'\',event)">'+
+      '<div class="tt">'+head+' · '+t.id+'</div>'+
+      '<div class="nm">'+nomeExib+'</div>'+
+      (t.tel?'<div class="eq">📞 '+esc(t.tel)+'</div>':'')+
+      '<div class="eq">'+esc(t.equipamento||'—')+(t.modelo?' · '+esc(t.modelo):'')+'</div>'+
+      (t.defeito?'<div class="eq" style="color:#fbbf24;">🔧 Reclamação: '+esc(t.defeito)+'</div>':'')+
+      (t.obs?'<div class="eq" style="color:#8b93a3;white-space:pre-wrap;">📝 '+esc(String(t.obs).substring(0,300))+'</div>':'')+
+      '<div class="rota-mov"><span class="de">'+lbl(t.origem)+'</span><span class="seta">→</span><span class="para">'+lbl(t.destino)+'</span></div>';
+    if(t.status==='pendente'){
+      if(t.tipo==='receber'){
+        html+='<div class="acts" style="margin-top:8px;">'+
+          '<button class="btn" style="flex:1;background:rgba(168,85,247,.2);color:#c084fc;border:1px solid rgba(168,85,247,.5);font-weight:800;font-size:14px;padding:12px;" onclick="irDiagnostico(\''+t.cardId+'\')">🩺 Diagnóstico (foto + modelo lá dentro)</button></div>'+
+        '<div class="acts" style="margin-top:6px;">'+
+          '<button class="btn" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);" onclick="receberRS(\''+t.id+'\')">🔴 RS (garantia)</button>'+
+          '<button class="btn" style="background:rgba(249,115,22,.15);color:#fb923c;border:1px solid rgba(249,115,22,.4);" onclick="remarcarColeta(\''+t.cardId+'\')">📅 Remarcar</button>'+
+          '<button class="btn b-no" onclick="naoChegou(\''+t.id+'\')">🚫 Não chegou</button></div>';
+      }else if(t.tipo==='venda'){
+        html+='<div class="acts">'+
+          '<button class="btn '+(t.videoGravado?'b-ok':'b-foto')+'" onclick="vendaCheck(\''+t.id+'\',\'video\')">'+(t.videoGravado?'✅':'🎥')+' Vídeo gravado</button>'+
+          '<button class="btn '+(t.separado?'b-ok':'b-foto')+'" onclick="vendaCheck(\''+t.id+'\',\'separado\')">'+(t.separado?'✅':'📦')+' Separado p/ entrega</button></div>';
+      }else if(t.tipo==='avaliar-compra'){
+        if(t.temFoto){
+          html+='<div style="margin:6px 0;padding:6px 9px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:7px;font-size:11.5px;color:#4ade80;font-weight:800;">✅ Foto registrada · <a href="#" onclick="verFoto(\''+t.cardId+'\');return false;" style="color:#60a5fa;">ver foto</a></div>';
+        }else{
+          html+='<div style="margin:6px 0;padding:8px 9px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.45);border-radius:7px;font-size:11.5px;color:#fb923c;font-weight:800;">📷 SEM FOTO — tire a foto do equipamento para a análise'
+            +'<label style="display:block;margin-top:6px;background:#1f2937;border-radius:7px;padding:7px;text-align:center;color:#e5e7eb;cursor:pointer;font-weight:900;">📸 Tirar foto agora'
+            +'<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="enviarFoto(\''+t.id+'\',this)"></label>'
+            +'<div id="foto-status-'+t.id+'" style="font-size:10.5px;margin-top:5px;color:#8b93a3;"></div></div>';
+        }
+        if(t.obs)html+='<div class="eq" style="font-size:11px;color:#8b93a3;">📝 '+esc(t.obs)+'</div>';
+        html+='<div class="acts">'+
+          '<button class="btn b-no" onclick="avaliarCompra(\''+t.id+'\',\'nao\')">👎 Não recomendo</button>'+
+          '<button class="btn b-ok" onclick="avaliarCompra(\''+t.id+'\',\'sim\')">👍 Recomendo + preço</button></div>';
+      }else{
+        html+='<div class="acts">'+
+          '<button class="btn b-no" onclick="naoConsegui(\''+t.id+'\')">⚠️ Não consegui</button>'+
+          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Feito</button></div>';
+      }
+    }
+    if(t.status==='falha'){
+      html+='<div class="meta">⚠️ <b>'+esc(t.feitoPor||'')+'</b>: '+esc(t.motivoFalha||'')+'</div>'+
+        '<div class="acts"><button class="btn b-re" onclick="reabrir(\''+t.id+'\')">🔁 Resolvido — reabrir tarefa</button></div>';
+    }
+    if(t.status==='feito'){
+      html+='<div class="meta">✅ '+esc(t.feitoPor||'—')+' · '+fmtD(t.feitoEm)+(t.cardId&&t.tipo==='receber'?' · <a href="#" onclick="verFoto(\''+t.cardId+'\');return false;" style="color:#60a5fa;">ver foto</a>':'')+'</div>';
+    }
+    return html+'</div>';
+  }).join('')+htmlFeitasHoje()+htmlRotasFinalizadas();
+}
+function htmlFeitasHoje(){
+  var feitas=_db.tarefas.filter(function(t){return t.status==='feito'&&hoje(t.feitoEm);});
+  if(!feitas.length)return '';
+  return '<div style="font-size:12px;font-weight:900;color:#4ade80;margin:14px 0 8px;">✅ CONCLUÍDAS HOJE ('+feitas.length+')</div>'+feitas.map(function(t){
+    return '<div class="card feito-c"><div class="nm" style="font-size:13px;">'+esc(t.cliente)+'</div>'+
+      '<div class="meta">'+esc(t.equipamento||'—')+' · '+lbl(t.origem)+' → '+lbl(t.destino)+' · '+esc(t.feitoPor||'—')+' · '+fmtD(t.feitoEm)+'</div></div>';
+  }).join('');
+}
+function htmlRotasFinalizadas(){
+  var fin=(_rotas||[]).filter(function(r){return r.status==='finalizada'&&hoje(r.saidaEm);});
+  if(!fin.length)return '';
+  return '<div style="font-size:12px;font-weight:900;color:#4ade80;margin:14px 0 8px;">🚛 ROTAS QUE SAÍRAM HOJE ('+fin.length+')</div>'+htmlRotas(fin);
+}
+
+function renderInv(){
+  var el=document.getElementById('lista');
+  var itens=Object.keys(_db.inventario).map(function(k){return Object.assign({cardId:k},_db.inventario[k]);});
+  itens.sort(function(a,b){return (b.atualizadoEm||'').localeCompare(a.atualizadoEm||'');});
+  var html='<input class="search" id="busca" placeholder="🔎 Buscar cliente ou equipamento..." oninput="filtraInv(this.value)">'+
+    '<div id="inv-list">'+invHtml(itens)+'</div>';
+  el.innerHTML=html;
+}
+function invHtml(itens){
+  if(!itens.length)return '<div class="empty">Inventário vazio — vai se preenchendo conforme as tarefas são concluídas</div>';
+  return itens.map(function(i){
+    return '<div class="card"><div class="inv-item"><div>'+
+      '<div class="nm" style="font-size:14px;">'+esc(i.cliente)+'</div>'+
+      '<div class="eq">'+esc(i.equipamento||'')+(i.modelo?' · '+esc(i.modelo):'')+'</div>'+
+      '<div class="meta">'+fmtD(i.atualizadoEm)+(i.por?' · por '+esc(i.por):'')+'</div></div>'+
+      '<div class="loc">'+lbl(i.local)+'</div></div></div>';
+  }).join('');
+}
+function filtraInv(q){
+  q=q.toLowerCase();
+  var itens=Object.keys(_db.inventario).map(function(k){return Object.assign({cardId:k},_db.inventario[k]);})
+    .filter(function(i){return (i.cliente||'').toLowerCase().indexOf(q)>-1||(i.equipamento||'').toLowerCase().indexOf(q)>-1;});
+  document.getElementById('inv-list').innerHTML=invHtml(itens);
+}
+
+function setTab(el){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  el.classList.add('on');_tab=el.getAttribute('data-v');
+  if(_tab==='ml'){loadML();return;}
+  render();
+}
+
+// ── FOTO (compressão no celular antes de subir) ──
+function tirarFoto(id){document.getElementById('file-'+id).click();}
+function comprimirImg(file,mx,q){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,hh=img.height;
+      if(w>hh&&w>mx){hh=hh*mx/w;w=mx;}else if(hh>mx){w=w*mx/hh;hh=mx;}
+      var cv=document.createElement('canvas');cv.width=w;cv.height=hh;
+      cv.getContext('2d').drawImage(img,0,0,w,hh);
+      resolve(cv.toDataURL('image/jpeg',q||0.55));
+    };
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function enviarFoto(id,input){
+  var file=input.files&&input.files[0];
+  if(!file){alert('Nenhuma foto selecionada.');return;}
+  var aviso=document.getElementById('foto-status-'+id);
+  var diz=function(t,cor){ if(aviso){aviso.textContent=t;aviso.style.color=cor||'#8b93a3';} };
+  diz('📤 processando a foto…','#60a5fa');
+  try{
+    var dataUrl=await comprimirFoto(file);
+    if(!dataUrl){diz('❌ não consegui ler esta imagem. Tente tirar de novo pela câmera.','#f87171');return;}
+    // se ainda estiver grande, comprime mais até caber
+    var q=0.55;
+    while(dataUrl.length>230000&&q>0.25){ q-=0.1; dataUrl=await comprimirFoto(file,q); }
+    if(dataUrl.length>230000){diz('❌ foto muito pesada mesmo após compressão. Tire de mais longe.','#f87171');return;}
+    var modInp=document.getElementById('mod-'+id);
+    diz('📤 enviando…','#60a5fa');
+    var r=await fetch('/api/tv-almoxarifado?action=foto',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id,dataUrl:dataUrl,modelo:(modInp&&modInp.value)||''})}).then(function(x){return x.json();});
+    if(r&&r.ok){diz('✅ foto salva!','#4ade80');setTimeout(load,600);}
+    else diz('❌ '+((r&&r.error)||'falha ao salvar'),'#f87171');
+  }catch(e){ diz('❌ erro: '+(e.message||e),'#f87171'); }
+}
+// leitura robusta: tenta decodificar de duas formas (celulares antigos e iPhone falham na primeira)
+function comprimirFoto(file,qual){
+  var q=qual||0.55;
+  return new Promise(function(resolve){
+    var finalizado=false;
+    var pronto=function(bmpOuImg,w0,h0){
+      if(finalizado)return; finalizado=true;
+      try{
+        var mx=640,w=w0,h=h0;
+        if(w>h&&w>mx){h=h*mx/w;w=mx;}else if(h>mx){w=w*mx/h;h=mx;}
+        var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+        cv.getContext('2d').drawImage(bmpOuImg,0,0,w,h);
+        resolve(cv.toDataURL('image/jpeg',q));
+      }catch(e){resolve(null);}
+    };
+    // caminho 1: createImageBitmap (funciona com HEIC em vários aparelhos)
+    if(window.createImageBitmap){
+      createImageBitmap(file).then(function(bmp){pronto(bmp,bmp.width,bmp.height);}).catch(function(){});
+    }
+    // caminho 2: FileReader + Image
+    var rd=new FileReader();
+    rd.onload=function(){
+      var img=new Image();
+      img.onload=function(){pronto(img,img.width,img.height);};
+      img.onerror=function(){ if(!finalizado){finalizado=true;resolve(null);} };
+      img.src=rd.result;
+    };
+    rd.onerror=function(){ if(!finalizado){finalizado=true;resolve(null);} };
+    rd.readAsDataURL(file);
+    setTimeout(function(){ if(!finalizado){finalizado=true;resolve(null);} },15000);
+  });
+}
+async function verFoto(cardId){
+  var r=await fetch('/api/tv-almoxarifado?action=ver-foto&cardId='+encodeURIComponent(cardId)).then(function(x){return x.json();});
+  if(r.ok&&r.foto){
+    var w=window.open('');
+    w.document.write('<body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+r.foto.img+'" style="max-width:100%;max-height:100vh;"></body>');
+  }else alert('Foto não encontrada.');
+}
+
+// ── AÇÕES ──
+async function concluir(id){
+  if(!exigeOp())return;
+  var t=_db.tarefas.find(function(x){return x.id===id;});
+  var body={id:id,feitoPor:op()};
+  if(t&&t.tipo==='receber'){
+    var mod=document.getElementById('mod-'+id);
+    body.modelo=mod?mod.value.trim():'';
+    if(!body.modelo){alert('Informe o modelo do equipamento 📝');return;}
+    if(!t.temFoto){alert('Tira a foto do equipamento primeiro 📷 (obrigatória)');return;}
+  }
+  var r=await fetch('/api/tv-almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function naoConsegui(id){
+  if(!exigeOp())return;
+  var motivo=prompt('⚠️ O que impediu? (obrigatório — vai para o gestor)');
+  if(!motivo)return;
+  var r=await fetch('/api/tv-almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,feitoPor:op(),motivo:motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+function irDiagnostico(fichaId){
+  location.href='/logistica?diag='+encodeURIComponent(fichaId);
+}
+async function remarcarColeta(fichaId){
+  if(!confirm('📅 Remarcar esta coleta? A ficha volta para Remarcar na Logística.'))return;
+  var r=await fetch('/api/tv-logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:fichaId,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){alert('📅 Movida para Remarcar');load();}else alert('Erro: '+(r.error||'falha'));
+}
+async function receberRS(id){
+  if(!exigeOp())return;
+  var t=_db.tarefas.find(function(x){return x.id===id;});
+  var mod=document.getElementById('mod-'+id);
+  if(!confirm('🔴 Finalizar como RS (garantia)? Mesma ação do botão RS da Logística.'))return;
+  var r=await fetch('/api/tv-almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,feitoPor:op(),modelo:(mod&&mod.value)||'',rs:true})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    await fetch('/api/tv-logistica?action=finalizar-rs',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:t.cardId})}).catch(function(){});
+    alert('🔴 RS finalizado — registrado como garantia');load();
+  }else alert('Erro: '+(r.error||'falha'));
+}
+async function naoChegou(id){
+  if(!exigeOp())return;
+  var motivo=prompt('🚫 O equipamento NÃO chegou na loja — qual o motivo?');
+  if(!motivo)return;
+  var r=await fetch('/api/tv-almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,feitoPor:op(),motivo:'NÃO CHEGOU: '+motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function vendaCheck(id,qual){
+  if(!exigeOp())return;
+  var r=await fetch('/api/tv-almoxarifado?action=venda-check',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,qual:qual,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function avaliarCompra(id,parecer){
+  if(!exigeOp())return;
+  var preco='';
+  if(parecer==='sim'){preco=prompt('💰 Preço sugerido de compra (R$):');if(preco===null)return;}
+  var r=await fetch('/api/tv-almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,feitoPor:op(),parecer:parecer,preco:preco})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function reabrir(id){
+  await fetch('/api/tv-almoxarifado?action=reabrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  load();
+}
+
+function esc(s){return String(s||'').replace(/</g,'&lt;').replace(/'/g,'&#39;');}
+function fmtD(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+load();
+setInterval(function(){if(!document.hidden)load();},60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
+setInterval(function(){if(!document.hidden){if(_tab==='ml')loadML();else load();}},45000);
+</script>
+<input type="file" accept="image/*" capture="environment" id="file-rota" style="display:none" onchange="fotoRotaSelecionada(this)">
+</body>
+</html>

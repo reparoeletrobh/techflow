@@ -1,0 +1,1361 @@
+// ═══════════════════════════════════════════════════════════════════
+// GARANTIA — TELEVISORES
+// Mesmo funcionamento da garantia da linha branca, sobre os bancos do
+// sistema de TV: cadastro, fila de tratamento, tipos, contadores e envio
+// ao controle de qualidade. Separado porque as duas frentes têm equipes,
+// prazos e tipos de atendimento próprios.
+// ═══════════════════════════════════════════════════════════════════
+// api/garantia.js — Sistema de Garantia v2
+const GARANTIA_KEY  = "tv_garantia_v2";
+const PIPE_ID       = "305832912";
+// Fases Pipefy (Reparo Eletro)
+const PIPEFY_FASE_SOLICITAR_COLETA  = "334875150"; // fase inicial para delivery
+const PIPEFY_FASE_SOLICITAR_ENTREGA = "334875186"; // Solicitar Entrega
+const PIPEFY_FASE_FINALIZADO        = "334875153"; // Finalizado
+
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
+
+async function dbGet(key) {
+  try {
+    const r = await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const j = await r.json();
+    return j[0] && j[0].result ? JSON.parse(j[0].result) : null;
+  } catch(e) { return null; }
+}
+async function dbSet(key, val) {
+  try {
+    await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([["SET", key, JSON.stringify(val)]]),
+    });
+    return true;
+  } catch(e) { return false; }
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function pipefyToken() { return (process.env.PIPEFY_TOKEN || "").trim(); }
+
+// ── PIPEFY HELPERS ────────────────────────────────────────────
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
+}
+
+// Cria card no Pipefy para delivery
+async function criarCardPipefy() { return { ok: false, error: 'Pipefy desconectado' }; }
+
+// Move card Pipefy para uma fase
+async function moverCardPipefy(pipefyId, phaseId) {
+  const query = `mutation { moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${phaseId}" }) { card { id current_phase { name } } } }`;
+  return { ok: false, error: 'Pipefy desconectado' };
+}
+
+// Fases por tipo
+const FASES = {
+  loja_imediata: [
+    { id: "producao",            label: "Produção" },
+    { id: "conserto_concluido",  label: "Conserto Concluído" },
+    { id: "equip_retirado",      label: "Equipamento Retirado" },
+  ],
+  loja_acompanhamento: [
+    { id: "producao",            label: "Produção" },
+    { id: "conserto_concluido",  label: "Conserto Concluído" },
+    { id: "teste_realizado",     label: "Teste Realizado" },
+    { id: "equip_retirado",      label: "Equipamento Retirado" },
+  ],
+  delivery: [
+    { id: "coleta_solicitada",   label: "Coleta Solicitada" },
+    { id: "producao",            label: "Produção" },
+    { id: "conserto_concluido",  label: "Conserto Concluído" },
+    { id: "teste_realizado",     label: "Teste Realizado" },
+    { id: "solicitar_entrega",   label: "Solicitar Entrega" },
+    { id: "entrega_realizada",   label: "Entrega Realizada" },
+  ],
+  rua: [
+    { id: "garantia_solicitada", label: "Garantia Solicitada" },
+    { id: "equip_recolhido",     label: "Equipamento Recolhido" },
+    { id: "conserto_realizado",  label: "Conserto Realizado" },
+  ],
+};
+
+function primeiraFase(tipo) { return (FASES[tipo] || [])[0]?.id || "producao"; }
+function defaultDB()        { return { fichas: [] }; }
+function isConcluida(ficha) {
+  const ultimas = { loja_imediata: "equip_retirado", loja_acompanhamento: "equip_retirado", delivery: "entrega_realizada", rua: "conserto_realizado" };
+  return ficha.faseId === ultimas[ficha.tipo];
+}
+
+
+// ── 🔥 ENVIA PARA A FILA DE TRATAMENTO ──
+// Regras: garantia de LOJA entra ao ser cadastrada; RS RUA entra apenas quando o
+// equipamento é RECOLHIDO; almoxarifado já entra pelo seu próprio caminho.
+async function enviarParaFila(ficha, origem) {
+  try {
+    const FK = "tv_garantia_fila";
+    const fdb = (await dbGet(FK)) || { itens: [] };
+    fdb.itens = fdb.itens || [];
+    const d8 = String(ficha.telefone || "").replace(/\D/g, "").slice(-8);
+    if (d8 && fdb.itens.some(i => i.status !== "resolvido" &&
+        String(i.telefone || "").replace(/\D/g, "").slice(-8) === d8)) {
+      return { ok: true, dedupe: true };
+    }
+    fdb.itens.unshift({
+      id: "gar_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      nome: String(ficha.nome || "Cliente").slice(0, 80),
+      telefone: String(ficha.telefone || "").slice(0, 20),
+      equipamento: String(ficha.equipamento || ficha.defeito || "").slice(0, 80),
+      relato: String(ficha.defeito || "").slice(0, 400),
+      origem: origem || ficha.tipo || "garantia",
+      tecnico: ficha.tecnico || null,
+      fichaGarantiaId: ficha.id || null,
+      status: "aberto",
+      criadoEm: new Date().toISOString(),
+    });
+    await dbSet(FK, fdb);
+    return { ok: true };
+  } catch (e) { return { ok: false, erro: e.message }; }
+}
+
+module.exports = async function handler(req, res) {
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
+  res.setHeader("Access-Control-Allow-Origin", "https://reparoeletroadm.com");
+  res.setHeader("X-Content-Type-Options","nosniff");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+
+  const { action } = req.query;
+
+  // ── ✅ BAIXAR-CONCLUIDAS: tira da fila o que já foi aprovado no CQ ──
+  if (action === 'baixar-concluidas') {
+    const K3 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    let cruz = null;
+    try {
+      cruz = await fetch('https://reparoeletroadm.com/api/garantia?action=cruzar-qualidade&k=' + K3)
+        .then(x => x.json());
+    } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui cruzar' }); }
+    const linhas = (cruz && cruz.JA_CONCLUIDAS) || [];
+    if (!linhas.length) return res.status(200).json({ ok: true, nada: 'nenhuma a baixar' });
+    const fdb = (await dbGet('tv_garantia_fila')) || { itens: [] };
+    const d8b2 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const alvo = [];
+    for (const l of linhas) {
+      const m2 = String(l).match(/^(.+?)\s(\d{4})\s\|.*\|\s(\S+)\s(aprovado|reprovado)/);
+      if (!m2) continue;
+      const tel4 = m2[2], os = m2[3];
+      const it = (fdb.itens || []).find(x => x.status !== 'resolvido' &&
+        d8b2(x.telefone).slice(-4) === tel4);
+      if (it) alvo.push({ it, os });
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSerBaixadas: alvo.length,
+        L: alvo.map(a => String(a.it.nome || '?').slice(0, 24) + ' | ' + a.os),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    for (const a of alvo) {
+      a.it.status = 'resolvido';
+      a.it.destino = 'qc';
+      a.it.resolvidoEm = new Date().toISOString();
+      a.it.resolvidoPor = 'cruzamento com o controle de qualidade';
+      a.it.inspecaoOs = a.os;
+    }
+    if (alvo.length) await dbSet('tv_garantia_fila', fdb);
+    return res.status(200).json({ ok: true, baixadas: alvo.length,
+      L: alvo.map(a => String(a.it.nome || '?').slice(0, 24) + ' → ' + a.os) });
+  }
+
+  // ── 🔎 CRUZAR-QUALIDADE: garantia na fila que já foi aprovada no CQ ──
+  // A inspeção pode ter sido criada de forma avulsa, sem vínculo com a garantia:
+  // nesse caso o serviço foi concluído e conferido, mas o item continua na fila
+  // esperando tratamento que já aconteceu.
+  if (action === 'cruzar-qualidade') {
+    const d8g = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const norm = s => String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+
+    // a constante da fila é declarada mais abaixo neste arquivo: usá-la aqui
+    // derrubaria a chamada, como o teste de execução apontou
+    const fdb = (await dbGet('tv_garantia_fila')) || { itens: [] };
+    const naFila = (fdb.itens || []).filter(i => i.status !== 'resolvido');
+    const q = (await dbGet('tv_qualidade')) || { inspecoes: [] };
+    const inspecoes = q.inspecoes || [];
+
+    const achados = [], semCruzamento = [];
+    for (const it of naFila) {
+      const tel = d8g(it.telefone);
+      const ult4 = tel.slice(-4);
+      const nomeIt = norm(it.nome || it.nomeContato);
+      const primeiro = nomeIt.split(' ')[0] || '';
+
+      const candidatas = inspecoes.filter(i => {
+        if (i.garantiaId && String(i.garantiaId) === String(it.id)) return true;
+        const telI = d8g(i.telefone);
+        const nomeI = norm(i.cliente);
+        // 🎯 o caso pedido: mesmo nome e os mesmos quatro dígitos no texto
+        const bate4 = ult4 && (telI.slice(-4) === ult4 || nomeI.includes(ult4) ||
+          norm(i.equipamentoTexto).includes(ult4));
+        const bateNome = primeiro.length > 2 &&
+          (nomeI.includes(primeiro) || nomeIt.includes(nomeI.split(' ')[0] || '#'));
+        return bate4 && bateNome;
+      });
+
+      const concluidas = candidatas.filter(i => i.status === 'aprovado' || i.status === 'reprovado');
+      if (!candidatas.length) { semCruzamento.push(it); continue; }
+      for (const i of concluidas) {
+        achados.push({
+          filaId: it.id, nome: it.nome || it.nomeContato, tel,
+          equipamentoFila: String(it.equipamento || it.descricao || '').slice(0, 30),
+          naFilaDesde: it.criadoEm || it.em,
+          inspOs: i.os, inspId: i.id, inspStatus: i.status,
+          inspTecnico: i.tecnico, inspCliente: i.cliente,
+          inspEquip: String(i.equipamentoTexto || i.equipamento || '').slice(0, 30),
+          concluidaEm: i.aprovadoEm || i.reprovadoEm,
+          avulsa: i.avulsa === true,
+          vinculada: !!i.garantiaId,
+        });
+      }
+    }
+    const avulsas = achados.filter(a => a.avulsa || !a.vinculada);
+    return res.status(200).json({ ok: achados.length === 0,
+      naFila: naFila.length,
+      inspecoesNoCq: inspecoes.length,
+      jaConcluidasNoCq: achados.length,
+      criadasDeFormaAvulsa: avulsas.length,
+      VEREDITO: achados.length
+        ? '⚠️ ' + achados.length + ' item(ns) na fila de garantia já foram concluídos ' +
+          'no controle de qualidade — a fila não foi baixada'
+        : '✅ nenhum item da fila já concluído no controle de qualidade',
+      JA_CONCLUIDAS: achados.map(a => a.nome.slice(0, 22) + ' ' + a.tel.slice(-4) +
+        ' | fila desde ' + hh(a.naFilaDesde) +
+        ' | ' + a.inspOs + ' ' + a.inspStatus + ' em ' + hh(a.concluidaEm) +
+        ' | téc: ' + (a.inspTecnico || '—') +
+        (a.avulsa ? ' | 🏷️ AVULSA' : '') + (a.vinculada ? '' : ' | sem vínculo com a garantia') +
+        ' | fila: ' + a.equipamentoFila + ' ↔ CQ: ' + a.inspEquip),
+      observacao: 'a inspeção avulsa não guarda vínculo com a garantia, por isso a fila ' +
+        'não é baixada automaticamente quando ela é aprovada' });
+  }
+
+  try {
+
+    // ── GET load ──────────────────────────────────────────────
+      // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
+  const FILA_KEY = "tv_garantia_fila";
+
+  // ── ♻️ RESTAURAR-RSRUA: devolve as garantias de RS Rua que a redefinição removeu ──
+  if (action === 'restaurar-rsrua') {
+    const lix2 = await dbGet('tv_garantia_lixeira_2');   // estado antes da redefinição
+    const lix1 = await dbGet('tv_garantia_lixeira');     // antes do manter-apenas
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    db[campo] = db[campo] || [];
+    const agora = new Set(db[campo].map(f => d4(f.telefone)));
+
+    // tudo que havia nas duas lixeiras
+    const candidatas = [];
+    for (const [nome, lx] of [['lixeira_2', lix2], ['lixeira_1', lix1]]) {
+      for (const f of (((lx || {}).fichas) || [])) candidatas.push({ ...f, _de: nome });
+    }
+    // as de RS RUA: identificadas pelo tipo/origem/fase
+    // 🔍 diagnóstico: mostra os campos reais antes de filtrar. O filtro anterior
+    // procurava "rua" em vários campos e batia no ENDEREÇO ("Rua tal, 123"),
+    // trazendo 136 fichas que não têm relação com RS Rua.
+    if (String(req.query.campos || '') === '1') {
+      const ex = candidatas.slice(0, 3).map(f => ({ campos: Object.keys(f), amostra: f }));
+      const valoresTipo = {};
+      for (const f of candidatas) {
+        for (const c of ['tipo', 'origem', 'fase', 'phase', 'status', 'board', 'lista', 'grupo']) {
+          if (f[c] === undefined) continue;
+          const k = c + '=' + String(f[c]).slice(0, 24);
+          valoresTipo[k] = (valoresTipo[k] || 0) + 1;
+        }
+      }
+      return res.status(200).json({ ok: true,
+        totalNasLixeiras: candidatas.length,
+        CAMPOS_DE_EXEMPLO: ex.map(e => e.campos),
+        VALORES_ENCONTRADOS: Object.entries(valoresTipo).sort((a, b) => b[1] - a[1]).slice(0, 30),
+        UMA_FICHA_COMPLETA: candidatas[0] || null });
+    }
+    // 🎯 o campo tipo classifica a garantia: rua, delivery, loja_acompanhamento,
+    // loja_imediata. RS Rua é exatamente tipo === 'rua'.
+    const ehRua = f => String(f.tipo || '').toLowerCase().trim() === 'rua';
+    const soRua = String(req.query.tudo || '') === '1' ? candidatas : candidatas.filter(ehRua);
+    // sem duplicar o que já está lá
+    const vistos = new Set();
+    const voltar = soRua.filter(f => {
+      const k = d4(f.telefone) + '|' + String(f.equipamento || f.descricao || '').slice(0, 18);
+      if (agora.has(d4(f.telefone)) || vistos.has(k)) return false;
+      vistos.add(k); return true;
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        naGarantiaAgora: db[campo].length,
+        naLixeira2: (((lix2 || {}).fichas) || []).length,
+        naLixeira1: (((lix1 || {}).fichas) || []).length,
+        identificadasComoRSRua: soRua.length,
+        vaoVoltar: voltar.length,
+        porTipoNasLixeiras: candidatas.reduce((o, f) => {
+          const k = String(f.tipo || '(sem tipo)'); o[k] = (o[k] || 0) + 1; return o; }, {}),
+        // 🔍 as fases que as fichas de RS Rua tinham guardadas
+        FASES_DAS_DE_RUA: soRua.reduce((o, f) => {
+          const k = String(f.fase || f.phase || f.status || f.faseId || f.coluna || '(sem fase)');
+          o[k] = (o[k] || 0) + 1; return o; }, {}),
+        camposDeUmaDeRua: soRua[0] ? Object.keys(soRua[0]) : [],
+        exemploDeRua: soRua[0] || null,
+        AMOSTRA: voltar.slice(0, 40).map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
+          ' ' + d4(f.telefone) + ' | ' + String(f.equipamento || f.descricao || '').slice(0, 22) +
+          ' | tipo: ' + (f.tipo || '?') + ' | ' + String(f.status || f.phase || '?')),
+        dica: soRua.length ? 'para restaurar: &aplicar=1'
+          : 'nenhuma identificada como RS Rua — use &tudo=1 para ver todas as da lixeira' });
+    }
+    // 🔒 preserva a fase original de cada ficha — a maioria já estava concluída
+    db[campo] = voltar.map(f => {
+      const g = { ...f }; delete g._de;
+      // se algum campo de fase existir, mantém; nunca sobrescreve
+      if (!g.fase && !g.phase && !g.status) { g.status = 'garantia_solicitada'; g.faseRestauradaPadrao = true; }
+      return g;
+    }).concat(db[campo]);
+    await dbSet(GARANTIA_KEY, db);
+    const porFase = voltar.reduce((o, f) => {
+      const k = String(f.fase || f.phase || f.status || '(sem fase)'); o[k] = (o[k] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true, restauradas: voltar.length,
+      totalAgora: db[campo].length,
+      POR_FASE: porFase,
+      semFaseOriginal: voltar.filter(f => !f.fase && !f.phase && !f.status).length });
+  }
+
+  // ── 📊 CONTADORES: garantias por dia, semana e por técnico ──
+  // ── 🔍 RASTREAR: procura um cliente na fila e na gestão de garantias ──
+  if (action === 'rastrear') {
+    const q = String(req.query.q || '').trim();
+    const qd = q.replace(/\D/g, '');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=nome ou telefone' });
+    const bate = (x) => {
+      const tel = String(x.telefone || '').replace(/\D/g, '');
+      const nome = String(x.nome || x.cliente || '').toLowerCase();
+      return (qd.length >= 3 && tel.endsWith(qd)) || (q.length >= 3 && nome.includes(q.toLowerCase()));
+    };
+    const [fila, gest] = await Promise.all([
+      dbGet('tv_garantia_fila'), dbGet(GARANTIA_KEY),
+    ]);
+    const naFila = ((fila || {}).itens || []).filter(bate).map(i => ({
+      onde: '🔥 Fila de tratamento', nome: i.nome, telefone: i.telefone,
+      equipamento: i.equipamento, origem: i.origem, status: i.status,
+      tecnico: i.tecnico || null, quando: i.criadoEm }));
+    const naGestao = ((gest || {}).fichas || []).filter(bate).map(f => ({
+      onde: '📁 Gestão de Garantias', nome: f.nome || f.cliente, telefone: f.telefone,
+      equipamento: f.equipamento || f.defeito, tipo: f.tipo || '(sem tipo)',
+      fase: f.faseId || f.status || '?', tecnico: f.tecnico || null,
+      concluida: !!f.concluida, quando: f.criadaEm || f.criadoEm }));
+    const tudo = naFila.concat(naGestao);
+    return res.status(200).json({ ok: tudo.length > 0, busca: q,
+      encontrados: tudo.length,
+      naFila: naFila.length, naGestao: naGestao.length,
+      L: tudo.map(x => x.onde + ' | ' + String(x.nome || '?').slice(0, 22) +
+        ' ' + String(x.telefone || '').slice(-4) +
+        ' | ' + String(x.equipamento || '').slice(0, 26) +
+        (x.tipo ? ' | tipo: ' + x.tipo : '') +
+        ' | ' + (x.fase || x.status || '?') +
+        (x.tecnico ? ' | téc: ' + x.tecnico : '') +
+        (x.concluida ? ' | ✅ concluída' : '') +
+        ' | ' + String(x.quando || '').slice(0, 10)),
+      detalhe: tudo });
+  }
+
+  // ── 🔎 VER-FICHA: mostra a ficha crua, sem interpretação ──
+  if (action === 'ver-ficha') {
+    const q = String(req.query.q || '').replace(/\D/g, '');
+    const db = (await dbGet(GARANTIA_KEY)) || {};
+    const CH = Object.keys(db);
+    const achados = [];
+    for (const L of ['fichas', 'cards', 'itens']) {
+      for (const f of ((db[L]) || [])) {
+        if (q && !String(f.telefone || '').replace(/\D/g, '').endsWith(q)) continue;
+        achados.push({ _lista: L, ...f });
+      }
+    }
+    return res.status(200).json({ ok: true,
+      chaveLida: 'tv_garantia_v2',
+      listasNoBanco: CH,
+      tamanhoDeCadaLista: Object.fromEntries(CH.map(k => [k, Array.isArray(db[k]) ? db[k].length : typeof db[k]])),
+      encontradas: achados.length,
+      FICHAS: achados.slice(0, 3) });
+  }
+
+  // ── 🔬 RAIO-X: o que existe no banco, por tipo, fase e situação ──
+  // ── 🔁 SINCRONIZAR-FILA: leva à fila quem já deveria estar nela ──
+  if (action === 'sincronizar-fila') {
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const fdb = (await dbGet('tv_garantia_fila')) || { itens: [] };
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const naFila = new Set((fdb.itens || []).filter(i => i.status !== 'resolvido').map(i => d8(i.telefone)));
+    const devem = (db.fichas || []).filter(f => {
+      if (f.concluida) return false;
+      if (naFila.has(d8(f.telefone))) return false;
+      if (f.tipo === 'loja_imediata' || f.tipo === 'loja_acompanhamento') return true;
+      if (f.tipo === 'rua' && f.faseId === 'equip_recolhido') return true;
+      return false;
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        naFilaAgora: (fdb.itens || []).filter(i => i.status !== 'resolvido').length,
+        vaoEntrar: devem.length,
+        L: devem.map(f => String(f.nome || '?').slice(0, 20) + ' | ' + f.tipo +
+          ' | ' + (f.faseId || '?') + ' | ' + String(f.defeito || '').slice(0, 30)),
+        regras: ['loja_imediata e loja_acompanhamento: entram ao cadastrar',
+          'rua: entra apenas quando marcada como equip_recolhido',
+          'almoxarifado: entra pelo caminho próprio'],
+        dica: 'para enviar: &aplicar=1' });
+    }
+    const feitos = [];
+    for (const f of devem) {
+      const r = await enviarParaFila({ ...f, equipamento: f.defeito },
+        f.tipo === 'rua' ? 'rs-rua-recolhido' : 'loja-' + f.tipo);
+      if (r.ok && !r.dedupe) feitos.push(String(f.nome || '?').slice(0, 20));
+      await new Promise(s => setTimeout(s, 80));
+    }
+    return res.status(200).json({ ok: true, enviadas: feitos.length, feitos });
+  }
+
+  if (action === 'raio-x') {
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || [];
+    const porTipo = {}, semTipo = [], faseInvalida = [];
+    const FASES_VALIDAS = {};
+    for (const [t, arr] of Object.entries(FASES || {})) FASES_VALIDAS[t] = (arr || []).map(x => x.id);
+    for (const f of lista) {
+      const t = String(f.tipo || '(SEM TIPO)');
+      porTipo[t] = porTipo[t] || { total: 0, ativas: 0, concluidas: 0, porFase: {} };
+      porTipo[t].total++;
+      if (f.concluida) porTipo[t].concluidas++; else porTipo[t].ativas++;
+      const fase = String(f.faseId || '(SEM FASE)');
+      porTipo[t].porFase[fase] = (porTipo[t].porFase[fase] || 0) + 1;
+      if (!f.tipo) semTipo.push(String(f.nome || '?').slice(0, 20));
+      else if (FASES_VALIDAS[f.tipo] && !FASES_VALIDAS[f.tipo].includes(String(f.faseId || ''))) {
+        faseInvalida.push(String(f.nome || '?').slice(0, 18) + ' | tipo ' + f.tipo +
+          ' | faseId "' + (f.faseId || '(vazio)') + '" não existe neste tipo');
+      }
+    }
+    const ativasTotal = lista.filter(f => !f.concluida).length;
+    return res.status(200).json({ ok: true,
+      totalNoBanco: lista.length,
+      ativas: ativasTotal, concluidas: lista.length - ativasTotal,
+      FASES_VALIDAS_POR_TIPO: FASES_VALIDAS,
+      POR_TIPO: porTipo,
+      SEM_TIPO: { quantas: semTipo.length, exemplos: semTipo.slice(0, 20) },
+      FASE_INVALIDA: { quantas: faseInvalida.length, exemplos: faseInvalida.slice(0, 20),
+        obs: 'ficha com faseId que não pertence ao seu tipo pode não renderizar na tela' },
+      ATIVAS_LOJA_ACOMPANHAMENTO: lista
+        .filter(f => f.tipo === 'loja_acompanhamento' && !f.concluida)
+        .map(f => String(f.nome || '?').slice(0, 20) + ' | fase: ' + (f.faseId || '?') +
+          ' | ' + String(f.criadaEm || '').slice(0, 10)) });
+  }
+
+  if (action === 'contadores') {
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || db.cards || [];
+    const bras = new Date(Date.now() - 3 * 3600000);
+    const hoje = bras.toISOString().slice(0, 10);
+    const diaSem = bras.getUTCDay();
+    const seg = new Date(bras); seg.setUTCDate(bras.getUTCDate() - ((diaSem === 0) ? 6 : (diaSem - 1)));
+    const iniSemana = seg.toISOString().slice(0, 10);
+    // 📅 a data gravada está em UTC e o dia de referência é o de Brasília:
+    // comparar direto fazia todo registro feito depois das 21h cair no dia seguinte
+    const dia = d => { const t = new Date(d || 0).getTime();
+      return t ? new Date(t - 3 * 3600000).toISOString().slice(0, 10) : ''; };
+    // a ficha marca conclusão no booleano concluida, além da fase
+    const RESOLVIDAS = ['resolvida', 'finalizado', 'entregue', 'concluida', 'concluido'];
+    const ehResolvida = f => f.concluida === true ||
+      RESOLVIDAS.includes(String(f.faseId || f.status || f.phase || '').toLowerCase());
+
+    const entrouHoje = lista.filter(f => dia(f.criadaEm || f.criadoEm || f.em) === hoje);
+    const entrouSemana = lista.filter(f => dia(f.criadaEm || f.criadoEm || f.em) >= iniSemana);
+    const resolvidas = lista.filter(f => ehResolvida(f));
+    const noCq = lista.filter(f => f.enviadoCqEm);
+    const porTecnico = {};
+    for (const f of lista) {
+      const t = String(f.tecnico || f.tecnicoOrigem || '(sem técnico)');
+      porTecnico[t] = porTecnico[t] || { hoje: 0, semana: 0, total: 0, resolvidas: 0 };
+      porTecnico[t].total++;
+      if (dia(f.criadaEm || f.criadoEm || f.em) === hoje) porTecnico[t].hoje++;
+      if (dia(f.criadaEm || f.criadoEm || f.em) >= iniSemana) porTecnico[t].semana++;
+      if (ehResolvida(f)) porTecnico[t].resolvidas++;
+    }
+    return res.status(200).json({ ok: true,
+      hoje, semanaComecaEm: iniSemana,
+      ENTRARAM: { hoje: entrouHoje.length, semana: entrouSemana.length, total: lista.length },
+      RESOLVIDAS: { total: resolvidas.length,
+        hoje: resolvidas.filter(f => dia(f.resolvidoEm) === hoje).length,
+        semana: resolvidas.filter(f => dia(f.resolvidoEm) >= iniSemana).length },
+      ENVIADAS_AO_CQ: { total: noCq.length,
+        hoje: noCq.filter(f => dia(f.enviadoCqEm) === hoje).length,
+        semana: noCq.filter(f => dia(f.enviadoCqEm) >= iniSemana).length },
+      EM_ABERTO: lista.length - resolvidas.length,
+      POR_TECNICO: Object.entries(porTecnico)
+        .sort((a, b) => b[1].semana - a[1].semana)
+        .map(([t, v]) => t.padEnd(12) + ' | hoje ' + String(v.hoje).padStart(2) +
+          ' | semana ' + String(v.semana).padStart(2) +
+          ' | resolvidas ' + String(v.resolvidas).padStart(2) +
+          ' | total ' + v.total),
+      // 📋 as garantias de cada técnico, nominalmente
+      GARANTIAS_POR_TECNICO: Object.fromEntries(Object.keys(porTecnico).map(t => [t,
+        lista.filter(f => String(f.tecnico || f.tecnicoOrigem || '(sem técnico)') === t &&
+            dia(f.criadaEm || f.criadoEm || f.em) >= iniSemana)
+          .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
+          .map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
+            ' ' + String(f.telefone || '').slice(-4) +
+            ' | ' + String(f.equipamento || f.descricao || '').slice(0, 22) +
+            ' | ' + String(f.faseId || f.status || f.phase || '?') +
+            ' | ' + (f.tipo || '?'))])),
+      observacao: 'o técnico da garantia vem de tecnicoOrigem — garantias antigas podem não ter esse campo' });
+  }
+
+  // ── 📊 RELATORIO: o que está na garantia agora e de onde veio ──
+  if (action === 'relatorio') {
+    const LISTA14 = ['1991','2582','9757','2908','1427','0942','4404','3292',
+      '5978','0611','7270','3878','8937','8011'];
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || db.cards || [];
+    const daLista = [], deHoje = [], outras = [];
+    for (const f of lista) {
+      const c = d4(f.telefone);
+      if (LISTA14.includes(c)) { daLista.push(f); continue; }
+      const q = String(f.criadaEm || f.criadoEm || f.em || '').slice(0, 10);
+      (q === hoje ? deHoje : outras).push(f);
+    }
+    const linha = f => String(f.nome || f.cliente || '?').slice(0, 20).padEnd(20) +
+      ' ' + d4(f.telefone) + ' | ' +
+      (f.equipamento || f.descricao ? String(f.equipamento || f.descricao).slice(0, 34) : '⚠️ COMPLETAR') +
+      ' | ' + String(f.status || f.phase || '?');
+    return res.status(200).json({ ok: true,
+      totalNaGarantia: lista.length,
+      dos14ConferidosNaLoja: daLista.length,
+      abertasHojeForaDaLista: deHoje.length,
+      outras: outras.length,
+      precisamCompletar: daLista.filter(f => !(f.equipamento || f.descricao))
+        .map(f => String(f.nome || '?') + ' ' + d4(f.telefone)),
+      OS_14: daLista.map(linha),
+      ABERTAS_HOJE: deHoje.length ? deHoje.map(linha) : 'nenhuma além dos 14',
+      OUTRAS: outras.length ? outras.map(linha) : 'nenhuma' });
+  }
+
+  // ── 🎯 REDEFINIR-LISTA: deixa exatamente os 14 da loja + as criadas hoje ──
+  if (action === 'redefinir-lista') {
+    const LISTA = [
+      ['Alexandre','1991'],['Augusto','2582'],['Vera','9757'],['Marcio','2908'],
+      ['Vilmar','1427'],['Isabel','0942'],['Elton','4404'],['Lucas','3292'],
+      ['Emerson','5978'],['Emília','0611'],['Gilda','7270'],['Daianne','3878'],
+      ['Davidson','8937'],['Paulo','8011'],
+    ];
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    const atual = db[campo] || [];
+    const cods = new Set(LISTA.map(x => x[1]));
+
+    // 1) as criadas HOJE que não estão na lista permanecem
+    const criadasHoje = atual.filter(f => {
+      const c = d4(f.telefone);
+      if (cods.has(c)) return false;
+      const q = String(f.criadaEm || f.criadoEm || f.em || '');
+      return q.slice(0, 10) === hoje && !String(f.origem || '').includes('conferência física');
+    });
+
+    // 2) monta uma ficha por item da lista, com o NOME QUE VOCÊ PASSOU
+    const FONTES = ['tv_pipe', 'tv_logistica', 'fichas_tv', 'tv_arquivo'];
+    const dados = {};
+    for (const k of FONTES) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['cards', 'fichas']) {
+          for (const x of ((b || {})[L] || [])) {
+            const c = d4(x.telefone);
+            if (!cods.has(c)) continue;
+            const eq = x.equipamento || x.descricao || '';
+            if (dados[c] && dados[c].equipamento) continue;
+            dados[c] = { telefone: x.telefone, equipamento: eq, endereco: x.endereco || '',
+              nomeNoSistema: x.nomeContato || x.nome || null, origemBanco: k };
+          }
+        }
+      } catch (e) {}
+    }
+    // aproveita o que já existe na garantia
+    for (const f of atual) {
+      const c = d4(f.telefone);
+      if (!cods.has(c)) continue;
+      const eq = f.equipamento || f.descricao || '';
+      if (eq && (!dados[c] || !dados[c].equipamento)) {
+        dados[c] = { ...(dados[c] || {}), telefone: f.telefone, equipamento: eq,
+          endereco: f.endereco || '', origemBanco: 'garantia' };
+      }
+    }
+    const novos = LISTA.map(([nome, cod]) => {
+      const d = dados[cod] || {};
+      const falta = !d.equipamento;
+      return {
+        id: 'gar_' + cod,
+        nome, cliente: nome,                         // 👤 o nome que veio da conferência física
+        nomeNoSistema: d.nomeNoSistema || null,      // guarda a divergência, se houver
+        telefone: d.telefone || cod,
+        equipamento: d.equipamento || '',
+        endereco: d.endereco || '',
+        valor: 0,
+        status: 'garantia_solicitada', phase: 'garantia_solicitada',
+        origem: 'conferência física na loja',
+        cadastroIncompleto: falta,
+        obs: falta ? '⚠️ COMPLETAR: falta o equipamento' : null,
+        criadoEm: new Date().toISOString(),
+      };
+    });
+    const divergentes = novos.filter(n => n.nomeNoSistema &&
+      !String(n.nomeNoSistema).toLowerCase().includes(String(n.nome).toLowerCase()));
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        totalHoje: atual.length,
+        ficaraoDaLista: novos.length,
+        maisCriadasHoje: criadasHoje.length,
+        totalFinal: novos.length + criadasHoje.length,
+        precisamCompletar: novos.filter(n => n.cadastroIncompleto).map(n => n.nome + ' ' + String(n.telefone).slice(-4)),
+        NOME_DIVERGENTE: divergentes.map(n => n.nome + ' ' + String(n.telefone).slice(-4) +
+          ' → no sistema consta "' + n.nomeNoSistema + '"'),
+        LISTA_FINAL: novos.map(n => n.nome + ' ' + String(n.telefone).slice(-4) +
+          ' | ' + (n.equipamento || '⚠️ completar')),
+        MANTIDAS_DE_HOJE: criadasHoje.map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
+          ' ' + d4(f.telefone)),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    try { await dbSet('tv_garantia_lixeira_2', { em: new Date().toISOString(), fichas: atual }); } catch (e) {}
+    db[campo] = novos.concat(criadasHoje);
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true,
+      daLista: novos.length, mantidasDeHoje: criadasHoje.length,
+      total: db[campo].length,
+      precisamCompletar: novos.filter(n => n.cadastroIncompleto).map(n => n.nome),
+      backup: 'estado anterior em tv_garantia_lixeira_2' });
+  }
+
+  // ── 🧹 REMOVER-DUPLICADOS: mesma pessoa com mais de uma ficha na garantia ──
+  if (action === 'remover-duplicados') {
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    const lista = db[campo] || [];
+    const porTel = {};
+    for (const f of lista) {
+      const k = d4(f.telefone) + '|' + String(f.equipamento || f.descricao || '').toLowerCase().trim();
+      porTel[k] = porTel[k] || [];
+      porTel[k].push(f);
+    }
+    const ficam = [], removidos = [];
+    for (const [k, grupo] of Object.entries(porTel)) {
+      if (grupo.length === 1) { ficam.push(grupo[0]); continue; }
+      // mantém a mais completa: com equipamento e mais recente
+      grupo.sort((a, b) => {
+        const ea = (a.equipamento || a.descricao || '').length;
+        const eb = (b.equipamento || b.descricao || '').length;
+        if (ea !== eb) return eb - ea;
+        return String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+      });
+      ficam.push(grupo[0]);
+      for (const x of grupo.slice(1)) removidos.push(String(x.nome || x.cliente || '?') + ' ' + d4(x.telefone) +
+        ' | ' + String(x.equipamento || x.descricao || 'sem equipamento').slice(0, 20));
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        total: lista.length, ficam: ficam.length,
+        duplicados: removidos.length, REMOVER: removidos,
+        criterio: 'mesma pessoa e mesmo equipamento — mantém a ficha mais completa',
+        dica: 'para remover: &aplicar=1' });
+    }
+    db[campo] = ficam;
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, removidos: removidos.length, restaram: ficam.length });
+  }
+
+  // ── ➕ GARANTIR-14: coloca na garantia os equipamentos conferidos na loja ──
+  if (action === 'garantir-lista') {
+    const LISTA = [
+      ['Alexandre','1991'],['Augusto','2582'],['Vera','9757'],['Marcio','2908'],
+      ['Vilmar','1427'],['Isabel','0942'],['Elton','4404'],['Lucas','3292'],
+      ['Emerson','5978'],['Emília','0611'],['Gilda','7270'],['Daianne','3878'],
+      ['Davidson','8937'],['Paulo','8011'],
+    ];
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    db[campo] = db[campo] || [];
+    const jaTem = new Set(db[campo].map(f => d4(f.telefone)));
+
+    // procura os dados de cada um nos outros bancos
+    const FONTES = ['tv_pipe', 'tv_logistica', 'fichas_tv', 'tv_arquivo'];
+    const dados = {};
+    for (const k of FONTES) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['cards', 'fichas']) {
+          for (const x of ((b || {})[L] || [])) {
+            const c = d4(x.telefone);
+            if (!LISTA.some(([, cod]) => cod === c)) continue;
+            if (dados[c] && dados[c].equipamento) continue;   // já tem um bom
+            dados[c] = { nome: x.nomeContato || x.nome, telefone: x.telefone,
+              equipamento: x.equipamento || x.descricao || '', valor: x.valor || 0,
+              endereco: x.endereco || '', origemBanco: k };
+          }
+        }
+      } catch (e) {}
+    }
+    const criados = [], jaEstavam = [], semDados = [];
+    for (const [nome, cod] of LISTA) {
+      if (jaTem.has(cod)) { jaEstavam.push(nome + ' ' + cod); continue; }
+      const d = dados[cod];
+      criados.push({
+        id: 'gar_' + cod + '_' + Date.now().toString(36),
+        nome: d ? (d.nome || nome) : nome,
+        cliente: d ? (d.nome || nome) : nome,
+        telefone: d ? d.telefone : cod,
+        equipamento: d ? d.equipamento : '',
+        endereco: d ? d.endereco : '',
+        valor: 0,
+        status: 'garantia_solicitada',
+        phase: 'garantia_solicitada',
+        origem: 'conferência física na loja 10/08',
+        obs: d ? ('dados recuperados de ' + d.origemBanco) : 'CADASTRAR EQUIPAMENTO — não encontrado no sistema',
+        criadoEm: new Date().toISOString(),
+      });
+      if (!d) semDados.push(nome + ' ' + cod);
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        jaEstavamNaGarantia: jaEstavam.length, jaEstavam,
+        vaoSerCriados: criados.length,
+        semDadosNoSistema: semDados.length, semDados,
+        DETALHE: criados.map(c => c.nome + ' ' + String(c.telefone).slice(-4) +
+          ' | ' + (c.equipamento || '⚠️ sem equipamento') + ' | ' + c.obs),
+        dica: 'para criar: &aplicar=1' });
+    }
+    db[campo] = criados.concat(db[campo]);
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true,
+      criados: criados.length, jaEstavam: jaEstavam.length,
+      semDadosNoSistema: semDados,
+      totalAgora: db[campo].length });
+  }
+
+  // ── 🧹 MANTER-APENAS: deixa na garantia só os equipamentos conferidos na loja ──
+  if (action === 'manter-apenas') {
+    const LISTA = [
+      ['Alexandre','1991'],['Augusto','2582'],['Vera','9757'],['Marcio','2908'],
+      ['Vilmar','1427'],['Isabel','0942'],['Elton','4404'],['Lucas','3292'],
+      ['Emerson','5978'],['Emília','0611'],['Gilda','7270'],['Daianne','3878'],
+      ['Davidson','8937'],['Paulo','8011'],
+    ];
+    const cods = new Set(LISTA.map(x => x[1]));
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || db.cards || [];
+    const campo = db.fichas ? 'fichas' : 'cards';
+    const ficam = [], saem = [];
+    // 🎯 casa APENAS pelos 4 dígitos do telefone — casar por nome puxava homônimos
+    // (Emerson 5705, Davidson 8927, Marcio 2804 não são os da lista)
+    for (const f of lista) {
+      (cods.has(d4(f.telefone)) ? ficam : saem).push(f);
+    }
+    const naLista = LISTA.filter(([, c]) => !ficam.some(f => d4(f.telefone) === c));
+    // 🔎 os que não estão na garantia — onde eles estão?
+    const ondeEstao = {};
+    if (naLista.length) {
+      for (const chave of ['tv_pipe', 'tv_arquivo', 'tv_logistica',
+        'fichas_tv', 'tv_garantia_fila']) {
+        try {
+          const b = await dbGet(chave);
+          for (const L of ['cards', 'fichas']) {
+            for (const x of ((b || {})[L] || [])) {
+              const c4 = d4(x.telefone);
+              if (!naLista.some(([, c]) => c === c4)) continue;
+              ondeEstao[c4] = ondeEstao[c4] || [];
+              ondeEstao[c4].push(chave + ' · ' + String(x.phaseId || x.phase || x.status || '?'));
+            }
+          }
+        } catch (e) {}
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        ONDE_ESTAO_OS_QUE_FALTAM: Object.entries(ondeEstao).map(([c, v]) =>
+          c + ': ' + [...new Set(v)].slice(0, 3).join(' | ')),
+        totalHoje: lista.length,
+        vaoFicar: ficam.length, vaoSair: saem.length,
+        naListaMasNaoEncontrados: naLista.map(x => x[0] + ' ' + x[1]),
+        FICAM: ficam.map(f => String(f.nome || f.cliente || '?').slice(0, 20) + ' ' + d4(f.telefone) +
+          ' | ' + String(f.equipamento || f.descricao || '').slice(0, 20)),
+        SAEM: saem.slice(0, 50).map(f => String(f.nome || f.cliente || '?').slice(0, 20) + ' ' + d4(f.telefone)),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    try { await dbSet('tv_garantia_lixeira', { em: new Date().toISOString(), fichas: saem }); } catch (e) {}
+    db[campo] = ficam;
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true,
+      ficaram: ficam.length, removidos: saem.length,
+      naListaMasNaoEncontrados: naLista.map(x => x[0] + ' ' + x[1]),
+      backup: 'cópia em tv_garantia_lixeira' });
+  }
+  if (action === "fila-load") {
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const itens = [...(fdb.itens || [])].sort((a, b) => {
+      const sa = a.status === "resolvido" ? 1 : 0, sb = b.status === "resolvido" ? 1 : 0;
+      return sa - sb || new Date(b.criadoEm) - new Date(a.criadoEm);
+    });
+    const abertos = itens.filter(i => i.status !== "resolvido").length;
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const resolvidosHoje = itens.filter(i => i.status === "resolvido" && String(i.resolvidoEm || "").slice(0, 10) === hoje).length;
+    return res.status(200).json({ ok: true, itens: itens.slice(0, 200), abertos, resolvidosHoje, totalResolvidos: itens.filter(i => i.status === "resolvido").length });
+  }
+  if (action === "fila-badge") {
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    return res.status(200).json({ ok: true, abertos: (fdb.itens || []).filter(i => i.status !== "resolvido").length });
+  }
+  if (req.method === "POST" && action === "fila-criar") {
+    const b = req.body || {};
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const d8n = String(b.telefone || "").replace(/\D/g, "").slice(-8);
+    // dedupe: mesmo telefone com item aberto não duplica
+    if (d8n && (fdb.itens || []).some(i => i.status !== "resolvido" && String(i.telefone || "").replace(/\D/g, "").slice(-8) === d8n)) {
+      return res.status(200).json({ ok: true, dedupe: true });
+    }
+    fdb.itens.unshift({
+      id: "gar_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      nome: String(b.nome || "Cliente").slice(0, 80),
+      telefone: String(b.telefone || "").slice(0, 20),
+      equipamento: String(b.equipamento || "").slice(0, 80),
+      relato: String(b.relato || b.motivo || "").slice(0, 400),
+      origem: String(b.origem || "manual").slice(0, 30),
+      status: "aberto", criadoEm: new Date().toISOString(),
+    });
+    await dbSet(FILA_KEY, fdb);
+    return res.status(200).json({ ok: true });
+  }
+  if (req.method === "POST" && action === "fila-resolver") {
+    const { id, destino, tecnico } = req.body || {};
+    if (!["video", "qc"].includes(destino)) return res.status(400).json({ ok: false, error: "destino: video|qc" });
+    // 🔬 mandar para o controle de qualidade exige saber quem executou o serviço,
+    // senão a produção da garantia não entra na conta de nenhum técnico
+    if (destino === "qc" && !String(tecnico || "").trim()) {
+      return res.status(400).json({ ok: false, error: "informe o técnico que fez a garantia" });
+    }
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const it = (fdb.itens || []).find(x => x.id === id);
+    if (!it) return res.status(404).json({ ok: false });
+    it.status = "resolvido";
+    it.destino = destino;
+    it.tecnico = String(tecnico || "").trim() || null;
+    it.resolvidoEm = new Date().toISOString();
+    await dbSet(FILA_KEY, fdb);
+
+    // ── cria a inspeção no controle de qualidade ──
+    let inspecao = null;
+    if (destino === "qc") {
+      try {
+        const KQ = "tv_qualidade";
+        const q = (await dbGet(KQ)) || { inspecoes: [], config: { tecnicos: [], proximoNum: 1 } };
+        q.inspecoes = q.inspecoes || [];
+        q.config = q.config || { tecnicos: [], proximoNum: 1 };
+        const txt = String(it.equipamento || it.descricao || "").toLowerCase();
+        const tipo = /micro-?ondas|microondas|magnetron/.test(txt) ? "microondas"
+          : /purificador|bebedouro|filtro|agua|água/.test(txt) ? "purificador"
+          : /adega|climatizada/.test(txt) ? "adega"
+          : /forno|fogao|fogão/.test(txt) ? "forno"
+          : /\btv\b|televis/.test(txt) ? "tv" : "outro";
+        // não duplica se já existir inspeção desta garantia
+        const jaTem = q.inspecoes.some(x => String(x.garantiaId || "") === String(it.id));
+        if (!jaTem) {
+          const num = q.config.proximoNum || (q.inspecoes.length + 1);
+          const nova = {
+            id: "insp_gar_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            os: "GAR-" + String(num).padStart(4, "0"),
+            cardId: null, garantiaId: it.id,
+            cliente: it.nome || it.nomeContato || "—",
+            telefone: it.telefone || "",
+            equipamento: tipo,
+            equipamentoTexto: String(it.equipamento || it.descricao || "").slice(0, 120),
+            tecnico: String(tecnico).trim(),
+            origem: "garantia",           // 🏷️ fica FORA da meta de 25, como as demais garantias
+            obsTecnica: it.defeito || it.motivo || null,
+            valor: 0, status: "aguardando", checklist: {},
+            criadoEm: new Date().toISOString(),
+          };
+          q.inspecoes.unshift(nova);
+          q.config.proximoNum = num + 1;
+          await dbSet(KQ, q);
+          // confere que persistiu
+          const conf = (await dbGet(KQ)) || {};
+          const ok2 = ((conf.inspecoes) || []).some(x => x.id === nova.id);
+          inspecao = ok2 ? { os: nova.os, tecnico: nova.tecnico }
+                         : { erro: "a inspeção não persistiu — tente de novo" };
+        } else {
+          inspecao = { jaExistia: true };
+        }
+      } catch (e) { inspecao = { erro: e.message }; }
+    }
+    return res.status(200).json({ ok: true, destino, tecnico: it.tecnico, inspecao });
+  }
+  if (req.method === "POST" && action === "fila-reabrir") {
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const it = (fdb.itens || []).find(x => x.id === (req.body || {}).id);
+    if (!it) return res.status(404).json({ ok: false });
+    it.status = "aberto"; delete it.destino; delete it.resolvidoEm;
+    await dbSet(FILA_KEY, fdb);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── 📊 RELATORIO: garantias por técnico, tempo de resolução e volume por período ──
+  if (action === "relatorio") {
+    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias || "30", 10)));
+    const corte = Date.now() - dias * 86400000;
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const todas = (db.garantias || []).concat(db.lojaImediata || []);
+    const noPeriodo = todas.filter(g => new Date(g.criadaEm || 0).getTime() >= corte);
+
+    const horas = g => {
+      if (!g.concluida) return null;
+      const ini = new Date(g.criadaEm || 0).getTime();
+      const fim = new Date(g.concluidaEm || g.movidaEm || 0).getTime();
+      return (ini && fim && fim > ini) ? Number(((fim - ini) / 3600000).toFixed(1)) : null;
+    };
+    const media = a => a.length ? Number((a.reduce((s, x) => s + x, 0) / a.length).toFixed(1)) : null;
+
+    // por TÉCNICO DE ORIGEM (quem fez o serviço que voltou em garantia)
+    const porTec = {};
+    for (const g of noPeriodo) {
+      const t = (g.tecnicoOrigem || g.tecnico || "(não informado)").trim();
+      if (!porTec[t]) porTec[t] = { tecnico: t, total: 0, abertas: 0, concluidas: 0, tempos: [], equipamentos: {} };
+      const p = porTec[t];
+      p.total++;
+      if (g.concluida) { p.concluidas++; const hh = horas(g); if (hh != null) p.tempos.push(hh); }
+      else p.abertas++;
+      const eq = String(g.equipamento || g.defeito || "").toLowerCase();
+      const cat = /micro-?\s?ondas/.test(eq) ? "micro-ondas"
+        : (/purificador|bebedouro/.test(eq) ? "purificador"
+        : (/adega|cervejeir/.test(eq) ? "adega"
+        : (/\btvs?\b|televis/.test(eq) ? "tv"
+        : (/forno/.test(eq) ? "forno" : "outros"))));
+      p.equipamentos[cat] = (p.equipamentos[cat] || 0) + 1;
+    }
+    const ranking = Object.values(porTec).map(p => ({
+      tecnico: p.tecnico, garantias: p.total, abertas: p.abertas, concluidas: p.concluidas,
+      horasMedias: media(p.tempos),
+      equipamentos: p.equipamentos,
+    })).sort((a, b) => b.garantias - a.garantias);
+
+    // por DIA
+    const porDia = {};
+    for (const g of noPeriodo) {
+      const d = new Date(new Date(g.criadaEm).getTime() - 3 * 3600000).toISOString().slice(0, 10);
+      porDia[d] = (porDia[d] || 0) + 1;
+    }
+    // por TIPO de garantia
+    const porTipo = noPeriodo.reduce((o, g) => { const t = g.tipo || "?"; o[t] = (o[t] || 0) + 1; return o; }, {});
+    const temposGerais = noPeriodo.map(horas).filter(x => x != null);
+
+    if (String(req.query.mini || "") === "1") {
+      return res.status(200).json({ dias,
+        entraram: noPeriodo.length,
+        abertas: noPeriodo.filter(g => !g.concluida).length,
+        concluidas: noPeriodo.filter(g => g.concluida).length,
+        horasMedias: media(temposGerais),
+        porTipo,
+        porTecnico: ranking.reduce((o, r) => { o[r.tecnico] = r.garantias; return o; }, {}) });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      RESUMO: {
+        entraram: noPeriodo.length,
+        abertasAgora: todas.filter(g => !g.concluida).length,
+        concluidasNoPeriodo: noPeriodo.filter(g => g.concluida).length,
+        horasMediasParaResolver: media(temposGerais),
+        porTipo,
+      },
+      POR_TECNICO: ranking.map(r => r.tecnico + " | " + r.garantias + " garantia(s) | " +
+        r.concluidas + " resolvida(s)" + (r.horasMedias != null ? " em " + r.horasMedias + "h em média" : "") +
+        (r.abertas ? " | " + r.abertas + " aberta(s)" : "")),
+      porDia,
+      detalhePorTecnico: ranking,
+      abertas: todas.filter(g => !g.concluida).map(g => ({
+        nome: g.nome, telefone: String(g.telefone || "").slice(-4),
+        equipamento: g.equipamento || g.defeito, tipo: g.tipo,
+        tecnicoOrigem: g.tecnicoOrigem || g.tecnico || null,
+        diasAberta: Number(((Date.now() - new Date(g.criadaEm || 0).getTime()) / 86400000).toFixed(1)),
+      })).sort((a, b) => b.diasAberta - a.diasAberta) });
+  }
+
+  if (action === "load") {
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      return res.status(200).json({ ok: true, fichas: db.fichas || [], fases: FASES });
+    }
+
+    // ── POST cadastrar ─────────────────────────────────────────
+    if (req.method === "POST" && action === "cadastrar") {
+      const { nome, telefone, defeito, endereco, tipo } = req.body || {};
+      if (!nome || !telefone || !defeito || !tipo)
+        return res.status(400).json({ ok: false, error: "nome, telefone, defeito e tipo são obrigatórios" });
+      if (!FASES[tipo])
+        return res.status(400).json({ ok: false, error: "tipo inválido: " + tipo });
+
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+            const tecnico = (req.body.tecnico || "").trim();
+      ficha = {
+        id:         uid(),
+        nome:       nome.trim(),
+        telefone:   telefone.trim(),
+        defeito:    defeito.trim(),
+        endereco:   (endereco || "").trim(),
+        tipo,
+        tecnico:    tecnico || null,
+        faseId:     primeiraFase(tipo),
+        criadaEm:   new Date().toISOString(),
+        movidaEm:   new Date().toISOString(),
+        concluida:  false,
+        pipefyId:   null,
+        pipefyErro: null,
+      };
+
+      // 🔥 LOJA vai para a fila de tratamento assim que é cadastrada
+      if (tipo === "loja_imediata" || tipo === "loja_acompanhamento") {
+        const rf = await enviarParaFila({ ...ficha, equipamento: ficha.defeito }, "loja-" + tipo);
+        ficha.naFila = rf.ok && !rf.dedupe;
+      }
+
+      // Delivery → cria card no Pipefy imediatamente
+      if (tipo === "delivery") {
+        // Criar card na coluna Garantia do Pipe ADM
+        try {
+          const _gU=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+          const _gT=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+          async function _gg(k){const r=await fetch(_gU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_gT,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+          async function _gs(k,v){await fetch(_gU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_gT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+          const pdbG=(await _gg('tv_pipe'))||{cards:[],syncedPipefyIds:[],lastSync:null};
+          if(!Array.isArray(pdbG.cards))pdbG.cards=[];
+          const nowG=new Date().toISOString();
+          pdbG.cards.unshift({
+            id:'GARANTIA-'+String(Date.now()),
+            phase:'garantia',
+            nomeContato:ficha.nome||'',
+            telefone:ficha.telefone||'',
+            equipamento:ficha.equipamento||'',
+            descricao:ficha.defeito||'',
+            valor:parseFloat(ficha.valorServico)||0,
+            origem:'garantia_delivery',
+            garantiaId:ficha.id,
+            criadoEm:nowG,movedAt:nowG,
+            aguardandoDesde:null,history:[],analiseCompra:false
+          });
+          pdbG.lastSync=nowG;
+          await _gs('tv_pipe',pdbG);
+        } catch(eg){ console.error('[garantia→pipe]',eg.message); }
+
+        const pip = await criarCardPipefy(ficha);
+        if (pip.ok) {
+          ficha.pipefyId    = pip.pipefyId;
+          ficha.pipefyTitle = pip.pipefyTitle;
+        } else {
+          ficha.pipefyErro = pip.error;
+        }
+
+        // Delivery → registrar também na Logística em "Liberado para Coleta"
+        try {
+          const U2 = process.env.UPSTASH_URL;
+          const T2 = process.env.UPSTASH_TOKEN;
+          const LOG_KEY = "tv_logistica";
+          const logDb = await fetch(`${U2}/get/${LOG_KEY}`, {
+            headers: { Authorization: `Bearer ${T2}` }
+          }).then(r=>r.json()).then(j => j.result ? JSON.parse(j.result) : { fichas:[], nextId:1 });
+          const logId = "LOG-" + String(logDb.nextId || 1).padStart(4, "0");
+          logDb.fichas.unshift({
+            id:          logId,
+            nome:        ficha.nome,
+            telefone:    ficha.telefone || "",
+            endereco:    ficha.endereco || "",
+            equipamento: "",
+            defeito:     ficha.defeito || "",
+            pipefyCardId: ficha.pipefyId ? String(ficha.pipefyId) : null,
+            texto:       "[Garantia Delivery]",
+            phase:       "liberado_coleta",
+            origem:      "garantia",
+            garantiaId:  ficha.id,
+            criadoEm:    new Date().toISOString(),
+            movedAt:     new Date().toISOString(),
+            diagnostico: null,
+          });
+          logDb.nextId = (logDb.nextId || 1) + 1;
+          await fetch(`${U2}/set/${LOG_KEY}`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${T2}`, "Content-Type": "application/json" },
+            body: JSON.stringify(logDb)
+          });
+          console.log("[Garantia] ficha logística criada:", logId);
+        } catch(e) { console.error("[Garantia] logística:", e.message); }
+      }
+
+      db.fichas.unshift(ficha);
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok: true, ficha });
+    }
+
+    // ── POST mover ─────────────────────────────────────────────
+    if (req.method === "POST" && action === "mover") {
+      const { id, faseId } = req.body || {};
+      if (!id || !faseId) return res.status(400).json({ ok: false, error: "id e faseId obrigatórios" });
+
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      const ficha = db.fichas.find(function(f) { return f.id === id; });
+      if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+
+      const fases = FASES[ficha.tipo] || [];
+      if (!fases.find(function(f) { return f.id === faseId; }))
+        return res.status(400).json({ ok: false, error: "Fase inválida para este tipo" });
+
+      const faseAnterior = ficha.faseId;
+      ficha.faseId   = faseId;
+      ficha.movidaEm = new Date().toISOString();
+      // 🔥 RS RUA só entra na fila quando o equipamento é RECOLHIDO
+      if (ficha.tipo === "rua" && faseId === "equip_recolhido" && faseAnterior !== "equip_recolhido") {
+        const rf = await enviarParaFila({ ...ficha, equipamento: ficha.defeito }, "rs-rua-recolhido");
+        ficha.naFila = rf.ok && !rf.dedupe;
+        ficha.entrouNaFilaEm = new Date().toISOString();
+      }
+      // Ao mover via Técnico, auto-conclui (sai da coluna)
+      ficha.concluida = false;
+
+      // Delivery + solicitar_entrega → move card Pipefy para Solicitar Entrega
+      let pipefyResult = null;
+      if (ficha.tipo === "delivery" && faseId === "solicitar_entrega" && ficha.pipefyId) {
+        pipefyResult = await moverCardPipefy(ficha.pipefyId, PIPEFY_FASE_SOLICITAR_ENTREGA);
+        if (!pipefyResult.ok) ficha.pipefyErro = pipefyResult.error;
+      }
+
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok: true, ficha, pipefy: pipefyResult });
+    }
+
+    // ── POST concluir ──────────────────────────────────────────
+    if (req.method === "POST" && action === "concluir") {
+      const { id } = req.body || {};
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      const ficha = db.fichas.find(function(f) { return f.id === id; });
+      if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+      const ultimas = { loja_imediata: "equip_retirado", loja_acompanhamento: "equip_retirado", delivery: "entrega_realizada", rua: "conserto_realizado" };
+      ficha.faseId      = ultimas[ficha.tipo] || ficha.faseId;
+      ficha.concluida   = true;
+      ficha.concluidaEm = new Date().toISOString();
+      ficha.concluida = true;
+      ficha.concluidaEm = new Date().toISOString();
+      ficha.concluidaMotivo = "movida_tecnico";
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok: true, ficha });
+    }
+
+    // ── POST reabrir ───────────────────────────────────────────
+    if (req.method === "POST" && action === "reabrir") {
+      const { id } = req.body || {};
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      const ficha = db.fichas.find(function(f) { return f.id === id; });
+      if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+      ficha.concluida   = false;
+      ficha.concluidaEm = null;
+      ficha.faseId      = primeiraFase(ficha.tipo);
+      ficha.movidaEm    = new Date().toISOString();
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok: true, ficha });
+    }
+
+    // ── POST marcar-wpp: cliente comunicado via WhatsApp ─────────
+    if (action === 'marcar-wpp') {
+      const { id } = req.body || {};
+      if (!id) return res.status(400).json({ ok:false, error:'id obrigatório' });
+      const db = (await dbGet(GARANTIA_KEY)) || defaultDB();
+      const ficha = (db.fichas||[]).find(f => f.id === id);
+      if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada' });
+      ficha.wppComunicado   = true;
+      ficha.wppComunicadoEm = new Date().toISOString();
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok:true });
+    }
+
+    // ── POST excluir ───────────────────────────────────────────
+    if (req.method === "POST" && action === "excluir") {
+      const { id } = req.body || {};
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      db.fichas = db.fichas.filter(function(f) { return f.id !== id; });
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── GET pipefy-sync ────────────────────────────────────────
+    // Verifica fichas delivery que estão no Pipefy como Finalizado
+    // e move para entrega_realizada no nosso sistema
+    if (action === "pipefy-sync") {
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      // Busca fichas delivery com pipefyId que ainda não foram concluídas
+      const pendentes = db.fichas.filter(function(f) {
+        return f.tipo === "delivery" && f.pipefyId && !f.concluida;
+      });
+      if (!pendentes.length) return res.status(200).json({ ok: true, sincronizados: 0 });
+
+      // Busca o card de cada uma no Pipefy para ver a fase atual
+      const ids = pendentes.map(function(f) { return f.pipefyId; });
+      const cardQueries = ids.map(function(cid) {
+        return '  c' + cid + ': card(id: "' + cid + '") { id current_phase { id name } }';
+      }).join("\n");
+      const query = "query {\n" + cardQueries + "\n}";
+      const r = await pipefyQuery(query);
+
+      let sincronizados = 0;
+      if (r.data) {
+        pendentes.forEach(function(ficha) {
+          const cardData = r.data["c" + ficha.pipefyId];
+          if (cardData && cardData.current_phase && cardData.current_phase.id === PIPEFY_FASE_FINALIZADO) {
+            ficha.faseId      = "entrega_realizada";
+            ficha.concluida   = true;
+            ficha.concluidaEm = new Date().toISOString();
+            sincronizados++;
+          }
+        });
+        if (sincronizados > 0) await dbSet(GARANTIA_KEY, db);
+      }
+
+      return res.status(200).json({ ok: true, sincronizados, pipefyErro: r.error || null });
+    }
+
+    if (action === "tecnico-load") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all = db.fichas || [];
+    return res.status(200).json({ ok: true,
+      garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && !f.concluida),
+      lojaImediata: all.filter(f => f.tipo === "loja_imediata" && !f.concluida)
+    });
+  }
+  if (action === "relatorio-tecnico") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all = db.fichas || [];
+    const agora = new Date();
+    const hist = [];
+    for (let m = 0; m < 6; m++) {
+      const d   = new Date(agora.getFullYear(), agora.getMonth() - m, 1);
+      const ym  = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+      const lbl = d.toLocaleDateString("pt-BR", { month:"short", year:"2-digit" });
+      const fichasM = all.filter(f => f.criadaEm && f.criadaEm.slice(0,7) === ym);
+      const porTec  = {};
+      fichasM.forEach(f => { const t = f.tecnico || "N/D"; porTec[t] = (porTec[t]||0)+1; });
+      hist.push({ ym, label: lbl, total: fichasM.length, porTecnico: porTec });
+    }
+    return res.status(200).json({ ok: true, mesAtual: hist[0]||{label:"",total:0,porTecnico:{}}, historico: hist });
+  }
+      // ── compare-pipefy — compara fichas ativas com fase atual no Pipefy ──
+  if (action === "compare-pipefy") {
+    const db   = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all  = db.fichas || [];
+    const ativas = all.filter(f => !f.concluida);
+    const comPipefy  = ativas.filter(f => f.pipefyId);
+    const semPipefy  = ativas.filter(f => !f.pipefyId);
+
+    // Query em lote — todos os pipefyIds de uma vez
+    let pipefyFases = {};
+    if (comPipefy.length > 0) {
+      try {
+        const parts = comPipefy.map(f =>
+          'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id title current_phase { id name } }'
+        ).join("\n");
+        // Fetch direto — cards do pipe TV não são acessíveis via pipefyQuery do pipe garantia
+        const _tok = pipefyToken();
+        const _resp = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + _tok },
+          body: JSON.stringify({ query: "query {\n" + parts + "\n}" })
+        });
+        const _json = await _resp.json();
+        const data = _json.data || {};
+        for (const ficha of comPipefy) {
+          const key  = "c" + ficha.pipefyId;
+          const card = data && data[key];
+          pipefyFases[ficha.pipefyId] = card
+            ? { fase: card.current_phase ? card.current_phase.name : "?", faseId: card.current_phase ? card.current_phase.id : "?" }
+            : { fase: "Não encontrado no Pipefy", faseId: null };
+        }
+      } catch(e) {
+        for (const f of comPipefy) pipefyFases[f.pipefyId] = { fase: "Erro: " + e.message, faseId: null };
+      }
+    }
+
+    const result = ativas.map(f => ({
+      nome:       f.nome,
+      tipo:       f.tipo,
+      faseLocal:  f.faseId,
+      pipefyId:   f.pipefyId || null,
+      pipefyFase: f.pipefyId ? (pipefyFases[f.pipefyId] || {}).fase : "Sem ID Pipefy",
+      pipefyFaseId: f.pipefyId ? (pipefyFases[f.pipefyId] || {}).faseId : null,
+      dias:       Math.floor((Date.now() - new Date(f.movidaEm)) / 86400000),
+    }));
+
+    return res.status(200).json({ ok: true, total: result.length, fichas: result });
+  }
+
+    // ── force-remove-finalizados ─────────────────────────────────
+  if (action === "force-remove-finalizados") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    // pipefyIds confirmados como Finalizado no Pipefy
+    const PIPEFY_FINALIZADOS = new Set([
+      "1341050397","1340515029","1339647098","1339437751",
+      "1338487077","1338477821","1338141543","1337253696",
+      "1336559831","1336463675","1336246266","1335982509",
+      "1335887472","1335874019","1335392718","1335154250"
+    ]);
+    // Fases terminais locais
+    const FASES_T = ["entrega_realizada","equip_retirado","equip_recolhido","conserto_realizado","servico_finalizado"];
+    const removidas = [];
+    for (const f of db.fichas || []) {
+      if (f.concluida) continue;
+      const byPipefy = f.pipefyId && PIPEFY_FINALIZADOS.has(f.pipefyId);
+      const byFase   = FASES_T.includes(f.faseId);
+      if (byPipefy || byFase) {
+        f.concluida = true;
+        f.concluidaEm = new Date().toISOString();
+        f.concluidaMotivo = byPipefy ? "pipefy_finalizado_force" : "fase_terminal";
+        removidas.push({ nome: f.nome, pipefyId: f.pipefyId||null, motivo: f.concluidaMotivo });
+      }
+    }
+    if (removidas.length > 0) await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, total: removidas.length, removidas });
+  }
+
+    if (action === "limpar-coluna") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    let count = 0;
+    for (const f of db.fichas || []) {
+      if (!f.concluida) { f.concluida=true; f.concluidaEm=new Date().toISOString(); f.concluidaMotivo="reset_manual"; count++; }
+    }
+    if (count > 0) await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, removidas: count });
+  }
+
+  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+
+  } catch(e) {
+    return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
+  }
+};

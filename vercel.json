@@ -1285,6 +1285,18 @@
     {
       "source": "/kpis",
       "destination": "/kpis.html"
+    },
+    {
+      "source": "/tv-almoxarifado",
+      "destination": "/tv-almoxarifado.html"
+    },
+    {
+      "source": "/tv-garantia-v2",
+      "destination": "/tv-garantia-v2.html"
+    },
+    {
+      "source": "/tv-garantia-fila",
+      "destination": "/tv-garantia-fila.html"
     }
   ],
   "headers": [

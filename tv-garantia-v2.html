@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  // Papel TV: acesso restrito às telas do sistema TV
+  if(localStorage.getItem('tf_role')==='tv'&&location.pathname.indexOf('/tv')!==0){
+    location.replace('/tv-adm');return;
+  }
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    var isApi=false;
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        isApi=true;o=o||{};
+        var kk=localStorage.getItem('tf_key')||'';
+        if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
+        else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
+      }
+    }catch(e){}
+    var p=_f.call(this,u,o);
+    if(isApi){
+      p=p.then(function(r){
+        if(r&&r.status===401&&!window.__tfHealed){
+          window.__tfHealed=true;
+          localStorage.removeItem('tf_key');
+          location.replace('/login?next='+encodeURIComponent(location.pathname));
+        }
+        return r;
+      });
+    }
+    return p;
+  };
+  // Navegação/downloads para /api/ (links e window.open) também levam a chave
+  document.addEventListener('click',function(ev){
+    var a=ev.target&&ev.target.closest?ev.target.closest('a'):null;
+    if(a){
+      var hu=a.getAttribute('href')||'';
+      if(hu.indexOf('/api/')>-1&&hu.indexOf('k=')===-1){
+        a.setAttribute('href',hu+(hu.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||''));
+      }
+    }
+  },true);
+  var _wo=window.open;
+  window.open=function(u){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('k=')===-1){
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+        arguments[0]=u;
+      }
+    }catch(e){}
+    return _wo.apply(window,arguments);
+  };
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garantia TV</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--border2:#243050;
+  --text:#dce8f8;--muted:#4a607a;--dim:#060c18;
+  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--cyan:#06d6d6;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:52px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;background:var(--purple);border-radius:50%;box-shadow:0 0 8px var(--purple);}
+.logo span{color:var(--purple);}
+.hdr-btns{display:flex;gap:8px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+
+/* ── MAIN TABS ── */
+.main-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 22px;background:var(--bg);position:sticky;top:52px;z-index:90;gap:2px;}
+.mtab{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
+.mtab:hover{color:var(--text);}
+.mtab.active{color:var(--purple);border-bottom-color:var(--purple);}
+.mtab .badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:99px;background:var(--surface2);margin-left:4px;color:var(--muted);}
+.mtab.active .badge{background:rgba(168,85,247,.15);color:var(--purple);}
+
+.view{display:none;padding:20px 22px;}
+.view.active{display:block;}
+
+/* ── CADASTRO + KANBAN (view geral) ── */
+.geral-grid{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;}
+@media(max-width:900px){.geral-grid{grid-template-columns:1fr;}}
+
+/* Form */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.form-title{font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.form-title span{color:var(--purple);}
+.fl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;transition:border .15s;margin-bottom:12px;}
+.fi:focus{border-color:var(--purple);}
+.tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.tipo-btn{padding:10px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--fm);font-size:10px;font-weight:700;text-align:center;transition:all .15s;}
+.tipo-btn:hover{border-color:var(--purple);color:var(--text);}
+.tipo-btn.sel-loja_imediata{background:rgba(16,217,130,.1);color:var(--green);border-color:rgba(16,217,130,.4);}
+.tipo-btn.sel-loja_acompanhamento{background:rgba(59,158,255,.1);color:var(--accent);border-color:rgba(59,158,255,.4);}
+.tipo-btn.sel-delivery{background:rgba(249,115,22,.1);color:var(--orange);border-color:rgba(249,115,22,.4);}
+.tipo-btn.sel-rua{background:rgba(240,64,96,.1);color:var(--red);border-color:rgba(240,64,96,.4);}
+.btn-cad{width:100%;padding:11px;border-radius:8px;border:none;background:var(--purple);color:#fff;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px;}
+.btn-cad:hover{filter:brightness(1.1);}
+.btn-cad:disabled{opacity:.5;cursor:not-allowed;}
+
+/* Kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+@media(max-width:1200px){.kanban{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:700px){.kanban{grid-template-columns:1fr;}}
+.kb-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.kb-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.kb-label{font-family:var(--fh);font-size:12px;font-weight:800;}
+.kb-count{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;}
+.kb-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:60px;}
+.kb-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.kb-nome{font-size:12px;font-weight:600;color:#fff;margin-bottom:2px;}
+.kb-fase{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.kb-empty{font-family:var(--fm);font-size:10px;color:var(--muted);padding:12px;text-align:center;}
+
+/* ── POR-TIPO VIEWS (tabs: loja_imediata etc) ── */
+.tipo-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.tipo-title{font-family:var(--fh);font-size:18px;font-weight:900;}
+.kanban-fases{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
+.kanban-fases .fase-col{flex:0 0 260px;min-width:260px;}
+.fase-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.fase-head{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.fase-label{font-family:var(--fm);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
+.fase-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:50px;}
+
+/* Ficha card */
+.ficha-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;transition:border-color .15s;}
+.ficha-card:hover{border-color:rgba(168,85,247,.2);}
+.fc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.fc-nome{font-size:13px;font-weight:600;color:#fff;}
+.fc-tipo-badge{font-family:var(--fm);font-size:8px;padding:2px 7px;border-radius:99px;white-space:nowrap;}
+.fc-defeito{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.fc-meta{display:flex;gap:8px;flex-wrap:wrap;font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:8px;}
+.fc-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.fc-btn{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.fc-btn:hover{color:var(--text);border-color:var(--accent);}
+.fc-btn.green{color:var(--green);border-color:rgba(16,217,130,.3);}
+.fc-btn.red{color:var(--red);border-color:rgba(240,64,96,.3);}
+.fc-btn.orange{color:var(--orange);border-color:rgba(249,115,22,.3);}
+.fase-select{font-family:var(--fm);font-size:9px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;outline:none;}
+.fase-select:focus{border-color:var(--purple);}
+
+/* ── MONITORAMENTO TAB ── */
+.mon-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+@media(max-width:800px){.mon-grid{grid-template-columns:1fr;}}
+.mon-sec{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.mon-sec-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.mon-sec-title{font-family:var(--fh);font-size:13px;font-weight:800;}
+.mon-count{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:99px;}
+.mon-body{padding:8px;display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;}
+.mon-item{background:var(--surface2);border-radius:6px;padding:8px 10px;border-left:3px solid transparent;}
+.mon-nome{font-size:12px;font-weight:600;color:#fff;}
+.mon-fase{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;}
+.mon-empty{font-family:var(--fm);font-size:10px;color:var(--muted);padding:16px;text-align:center;}
+
+/* ── RELATÓRIO TAB ── */
+.rel-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.rel-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;}
+.rel-input:focus{border-color:var(--purple);}
+.qbtn{font-family:var(--fm);font-size:9px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.qbtn:hover,.qbtn.active{border-color:var(--purple);color:var(--purple);}
+.tipo-filter{display:flex;gap:6px;flex-wrap:wrap;}
+.tqbtn{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.tqbtn.active{border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,.08);}
+.rel-table{width:100%;border-collapse:collapse;font-size:12px;}
+.rel-table th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface);}
+.rel-table td{padding:10px 12px;border-bottom:1px solid var(--border);}
+.rel-table tr:hover td{background:var(--surface2);}
+.empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;border:1px dashed var(--border);border-radius:8px;}
+.search-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:14px;}
+.search-title{font-family:var(--fh);font-size:13px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.search-title span{color:var(--purple);}
+.search-row{display:flex;gap:8px;margin-bottom:10px;}
+.search-row .fi{margin-bottom:0;flex:1;}
+.btn-search{padding:9px 16px;border-radius:8px;border:none;background:var(--purple);color:#fff;font-family:var(--fm);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-search:hover{filter:brightness(1.1);}
+.sr-result{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.sr-nome{font-size:13px;font-weight:600;color:#fff;margin-bottom:2px;}
+.sr-meta{font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap;}
+.sr-mover-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.sr-mover-row select{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;cursor:pointer;}
+.sr-mover-row select:focus{border-color:var(--purple);}
+.btn-mover{padding:7px 16px;border-radius:7px;border:none;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);font-family:var(--fm);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-mover:hover{background:rgba(168,85,247,.25);}
+.sr-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--purple);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+.gk-box{background:#0d1117;border:1px solid #242b39;border-radius:14px;padding:15px 17px;}
+.gk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-top:11px;}
+.gk-card{background:#12161d;border:1px solid #242b39;border-radius:11px;padding:10px 12px;}
+.gk-v{font-family:ui-monospace,monospace;font-size:21px;font-weight:700;line-height:1;}
+.gk-l{font-size:9.5px;color:#5a6270;font-weight:700;margin-top:3px;}
+.gk-tec{background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:10px;
+  font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:190px;overflow-y:auto;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> — <span>Garantia</span></div>
+  <div class="hdr-btns">
+    <button class="hbtn" onclick="load()">↻ Atualizar</button>
+    <a class="hbtn" href="/adm">Home</a>
+  </div>
+</header>
+
+<div style="margin:14px 16px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <input id="busca-gar" placeholder="🔍 rastrear cliente por nome ou telefone…"
+    style="flex:1;min-width:240px;background:#12161d;border:1px solid #2a3140;border-radius:9px;
+    padding:9px 12px;color:#f0f2f5;font-size:12.5px;outline:none;"
+    onkeydown="if(event.key==='Enter')rastrearGarantia()">
+  <button class="hbtn" onclick="rastrearGarantia()">Rastrear</button>
+</div>
+<div id="res-busca" style="margin:0 16px;"></div>
+
+<div id="painel-kpis" style="margin:14px 16px 0;"></div>
+
+<div class="main-tabs">
+  <button class="mtab active" id="mtab-geral"            onclick="setView('geral')">📋 Geral<span class="badge" id="b-geral">0</span></button>
+  <button class="mtab" id="mtab-rel-tecnico" onclick="setView('rel-tecnico')">📊 Por Técnico<span class="badge" id="b-rel-tecnico"></span></button>
+  <button class="mtab"        id="mtab-loja_imediata"    onclick="setView('loja_imediata')">🏪 Loja Imediata<span class="badge" id="b-loja_imediata">0</span></button>
+  <button class="mtab"        id="mtab-loja_acompanhamento" onclick="setView('loja_acompanhamento')">🔍 Loja Acomp.<span class="badge" id="b-loja_acompanhamento">0</span></button>
+  <button class="mtab"        id="mtab-delivery"         onclick="setView('delivery')">🚚 Delivery<span class="badge" id="b-delivery">0</span></button>
+  <button class="mtab"        id="mtab-rua"              onclick="setView('rua')">🏘️ RS Rua<span class="badge" id="b-rua">0</span></button>
+  <button class="mtab"        id="mtab-monitoramento"    onclick="setView('monitoramento')">🔭 Monitoramento</button>
+  <button class="mtab"        id="mtab-relatorio"        onclick="setView('relatorio')">📊 Relatório</button>
+</div>
+
+<!-- VIEW GERAL -->
+<div class="view active" id="view-geral">
+  <div class="geral-grid">
+    <!-- Coluna esquerda: formulário + busca -->
+    <div>
+      <div class="form-card" style="margin-bottom:12px;border-top-color:var(--purple);">
+        <div class="form-title" style="font-size:16px;">🔍 Buscar <span style="color:var(--purple)">OS</span></div>
+        <input class="fi" id="busca-cad-os" placeholder="Nome, OS, telefone..." oninput="buscaCadOS(this.value)" autocomplete="off" style="margin-bottom:6px;"/>
+        <div id="busca-cad-resultados"></div>
+      </div>
+      <div class="form-card">
+        <div class="form-title">📝 Cadastrar <span>Garantia</span></div>
+        <div class="fl">Nome *</div>
+        <input class="fi" id="f-nome" placeholder="Nome do cliente"/>
+        <div class="fl">Telefone *</div>
+        <input class="fi" id="f-tel" placeholder="(31) 9 0000-0000"/>
+        <div class="fl">Defeito *</div>
+        <input class="fi" id="f-defeito" placeholder="Descreva o defeito relatado"/>
+        <div class="fl">Endereço (opcional)</div>
+        <input class="fi" id="f-end" placeholder="Rua, número, bairro"/>
+        <div class="fl">Tipo de Garantia *</div>
+        <div class="tipo-grid">
+          <button class="tipo-btn" id="tb-li"  onclick="setTipo('loja_imediata')">🏪 Loja<br>Imediata</button>
+          <button class="tipo-btn" id="tb-la"  onclick="setTipo('loja_acompanhamento')">🔍 Loja<br>Acomp.</button>
+          <button class="tipo-btn" id="tb-del" onclick="setTipo('delivery')">🚚 Delivery</button>
+          <button class="tipo-btn" id="tb-rua" onclick="setTipo('rua')">🏘️ RS Rua</button>
+        </div>
+        <div class="fl">Técnico Responsável *</div>
+        <div class="tipo-grid" style="grid-template-columns:repeat(3,1fr);" id="tec-grid-cad">
+          <button class="tipo-btn" id="tc-Lucas"   onclick="setTecnicoCad('Lucas')">Lucas</button>
+          <button class="tipo-btn" id="tc-Diego"   onclick="setTecnicoCad('Diego')">Diego</button>
+          <button class="tipo-btn" id="tc-Kassio"  onclick="setTecnicoCad('Kassio')">Kassio</button>
+          <button class="tipo-btn" id="tc-Roberto" onclick="setTecnicoCad('Roberto')">Roberto</button>
+          <button class="tipo-btn" id="tc-Carlos"  onclick="setTecnicoCad('Carlos')">Carlos</button>
+        </div>
+        <button class="btn-cad" id="btn-cad" onclick="cadastrar()">+ Cadastrar Garantia</button>
+      </div>
+
+      <!-- Busca de OS -->
+      <div class="search-card">
+        <div class="search-title">🔍 Buscar <span>OS</span></div>
+        <div class="search-row">
+          <input class="fi" id="busca-os" placeholder="Nome, telefone ou defeito..." onkeydown="if(event.key==='Enter')buscarOS()"/>
+          <button class="btn-search" onclick="buscarOS()">Buscar</button>
+        </div>
+        <div id="busca-resultados"></div>
+      </div>
+    </div>
+    <!-- Coluna direita: Kanban -->
+    <div>
+      <div style="font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:12px;color:var(--purple);">Kanban de Garantias</div>
+      <div class="kanban" id="kanban-geral"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW LOJA IMEDIATA -->
+<div class="view" id="view-loja_imediata">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--green)">🏪 Loja Imediata</div>
+  </div>
+  <div class="kanban-fases" id="fases-loja_imediata"></div>
+</div>
+
+<!-- VIEW LOJA ACOMPANHAMENTO -->
+<div class="view" id="view-loja_acompanhamento">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--accent)">🔍 Loja Acompanhamento</div>
+  </div>
+  <div class="kanban-fases" id="fases-loja_acompanhamento"></div>
+</div>
+
+<!-- VIEW DELIVERY -->
+<div class="view" id="view-delivery">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--orange)">🚚 Delivery</div>
+  </div>
+  <div class="kanban-fases" id="fases-delivery"></div>
+</div>
+
+<!-- VIEW RS RUA -->
+<div class="view" id="view-rua">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--red)">🏘️ RS Rua</div>
+    <a class="hbtn" href="/adm-rsrua" target="_blank" style="color:var(--red);border-color:rgba(240,64,96,.3);">📱 Painel Motorista</a>
+  </div>
+  <div class="kanban-fases" id="fases-rua"></div>
+</div>
+
+<!-- VIEW MONITORAMENTO -->
+<div class="view" id="view-monitoramento">
+  <div style="font-family:var(--fh);font-size:16px;font-weight:900;margin-bottom:16px;">🔭 Monitoramento de <span style="color:var(--purple)">Garantias</span></div>
+  <div class="mon-grid" id="mon-garantia"></div>
+</div>
+
+<!-- VIEW RELATÓRIO -->
+<div class="view" id="view-relatorio">
+  <div style="font-family:var(--fh);font-size:16px;font-weight:900;margin-bottom:16px;">📊 Relatório de <span style="color:var(--purple)">Garantias Concluídas</span></div>
+  <div class="rel-filters">
+    <input type="date" class="rel-input" id="rel-de"/>
+    <span style="font-family:var(--fm);font-size:10px;color:var(--muted)">até</span>
+    <input type="date" class="rel-input" id="rel-ate"/>
+    <button class="qbtn" onclick="relPeriodo('hoje')">Hoje</button>
+    <button class="qbtn" onclick="relPeriodo('semana')">Esta semana</button>
+    <button class="qbtn" onclick="relPeriodo('mes')">Este mês</button>
+    <button class="qbtn" onclick="relPeriodo('tudo')">Tudo</button>
+  </div>
+  <div class="tipo-filter" style="margin-bottom:16px;" id="rel-tipo-filter">
+    <button class="tqbtn active" data-tipo="" onclick="setRelTipo(this,'')">Todos</button>
+    <button class="tqbtn" data-tipo="loja_imediata" onclick="setRelTipo(this,'loja_imediata')">🏪 Loja Imediata</button>
+    <button class="tqbtn" data-tipo="loja_acompanhamento" onclick="setRelTipo(this,'loja_acompanhamento')">🔍 Loja Acomp.</button>
+    <button class="tqbtn" data-tipo="delivery" onclick="setRelTipo(this,'delivery')">🚚 Delivery</button>
+    <button class="tqbtn" data-tipo="rua" onclick="setRelTipo(this,'rua')">🏘️ RS Rua</button>
+  </div>
+  <div id="rel-resumo" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+  <div style="overflow-x:auto;">
+    <table class="rel-table"><thead><tr>
+      <th>Data</th><th>Nome</th><th>Telefone</th><th>Defeito</th><th>Tipo</th><th>Duração</th>
+    </tr></thead><tbody id="rel-body"></tbody></table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- VIEW RELATORIO POR TECNICO -->
+<div class="view" id="view-rel-tecnico">
+  <div style="padding:16px 0;">
+    <div style="font-family:var(--fh);font-size:18px;font-weight:900;margin-bottom:16px;color:var(--purple);">📊 Garantias por <span style="color:var(--accent)">Técnico</span></div>
+    <div id="rel-tec-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px;"></div>
+    <div style="font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:12px;color:var(--muted);">Histórico (6 meses)</div>
+    <div id="rel-tec-hist" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+<script>
+// ── 🔍 RASTREAR cliente na fila e na gestão ──
+async function rastrearGarantia(){
+  const q = (document.getElementById('busca-gar')||{}).value || '';
+  const alvo = document.getElementById('res-busca');
+  if(!alvo) return;
+  if(!q.trim()){ alvo.innerHTML=''; return; }
+  alvo.innerHTML = '<div style="font-size:12px;color:#8b93a3;padding:9px 0;">⏳ procurando…</div>';
+  let r = null;
+  try { r = await fetch('/api/tv-garantia-v2?action=rastrear&q='+encodeURIComponent(q)).then(x=>x.json()); } catch(e){}
+  if(!r){ alvo.innerHTML='<div style="font-size:12px;color:#f87171;padding:9px 0;">erro na busca</div>'; return; }
+  const esc2 = s => String(s||'').replace(/</g,'&lt;');
+  alvo.innerHTML = '<div style="background:#0d1117;border:1px solid #242b39;border-radius:12px;padding:12px 14px;margin-top:9px;">'
+    + '<div style="display:flex;align-items:center;gap:9px;">'
+      + '<span style="font-size:12.5px;font-weight:900;color:'+(r.encontrados?'#4ade80':'#fbbf24')+';">'
+      + (r.encontrados ? '🔍 '+r.encontrados+' resultado(s) — fila: '+r.naFila+' · gestão: '+r.naGestao
+                       : '🔍 nada encontrado para "'+esc2(q)+'"')+'</span>'
+      + '<button class="hbtn" style="margin-left:auto;font-size:11px;padding:3px 9px;" onclick="document.getElementById(\'res-busca\').innerHTML=\'\'">✕</button>'
+    + '</div>'
+    + ((r.L&&r.L.length)
+      ? '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:8px;'
+        + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.9;">'
+        + r.L.map(esc2).join('<br>')+'</div>' : '')
+  + '</div>';
+}
+
+// ── 📊 KPIs da garantia: dia, semana, resolvidas, enviadas ao CQ e por técnico ──
+async function carregarKpisGarantia(){
+  const el = document.getElementById('painel-kpis');
+  if(!el) return;
+  let c = null, falha = null;
+  try {
+    const resp = await fetch('/api/tv-garantia-v2?action=contadores');
+    if(!resp.ok) falha = 'HTTP ' + resp.status;
+    c = await resp.json();
+    if(c && c.ok === false) falha = c.error || 'retorno sem ok';
+  } catch(e){ falha = e.message; }
+  // 🔊 painel mudo esconde o problema — mostra o motivo real da falha
+  if(!c || !c.ok){
+    el.innerHTML = '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);'
+      + 'border-radius:11px;padding:11px 14px;font-size:11.5px;color:#fbbf24;">'
+      + '⚠️ não consegui carregar os indicadores — ' + (falha||'motivo desconhecido') + '</div>';
+    return;
+  }
+  const kpi = (v,l,cr) => '<div class="gk-card"><div class="gk-v" style="color:'+(cr||'#f0f2f5')+'">'+v+'</div><div class="gk-l">'+l+'</div></div>';
+  el.innerHTML = '<div class="gk-box">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span style="font-size:14px;font-weight:900;color:#f59e0b;">🛡️ Garantias</span>'
+      + '<span style="font-size:11px;color:#5a6270;">semana desde '+(c.semanaComecaEm||'')+'</span>'
+    + '</div>'
+    + '<div class="gk-grid">'
+      + kpi((c.ENTRARAM&&c.ENTRARAM.hoje)||0, 'ENTRARAM HOJE', '#f87171')
+      + kpi((c.ENTRARAM&&c.ENTRARAM.semana)||0, 'NA SEMANA', '#fbbf24')
+      + kpi((c.RESOLVIDAS&&c.RESOLVIDAS.hoje)||0, 'RESOLVIDAS HOJE', '#4ade80')
+      + kpi((c.RESOLVIDAS&&c.RESOLVIDAS.semana)||0, 'RESOLVIDAS SEMANA', '#4ade80')
+      + kpi((c.ENVIADAS_AO_CQ&&c.ENVIADAS_AO_CQ.semana)||0, 'ENVIADAS AO CQ', '#60a5fa')
+      + kpi(c.EM_ABERTO||0, 'EM ABERTO', '#f59e0b')
+    + '</div>'
+    + ((c.POR_TECNICO&&c.POR_TECNICO.length)
+      ? '<div style="font-size:11px;font-weight:900;color:#8b93a3;margin-top:12px;">👨‍🔧 POR TÉCNICO <span style="font-weight:400;color:#5a6270;">— clique para ver as garantias</span></div>'
+        + '<div class="gk-tec">'+c.POR_TECNICO.map(function(t){
+            var nome = String(t).split('|')[0].trim();
+            return '<div style="cursor:pointer;padding:2px 0;" onclick="verGarantiasTecnico(\''+nome.replace(/'/g,"")+'\')">'
+              + '▸ '+String(t).replace(/</g,'&lt;')+'</div>';
+          }).join('')+'</div>'
+        + '<div id="gar-tecnico"></div>'
+      : '')
+  + '</div>';
+  window._garPorTecnico = c.GARANTIAS_POR_TECNICO || {};
+}
+function verGarantiasTecnico(nome){
+  const alvo = document.getElementById('gar-tecnico');
+  if(!alvo) return;
+  const lista = (window._garPorTecnico||{})[nome] || [];
+  if(alvo.dataset.aberto === nome){ alvo.innerHTML=''; alvo.dataset.aberto=''; return; }
+  alvo.dataset.aberto = nome;
+  alvo.innerHTML = '<div style="background:#0f1319;border:1px solid #2a3140;border-radius:9px;padding:10px 12px;margin-top:9px;">'
+    + '<div style="font-size:11.5px;font-weight:900;color:#f59e0b;margin-bottom:7px;">🛡️ '+nome+' — '+lista.length+' garantia(s) nesta semana</div>'
+    + (lista.length
+      ? '<div style="font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.9;max-height:260px;overflow-y:auto;">'
+        + lista.map(function(x){return String(x).replace(/</g,'&lt;');}).join('<br>')+'</div>'
+      : '<div style="font-size:11px;color:#5a6270;">nenhuma nesta semana</div>')
+  + '</div>';
+}
+
+var fichas = [], fases = {}, tipoSel = null, curView = 'geral', relTipoFiltro = '';
+
+var TIPO_COLORS = {
+  loja_imediata:      { c: 'var(--green)',  bg: 'rgba(16,217,130,.1)',  label: '🏪 Loja Imediata' },
+  loja_acompanhamento:{ c: 'var(--accent)', bg: 'rgba(59,158,255,.1)',  label: '🔍 Loja Acomp.' },
+  delivery:           { c: 'var(--orange)', bg: 'rgba(249,115,22,.1)',  label: '🚚 Delivery' },
+  rua:                { c: 'var(--red)',    bg: 'rgba(240,64,96,.1)',   label: '🏘️ RS Rua' },
+};
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}); }
+function fmtDur(a,b){ if(!a||!b) return '—'; var ms=new Date(b)-new Date(a); var h=Math.round(ms/3600000); return h<24?h+'h':Math.round(h/24)+'d'; }
+function df(d){ return d.toISOString().slice(0,10); }
+
+var toastT;
+function toast(msg, cor){
+  var t=document.getElementById('toast'); t.textContent=msg; t.style.borderTopColor=cor||'var(--purple)';
+  t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+async function api(action, body){
+  var opts={headers:{'Content-Type':'application/json'}};
+  if(body){opts.method='POST';opts.body=JSON.stringify(body);}
+  var r=await fetch('/api/tv-garantia-v2?action='+action,opts);
+  return r.json();
+}
+
+async function load(){
+  var d = await api('load');
+  if(!d.ok) return;
+  fichas = d.fichas || [];
+  fases  = d.fases  || {};
+  updateBadges();
+  render();
+}
+
+function updateBadges(){
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  var total=0;
+  tipos.forEach(function(t){
+    var n=fichas.filter(function(f){return f.tipo===t&&!f.concluida;}).length;
+    var el=document.getElementById('b-'+t); if(el) el.textContent=n;
+    total+=n;
+  });
+  var bg=document.getElementById('b-geral'); if(bg) bg.textContent=total;
+}
+
+function setView(v){
+  if(v==='rel-tecnico'){renderRelTecnico();};
+  curView=v;
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active');});
+  document.querySelectorAll('.mtab').forEach(function(el){el.classList.remove('active');});
+  var vEl=document.getElementById('view-'+v); if(vEl) vEl.classList.add('active');
+  var tEl=document.getElementById('mtab-'+v); if(tEl) tEl.classList.add('active');
+  render();
+}
+
+var tecnicoSel = null;
+
+function setTecnicoCad(name) {
+  tecnicoSel = name;
+  ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'].forEach(function(n) {
+    var el = document.getElementById('tc-'+n);
+    if (el) el.className = 'tipo-btn' + (n === name ? ' sel-loja_imediata' : '');
+  });
+}
+
+var _buscaCadTimer;
+function buscaCadOS(q) {
+  clearTimeout(_buscaCadTimer);
+  var el = document.getElementById('busca-cad-resultados');
+  if (!q || q.length < 2) { el.innerHTML = ''; return; }
+  _buscaCadTimer = setTimeout(async function() {
+    try {
+      var r = await fetch('/api/rastrear?q=' + encodeURIComponent(q));
+      var d = await r.json();
+      var results = (d.results || []).filter(function(r) { return r.tipo === 'os'; });
+      if (!results.length) { el.innerHTML = '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:6px;">Nenhum resultado</div>'; return; }
+      el.innerHTML = results.slice(0, 5).map(function(res) {
+        return '<div onclick="preencherFormGar('+JSON.stringify(res.label||'').replace(/"/g,"'")+',' + JSON.stringify(res.descricao||'').replace(/"/g,"'") + ')" style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);margin-bottom:5px;cursor:pointer;background:var(--surface2);">' +
+          '<div style="font-size:12px;font-weight:600;color:var(--text);">' + esc(res.label||'') + '</div>' +
+          (res.sublabel ? '<span style="font-family:var(--fm);font-size:10px;color:var(--accent);">' + esc(res.sublabel) + '</span>' : '') +
+          (res.descricao ? '<div style="font-size:11px;color:var(--muted);">' + esc(res.descricao.slice(0,70)) + '</div>' : '') +
+          '<div style="font-family:var(--fm);font-size:9px;color:#a855f7;">' + esc(res.fase||'') + '</div>' +
+          '</div>';
+      }).join('');
+    } catch(e) {}
+  }, 350);
+}
+
+function preencherFormGar(nome, defeito) {
+  if (nome) document.getElementById('f-nome').value = nome;
+  if (defeito) document.getElementById('f-defeito').value = defeito;
+  document.getElementById('busca-cad-resultados').innerHTML = '';
+  document.getElementById('busca-cad-os').value = '';
+}
+
+async function renderRelTecnico() {
+  var el = document.getElementById('rel-tec-container');
+  var hist = document.getElementById('rel-tec-hist');
+  if (!el) return;
+  try {
+    var r = await fetch('/api/tv-garantia-v2?action=relatorio-tecnico');
+    var d = await r.json();
+    if (!d.ok) { el.innerHTML = '<div style="color:var(--red);">Erro ao carregar</div>'; return; }
+    var mes = d.mesAtual || {};
+    var pt = mes.porTecnico || {};
+    var tecs = Object.keys(pt).sort();
+    el.innerHTML = (tecs.length ? tecs : ['Nenhum dado']).map(function(t) {
+      var n = pt[t] || 0;
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--purple);border-radius:10px;padding:14px;text-align:center;">' +
+        '<div style="font-family:var(--fh);font-size:28px;font-weight:900;color:var(--purple);">'+n+'</div>' +
+        '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;">'+esc(t)+'</div>' +
+        '<div style="font-family:var(--fm);font-size:8px;color:var(--muted);">'+(mes.label||'Mês atual')+'</div>' +
+        '</div>';
+    }).join('') +
+    '<div style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:14px;text-align:center;">' +
+      '<div style="font-family:var(--fh);font-size:28px;font-weight:900;color:var(--purple);">'+(mes.total||0)+'</div>' +
+      '<div style="font-family:var(--fm);font-size:10px;color:var(--purple);">TOTAL</div>' +
+      '<div style="font-family:var(--fm);font-size:8px;color:var(--muted);">'+(mes.label||'')+'</div>' +
+    '</div>';
+    // Hist
+    var allTecs = new Set();
+    (d.historico||[]).forEach(function(m){Object.keys(m.porTecnico||{}).forEach(function(t){allTecs.add(t);});});
+    var ta = Array.from(allTecs).sort();
+    hist.innerHTML = (d.historico||[]).map(function(m) {
+      return '<div style="display:flex;gap:8px;padding:6px 8px;border-radius:6px;background:var(--surface);align-items:center;">' +
+        '<span style="font-family:var(--fm);font-size:10px;color:var(--muted);width:60px;flex-shrink:0;">'+esc(m.label)+'</span>' +
+        ta.map(function(t){var n=(m.porTecnico||{})[t]||0;return '<span style="min-width:55px;text-align:center;font-family:var(--fm);font-size:11px;color:'+(n>0?'var(--text)':'var(--muted)')+';">'+n+' '+esc(t.split(' ')[0])+'</span>';}).join('') +
+        '<span style="min-width:40px;text-align:center;font-weight:700;color:var(--purple);">'+m.total+'</span>' +
+        '</div>';
+    }).join('');
+  } catch(e) { el.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
+}
+
+
+function setTipo(t){
+  tipoSel=t;
+  ['li','la','del','rua'].forEach(function(k){ document.getElementById('tb-'+k).className='tipo-btn'; });
+  var map={loja_imediata:'li',loja_acompanhamento:'la',delivery:'del',rua:'rua'};
+  var btn=document.getElementById('tb-'+map[t]); if(btn) btn.className='tipo-btn sel-'+t;
+}
+
+function render(){
+  if(curView==='geral')             renderGeral();
+  else if(curView==='monitoramento') renderMonitoramento();
+  else if(curView==='relatorio')     renderRelatorio();
+  else                               renderTipo(curView);
+}
+
+// ── GERAL ─────────────────────────────────────────────────────
+function renderGeral(){
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  var el=document.getElementById('kanban-geral');
+  el.innerHTML = tipos.map(function(t){
+    var tc=TIPO_COLORS[t];
+    var ativas=fichas.filter(function(f){return f.tipo===t&&!f.concluida;});
+    var cards=ativas.slice(0,5).map(function(f){
+      var fase=(fases[t]||[]).find(function(x){return x.id===f.faseId;});
+      return '<div class="kb-card" onclick="setView(\''+t+'\')" style="cursor:pointer;border-left:2px solid '+tc.c+'">'+
+        '<div class="kb-nome">'+esc(f.nome)+'</div>'+
+        '<div class="kb-fase">'+esc(fase?fase.label:f.faseId)+'</div>'+
+        '</div>';
+    }).join('');
+    var extra=ativas.length>5?'<div class="kb-empty">+'+( ativas.length-5)+' mais...</div>':'';
+    return '<div class="kb-col">'+
+      '<div class="kb-head">'+
+        '<div class="kb-label" style="color:'+tc.c+'">'+tc.label+'</div>'+
+        '<span class="kb-count" style="background:'+tc.bg+';color:'+tc.c+'">'+ativas.length+'</span>'+
+      '</div>'+
+      '<div class="kb-body">'+(ativas.length?cards+extra:'<div class="kb-empty">Vazio</div>')+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+// ── POR TIPO ──────────────────────────────────────────────────
+function renderTipo(tipo){
+  var el=document.getElementById('fases-'+tipo); if(!el) return;
+  var fasesT=fases[tipo]||[];
+  var tc=TIPO_COLORS[tipo]||{c:'var(--purple)',bg:'rgba(168,85,247,.1)'};
+  var ativas=fichas.filter(function(f){return f.tipo===tipo&&!f.concluida;});
+  var concluidasTipo=fichas.filter(function(f){return f.tipo===tipo&&f.concluida;});
+  // Última fase do tipo — concluídas aparecem aqui
+  var ultimaFaseId=fasesT.length?fasesT[fasesT.length-1].id:null;
+  el.innerHTML=fasesT.map(function(fase){
+    var cards=ativas.filter(function(f){return f.faseId===fase.id;});
+    // Na última fase, inclui as concluídas (visualmente diferenciadas)
+    var conclCards=(fase.id===ultimaFaseId)?concluidasTipo:[];
+    var totalCards=cards.length+conclCards.length;
+    var cardsHtml=
+      (cards.length?cards.map(function(f){ return buildFichaCard(f,tipo,fasesT); }).join(''):'')+
+      (conclCards.length?conclCards.map(function(f){ return buildFichaCardConcluida(f,tipo); }).join(''):'')+
+      (!totalCards?'<div class="kb-empty">—</div>':'');
+    return '<div class="fase-col">'+
+      '<div class="fase-head">'+
+        '<div class="fase-label" style="color:'+tc.c+'">'+esc(fase.label)+'</div>'+
+        '<span class="kb-count" style="background:'+tc.bg+';color:'+tc.c+'">'+totalCards+'</span>'+
+      '</div>'+
+      '<div class="fase-body">'+cardsHtml+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function buildFichaCardConcluida(f, tipo){
+  var tc=TIPO_COLORS[tipo]||{c:'var(--green)',bg:'rgba(16,217,130,.1)'};
+  var wppTel=(f.telefone||'').replace(/\D/g,'');
+  var dt=f.concluidaEm?fmtDate(f.concluidaEm):'';
+  return '<div class="ficha-card" style="opacity:.7;border-left:3px solid #10d982;">'+
+    '<div class="fc-top">'+
+      '<div class="fc-nome">'+esc(f.nome)+'</div>'+
+      '<span class="fc-tipo-badge" style="background:rgba(16,217,130,.15);color:#10d982;">✅ Concluída</span>'+
+    '</div>'+
+    '<div class="fc-defeito">'+esc(f.defeito)+'</div>'+
+    '<div class="fc-meta">'+
+      (f.telefone?'<span>📞 '+esc(f.telefone)+'</span>':'')+
+      (f.endereco?'<span>📍 '+esc(f.endereco)+'</span>':'')+
+      (dt?'<span style="color:#10d982;">✅ '+dt+'</span>':'')+
+    '</div>'+
+    '<div class="fc-actions">'+
+      (wppTel?'<a class="fc-btn" href="https://wa.me/'+wppTel+'" target="_blank">💬 WPP</a>':'')+
+      '<button class="fc-btn" style="border-color:rgba(59,158,255,.3);color:#3b9eff;" onclick="reabrirGarantia(\''+f.id+'\')">↩ Reabrir</button>'+
+      '<button class="fc-btn red" onclick="excluir(\''+f.id+'\')">🗑</button>'+
+    '</div>'+
+    '</div>';
+}
+
+function buildFichaCard(f, tipo, fasesT){
+  var tc=TIPO_COLORS[tipo]||{c:'var(--purple)'};
+  var opts=fasesT.map(function(fs){
+    return '<option value="'+fs.id+'"'+(f.faseId===fs.id?' selected':'')+'>'+esc(fs.label)+'</option>';
+  }).join('');
+  var wppTel=(f.telefone||'').replace(/\D/g,'');
+  return '<div class="ficha-card">'+
+    '<div class="fc-top">'+
+      '<div class="fc-nome">'+esc(f.nome)+'</div>'+
+      '<span class="fc-tipo-badge" style="background:'+tc.bg+';color:'+tc.c+'">'+tc.label+'</span>'+
+    '</div>'+
+    '<div class="fc-defeito">'+esc(f.defeito)+'</div>'+
+    '<div class="fc-meta">'+
+      (f.telefone?'<span>📞 '+esc(f.telefone)+'</span>':'')+
+      (f.endereco?'<span>📍 '+esc(f.endereco)+'</span>':'')+
+      '<span>'+fmtDate(f.criadaEm)+'</span>'+
+      (f.tecnico?'<span style="font-weight:600;color:var(--accent)">👨‍🔧 '+esc(f.tecnico)+'</span>':'')+
+      (f.pipefyId?'<span style="color:var(--green)">🔗 Pipefy #'+esc(f.pipefyId)+'</span>':'')+
+      (f.pipefyErro?'<span style="color:var(--red)" title="'+esc(f.pipefyErro)+'">⚠️ Pipefy erro</span>':'')+
+    '</div>'+
+    '<div class="fc-actions">'+
+      '<select class="fase-select" onchange="moverFase(\''+f.id+'\',this.value)">'+opts+'</select>'+
+      (wppTel?'<a class="fc-btn" href="https://wa.me/'+wppTel+'" target="_blank">💬 WPP</a>':'')+
+      (f.endereco?'<a class="fc-btn orange" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco)+'" target="_blank">🗺️</a>':'')+
+      '<button class="fc-btn green" onclick="concluir(\''+f.id+'\')">✅ Concluir</button>'+
+      '<button class="fc-btn red" onclick="excluir(\''+f.id+'\')">🗑</button>'+
+    '</div>'+
+    '</div>';
+}
+
+// ── MONITORAMENTO ──────────────────────────────────────────────
+function renderMonitoramento(){
+  var el=document.getElementById('mon-garantia');
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  el.innerHTML=tipos.map(function(tipo){
+    var tc=TIPO_COLORS[tipo];
+    var fasesT=fases[tipo]||[];
+    var ativas=fichas.filter(function(f){return f.tipo===tipo&&!f.concluida;});
+    var items=ativas.length?ativas.map(function(f){
+      var fase=(fasesT||[]).find(function(x){return x.id===f.faseId;});
+      return '<div class="mon-item" style="border-left-color:'+tc.c+'">'+
+        '<div class="mon-nome">'+esc(f.nome)+' <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+esc(f.telefone)+'</span></div>'+
+        '<div class="mon-fase">'+esc(fase?fase.label:f.faseId)+' · '+esc(f.defeito.slice(0,40))+'</div>'+
+        '</div>';
+    }).join(''):'<div class="mon-empty">✅ Nenhuma pendência</div>';
+    return '<div class="mon-sec">'+
+      '<div class="mon-sec-head">'+
+        '<div class="mon-sec-title" style="color:'+tc.c+'">'+tc.label+'</div>'+
+        '<span class="mon-count" style="background:'+TIPO_COLORS[tipo].bg+';color:'+tc.c+'">'+ativas.length+'</span>'+
+      '</div>'+
+      '<div class="mon-body">'+items+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+// ── RELATÓRIO ─────────────────────────────────────────────────
+function relPeriodo(p){
+  document.querySelectorAll('.qbtn').forEach(function(b){b.classList.remove('active');});
+  var h=new Date(), de, ate;
+  if(p==='hoje'){de=df(h);ate=de;}
+  else if(p==='semana'){var d=h.getDay(),dm=(d===0?6:d-1);var s=new Date(h);s.setDate(h.getDate()-dm);de=df(s);ate=df(new Date(s.setDate(s.getDate()+6)));}
+  else if(p==='mes'){de=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01';ate=df(h);}
+  else{de='';ate='';}
+  document.getElementById('rel-de').value=de||'';
+  document.getElementById('rel-ate').value=ate||'';
+  event.target.classList.add('active');
+  renderRelatorio();
+}
+
+function setRelTipo(btn, tipo){
+  relTipoFiltro=tipo;
+  document.querySelectorAll('.tqbtn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderRelatorio();
+}
+
+function renderRelatorio(){
+  var de=document.getElementById('rel-de').value;
+  var ate=document.getElementById('rel-ate').value;
+  var concluidas=fichas.filter(function(f){
+    if(!f.concluida) return false;
+    if(relTipoFiltro && f.tipo!==relTipoFiltro) return false;
+    if(de&&f.concluidaEm&&f.concluidaEm.slice(0,10)<de) return false;
+    if(ate&&f.concluidaEm&&f.concluidaEm.slice(0,10)>ate) return false;
+    return true;
+  });
+  // Resumo
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  var res=document.getElementById('rel-resumo');
+  res.innerHTML=tipos.map(function(t){
+    var tc=TIPO_COLORS[t];
+    var n=concluidas.filter(function(f){return f.tipo===t;}).length;
+    return '<div style="background:'+tc.bg+';border:1px solid '+tc.c+'40;border-radius:8px;padding:8px 14px;text-align:center;">'+
+      '<div style="font-family:var(--fh);font-size:20px;font-weight:900;color:'+tc.c+'">'+n+'</div>'+
+      '<div style="font-family:var(--fm);font-size:9px;color:'+tc.c+'">'+tc.label+'</div>'+
+      '</div>';
+  }).join('');
+  // Tabela
+  var tbody=document.getElementById('rel-body');
+  if(!concluidas.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhuma garantia concluída no período.</td></tr>'; return; }
+  tbody.innerHTML=concluidas.slice().reverse().map(function(f){
+    var tc=TIPO_COLORS[f.tipo]||{c:'var(--muted)',label:f.tipo};
+    return '<tr>'+
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+fmtDate(f.concluidaEm||f.movidaEm)+'</td>'+
+      '<td style="font-weight:600;">'+esc(f.nome)+'</td>'+
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+esc(f.telefone)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(f.defeito)+'</td>'+
+      '<td><span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;background:'+tc.bg+';color:'+tc.c+';">'+tc.label+'</span></td>'+
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+fmtDur(f.criadaEm,f.concluidaEm)+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+// ── AÇÕES ──────────────────────────────────────────────────────
+async function cadastrar(){
+  var nome=document.getElementById('f-nome').value.trim();
+  var tel=document.getElementById('f-tel').value.trim();
+  var def=document.getElementById('f-defeito').value.trim();
+  var end=document.getElementById('f-end').value.trim();
+  if(!nome||!tel||!def){ toast('Preencha nome, telefone e defeito','var(--red)'); return; }
+  if(!tipoSel){ toast('Selecione o tipo de garantia','var(--yellow)'); return; }
+  var btn=document.getElementById('btn-cad'); btn.disabled=true; btn.textContent='⏳ Cadastrando...';
+  var d=await api('cadastrar',{nome,telefone:tel,defeito:def,endereco:end,tipo:tipoSel,tecnico:tecnicoSel});
+  btn.disabled=false; btn.textContent='+ Cadastrar Garantia';
+  if(d.ok){
+    fichas.unshift(d.ficha);
+    ['f-nome','f-tel','f-defeito','f-end'].forEach(function(id){document.getElementById(id).value='';});
+    tipoSel=null; tecnicoSel=null;
+    ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'].forEach(function(n){var el=document.getElementById('tc-'+n);if(el)el.className='tipo-btn';});
+    ['li','la','del','rua'].forEach(function(k){document.getElementById('tb-'+k).className='tipo-btn';});
+    updateBadges(); render();
+    toast('✅ Garantia cadastrada!','var(--green)');
+  } else { toast('Erro: '+(d.error||'falha'),'var(--red)'); }
+}
+
+async function moverFase(id, faseId){
+  var d=await api('mover',{id,faseId});
+  if(d.ok){
+    var idx=fichas.findIndex(function(f){return f.id===id;});
+    if(idx>=0) fichas[idx]=d.ficha;
+    updateBadges(); renderTipo(curView);
+  } else { toast('Erro: '+d.error,'var(--red)'); }
+}
+
+async function concluir(id){
+  if(!confirm('Marcar como concluída?')) return;
+  var d=await api('concluir',{id});
+  if(d.ok){
+    var idx=fichas.findIndex(function(f){return f.id===id;});
+    if(idx>=0) fichas[idx]=d.ficha;
+    updateBadges(); render(); toast('✅ Garantia concluída!','var(--green)');
+  } else { toast('Erro: '+d.error,'var(--red)'); }
+}
+
+async function excluir(id){
+  if(!confirm('Excluir esta garantia?')) return;
+  var d=await api('excluir',{id});
+  if(d.ok){
+    fichas=fichas.filter(function(f){return f.id!==id;});
+    updateBadges(); render(); toast('🗑️ Excluída','var(--red)');
+  }
+}
+
+async function reabrirGarantia(id){
+  if(!confirm('Reabrir esta OS?')) return;
+  var d=await api('reabrir',{id});
+  if(d.ok){
+    var idx=fichas.findIndex(function(f){return f.id===id;});
+    if(idx>=0) fichas[idx]=d.ficha;
+    updateBadges(); render(); toast('↩ OS reaberta','var(--accent)');
+  } else { toast('Erro: '+(d.error||'falha'),'var(--red)'); }
+}
+
+// Pipefy sync para delivery — verifica Finalizado no Pipefy a cada 5 min
+async function pipefySync() {
+  try {
+    await api('pipefy-sync');
+    await load();
+  } catch(e) {}
+}
+
+// ── BUSCA DE OS ───────────────────────────────────────────────
+function buscarOS() {
+  var q = (document.getElementById('busca-os').value || '').trim().toLowerCase();
+  var el = document.getElementById('busca-resultados');
+  if (!q) { el.innerHTML = '<div class="sr-empty">Digite nome, telefone ou número da OS.</div>'; return; }
+  var resultados = fichas.filter(function(f) {
+    return (f.nome     && f.nome.toLowerCase().includes(q))
+        || (f.telefone && f.telefone.replace(/\D/g,'').includes(q.replace(/\D/g,'')))
+        || (f.defeito  && f.defeito.toLowerCase().includes(q));
+  });
+  if (!resultados.length) {
+    el.innerHTML = '<div class="sr-empty">Nenhuma OS encontrada para &ldquo;' + esc(q) + '&rdquo;.</div>';
+    return;
+  }
+  var rows = resultados.map(function(f) {
+    var tc = TIPO_COLORS[f.tipo] || { c: 'var(--purple)', label: f.tipo };
+    var fasesT = fases[f.tipo] || [];
+    var faseAtual = (fasesT.find(function(x){ return x.id === f.faseId; }) || {}).label || f.faseId;
+    var opts = fasesT.map(function(fase){
+      return '<option value="' + fase.id + '"' + (fase.id === f.faseId ? ' selected' : '') + '>' + esc(fase.label) + '</option>';
+    }).join('');
+    var status = f.concluida
+      ? '<span style="color:var(--green)">✅ Concluída</span>'
+      : '<span style="color:var(--muted)">⏳ Ativa</span>';
+    var row = document.createElement('div');
+    row.className = 'sr-result';
+    row.innerHTML = ''
+      + '<div class="sr-nome">' + esc(f.nome) + '</div>'
+      + '<div class="sr-meta">'
+        + '<span style="color:' + tc.c + '">' + tc.label + '</span>'
+        + '<span>📍 ' + esc(faseAtual) + '</span>'
+        + (f.telefone ? '<span>📞 ' + esc(f.telefone) + '</span>' : '')
+        + status
+      + '</div>'
+      + '<div class="sr-mover-row">'
+        + '<select id="sel-' + f.id + '">' + opts + '</select>'
+        + '<button class="btn-mover" id="mv-' + f.id + '">↪ Mover</button>'
+        + (!f.concluida ? '<button class="btn-mover" id="cl-' + f.id + '" style="background:rgba(16,217,130,.1);color:var(--green);border-color:rgba(16,217,130,.3);">✅ Concluir</button>' : '')
+      + '</div>';
+    // Attach events after DOM is set
+    var fid = f.id;
+    setTimeout(function() {
+      var mv = document.getElementById('mv-' + fid);
+      var cl = document.getElementById('cl-' + fid);
+      if (mv) mv.onclick = function() { moverDaBusca(fid); };
+      if (cl) cl.onclick = function() { concluirDaBusca(fid); };
+    }, 0);
+    return row;
+  });
+  el.innerHTML = '';
+  rows.forEach(function(r) { el.appendChild(r); });
+}
+
+async function moverDaBusca(id) {
+  var sel = document.getElementById('sel-fase-' + id);
+  if (!sel) return;
+  var faseId = sel.value;
+  var f = fichas.find(function(x) { return x.id === id; });
+  if (!f || f.faseId === faseId) { toast('Selecione uma fase diferente', 'var(--yellow)'); return; }
+  var d = await api('mover', { id: id, faseId: faseId });
+  if (d.ok) {
+    var idx = fichas.findIndex(function(x) { return x.id === id; });
+    if (idx >= 0) fichas[idx] = d.ficha;
+    var fasesT = fases[f.tipo] || [];
+    var faseLabel = (fasesT.find(function(x) { return x.id === faseId; }) || {}).label || faseId;
+    toast('✅ ' + (f.nome) + ' → ' + faseLabel, 'var(--green)');
+    updateBadges();
+    buscarOS(); // atualiza resultado da busca
+  } else { toast('Erro: ' + (d.error || 'falha'), 'var(--red)'); }
+}
+
+async function concluirDaBusca(id) {
+  var f = fichas.find(function(x) { return x.id === id; });
+  if (!f) return;
+  if (!confirm('Concluir OS de ' + f.nome + '?')) return;
+  var d = await api('concluir', { id: id });
+  if (d.ok) {
+    var idx = fichas.findIndex(function(x) { return x.id === id; });
+    if (idx >= 0) fichas[idx] = d.ficha;
+    toast('✅ OS concluída!', 'var(--green)');
+    updateBadges();
+    buscarOS();
+  } else { toast('Erro: ' + (d.error || 'falha'), 'var(--red)'); }
+}
+
+// init
+load();
+carregarKpisGarantia();
+setInterval(function(){carregarKpisGarantia();},120000);
+setInterval(load, 60000);
+setInterval(pipefySync, 300000); // sync Pipefy a cada 5 min
+</script>
+</body>
+</html>
