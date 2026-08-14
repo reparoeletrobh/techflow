@@ -417,6 +417,129 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── 📨 DISPARAR-ORCAMENTOS-PENDENTES: quem tem orçamento e nunca foi avisado ──
+  // Confere na hora do envio que o card AINDA está em aguardando aprovação: se
+  // saiu para aprovado, descarte ou outra fase, o disparo não faz mais sentido.
+  if (action === 'disparar-orcamentos-pendentes') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const d8d = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [ppA2, ppT2, ctrl2] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const clientes72 = ((ctrl2 || {}).clientes) || {};
+    let evts2 = [];
+    try {
+      const r = await fetch(`${U}/lrange/${EVT_LIST}/-8000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) { try { evts2.push(JSON.parse(s)); } catch (e) {} }
+    } catch (e) {}
+    const jaRecebeu = new Set();
+    for (const e of evts2) {
+      if (e.dir !== 'out') continue;
+      const t = String(e.texto || '');
+      if (/orcamento_pronto/i.test(t) || String(e.via || '') === 'recuperacao-7d' ||
+          String(e.via || '') === 'bot-auto-orcamento' ||
+          (e.tipo === 'template' && /reativa[çc][ãa]o/i.test(t))) jaRecebeu.add(d8d(e.tel));
+    }
+    for (const t of Object.keys(clientes72)) jaRecebeu.add(t);
+
+    const alvo = [];
+    for (const [db, sis, banco] of [[ppA2, 'ADM', 'reparoeletro_pipe'], [ppT2, 'TV', 'tv_pipe']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        // ✅ só quem está EM AGUARDANDO APROVAÇÃO agora
+        if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+        const d = d8d(c.telefone);
+        if (!d || jaRecebeu.has(d)) continue;
+        const valor = Number(c.valor || 0);
+        if (valor <= 0) continue;              // sem valor não há orçamento a comunicar
+        alvo.push({ sis, banco, id: c.id, nome: c.nomeContato || c.nome || '?',
+          tel: String(c.telefone || '').replace(/\D/g, ''), d, valor,
+          equipamento: String(c.equipamento || c.descricao || 'equipamento').slice(0, 40),
+          criadoEm: c.criadoEm,
+          dias: c.criadoEm
+            ? Math.floor((Date.now() - new Date(c.criadoEm).getTime()) / 86400000) : null });
+      }
+    }
+    // 👥 um disparo por cliente, mesmo com vários cards
+    const porCliente = {};
+    for (const a of alvo) if (!porCliente[a.d] || a.valor > porCliente[a.d].valor) porCliente[a.d] = a;
+    const fila = Object.values(porCliente);
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        cardsEncontrados: alvo.length,
+        clientesQueSeriamAvisados: fila.length,
+        valorTotal: +fila.reduce((s, x) => s + x.valor, 0).toFixed(2),
+        criterio: 'em aguardando aprovação AGORA, com valor definido e sem nenhum disparo de orçamento',
+        L: fila.sort((a, b) => (b.dias || 0) - (a.dias || 0))
+          .map(a => a.sis + ' | ' + a.nome.slice(0, 20).padEnd(20) + ' ' + a.d.slice(-4) +
+            ' | R$ ' + String(a.valor.toFixed(2)).padStart(8) +
+            ' | ' + a.equipamento.slice(0, 22) +
+            (a.dias != null ? ' | parado há ' + a.dias + 'd' : '')),
+        dica: 'para enviar: &aplicar=1' });
+    }
+
+    // ⏰ notícia de orçamento é assunto comercial: só em horário de expediente
+    const agoraBR3 = new Date(Date.now() - 3 * 3600000);
+    const hBR = agoraBR3.getUTCHours(), dBR = agoraBR3.getUTCDay();
+    const noExpediente3 = (dBR >= 1 && dBR <= 5 && hBR >= 8 && hBR < 18) ||
+      (dBR === 6 && hBR >= 8 && hBR < 12);
+    if (!noExpediente3 && String(req.query.forcarHorario || '') !== '1') {
+      return res.status(200).json({ ok: true, adiado: true,
+        motivo: 'fora do expediente — envie em horário comercial' });
+    }
+    const cfg3 = (await dbGet('wa_credenciais')) || {};
+    const pid3 = cfg3.phoneId || process.env.WA_PHONE_ID;
+    const tk3 = cfg3.token || process.env.WA_TOKEN;
+    if (!pid3 || !tk3) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+
+    const feitos = [], erros = [];
+    const controle3 = (await dbGet('wa_recuperacao_7d')) || { clientes: {} };
+    const hoje3 = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    for (const a of fila) {
+      // 🔁 relê o card imediatamente antes de enviar: ele pode ter sido movido
+      // ou aprovado enquanto a lista era percorrida
+      try {
+        const dbAgora = await dbGet(a.banco);
+        const cAgora = (((dbAgora || {}).cards) || []).find(x => String(x.id) === String(a.id));
+        if (!cAgora || String(cAgora.phaseId || cAgora.phase || '') !== 'aguardando_aprovacao') {
+          erros.push(a.nome + ': saiu de aguardando aprovação — não enviado');
+          continue;
+        }
+      } catch (e) {}
+      let to = a.tel;
+      if (to.length === 11 || to.length === 10) to = '55' + to;
+      if (to.length < 12) { erros.push(a.nome + ': telefone inválido'); continue; }
+      const primeiro = String(a.nome).trim().split(/\s+/)[0] || 'tudo bem';
+      try {
+        const r = await fetch(`https://graph.facebook.com/v20.0/${pid3}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tk3}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
+            template: { name: 'orcamento_pronto', language: { code: 'pt_BR' },
+              components: [{ type: 'body', parameters: [
+                { type: 'text', text: primeiro },
+                { type: 'text', text: a.equipamento }] }] } }),
+        }).then(x => x.json());
+        if (r && r.messages && r.messages[0]) {
+          controle3.clientes[a.d] = { tentativas: 1, ultimo: hoje3,
+            nome: a.nome, cardId: a.id, via: 'orçamento pendente' };
+          await dbSet('wa_recuperacao_7d', controle3);
+          try { await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+            texto: '📨 [orcamento_pronto] primeiro aviso — ' + primeiro,
+            tipo: 'template', via: 'orcamento-pendente', msgId: r.messages[0].id }); } catch (e) {}
+          feitos.push(a.sis + ' | ' + a.nome.slice(0, 20) + ' ' + a.d.slice(-4) +
+            ' | R$ ' + a.valor.toFixed(2));
+        } else {
+          erros.push(a.nome + ': ' + ((r && r.error && r.error.message) || 'falha no envio'));
+        }
+      } catch (e) { erros.push(a.nome + ': ' + e.message); }
+      await new Promise(s => setTimeout(s, 900));
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      enviados: feitos.length, L: feitos, erros });
+  }
+
   // ── 🔍 POR-QUE-SEM-FASE: explica cada card sem fase e sem disparo ──
   if (action === 'por-que-sem-fase') {
     const d8s = t => String(t || '').replace(/\D/g, '').slice(-8);
