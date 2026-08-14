@@ -809,8 +809,18 @@ module.exports = async function handler(req, res) {
     let orcBalcao = 0;
     const balcaoJaContado = new Set();
     for (const f of ((extraBalcao && extraBalcao.fichasFL) || [])) {
-      const q = f.orcamentoEm || f.orcamentoCadastradoEm || null;
+      // 📄 o balcão vira orçamento quando o técnico faz o diagnóstico na Análise
+      // Loja e a ficha passa a Orçamento Cadastrado — é aí que ganha valor.
+      // A ficha recém-cadastrada, sem preço, ainda não é um orçamento.
+      let q = f.orcamentoEm || f.orcamentoCadastradoEm || null;
+      if (!q) {
+        q = ((f.history || [])
+          .filter(x => String(x.phase || '') === 'orcamento_cadastrado')
+          .map(x => String(x.ts || '')).filter(Boolean).sort())[0] || null;
+      }
       if (!q) continue;
+      const vlr = Number(f.valorOrcamento || f.valor || 0);
+      if (vlr <= 0) continue;             // sem preço não é orçamento
       const t2 = new Date(q).getTime();
       if (!(t2 >= J.ini && t2 <= J.fim)) continue;
       const t = d8(f.telefone);

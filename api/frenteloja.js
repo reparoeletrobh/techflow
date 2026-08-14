@@ -286,6 +286,8 @@ export default async function handler(req,res){
     if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
     ficha.descricaoTecnica=descricaoTecnica;ficha.phase='orcamento_cadastrado';ficha.movedAt=now;
+    // 📄 mesmo momento pela via da análise técnica
+    if (!ficha.orcamentoEm) ficha.orcamentoEm = now;
     ficha.history=(ficha.history||[]).concat([{phase:'orcamento_cadastrado',ts:now}]);
     await dbSet(FL_KEY,db);
     logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Análise técnica', para:'orcamento_cadastrado', gatilho:'', status:'ok' }).catch(()=>{});
@@ -704,8 +706,13 @@ export default async function handler(req,res){
       total, totalComDesconto: comDesconto, descontoAplicado: '10%', texto, em: now };
     ficha.descricaoTecnica = listaTxt + (observacao ? ' · ' + observacao : '');
     ficha.valorOrcamento   = comDesconto;
+    ficha.valor            = comDesconto;           // o painel lê por este nome
     ficha.orcEnviadoWpp    = false;                 // 🔒 nasce NÃO enviado
     ficha.phase   = 'orcamento_cadastrado';
+    // 📄 ESTE é o momento do orçamento no balcão: a ficha nasce sem valor no
+    // cadastro e só ganha preço aqui, quando o técnico faz o diagnóstico.
+    // Sem este carimbo, o painel contava o orçamento pela criação da ficha.
+    if (!ficha.orcamentoEm) ficha.orcamentoEm = now;
     ficha.movedAt = now;
     ficha.history = (ficha.history||[]).concat([{ phase:'orcamento_cadastrado', ts:now, via:'diagnostico-loja' }]);
     await dbSet(FL_KEY, db);
