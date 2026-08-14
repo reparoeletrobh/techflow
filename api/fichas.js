@@ -129,6 +129,111 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔬 HISTORIA-COMPLETA: tudo que já aconteceu com cada ficha da coluna ──
+  // Cruza o registro de passagens da própria ficha com exclusões, cancelamentos
+  // e presença em outros bancos, para explicar por que ela está ali de novo.
+  if (action === 'historia-entrar-contato') {
+    const sis = String(req.query.sistema || 'tv');
+    const chave = sis === 'tv' ? KEY_TV : KEY_ADM;
+    const d8h = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+
+    const db = await dbGet(chave);
+    const naColuna = (((db || {}).fichas) || [])
+      .filter(f => String(f.status || '') === 'entrar_contato');
+
+    // exclusões conhecidas
+    const excl = {};
+    try {
+      const ex = await dbGet('prospeccao_excluidos');
+      const tels = (ex || {}).tels || ex || {};
+      for (const [t, v] of Object.entries(tels)) excl[d8h(t)] = v;
+    } catch (e) {}
+    // onde mais o cliente aparece
+    const outros = {};
+    for (const k of ['tv_logistica', 'reparoeletro_logistica', 'tv_pipe', 'reparoeletro_pipe',
+                     'prospeccao_adm', 'tv_arquivo', 'reparoeletro_arquivo']) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['fichas', 'cards']) {
+          for (const x of ((b || {})[L] || [])) {
+            const t = d8h(x.telefone); if (!t) continue;
+            const st = String(x.status || x.phase || x.phaseId || '?');
+            (outros[t] = outros[t] || []).push({ banco: k, status: st,
+              quando: x.criadoEm || x.movedAt, cancelado: /cancel|descarte|desistiu|duplicad/i.test(st) });
+          }
+        }
+      } catch (e) {}
+    }
+    // conversa
+    const conversa = {};
+    try {
+      const r = await fetch(`${U}/lrange/wa_evt_list/-8000/-1`,
+        { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
+      for (const s of (r.result || [])) {
+        try { const e = JSON.parse(s); const d = d8h(e.tel); if (!d) continue;
+          conversa[d] = conversa[d] || { in: 0, out: 0 };
+          if (e.dir === 'in') conversa[d].in++; else if (e.dir === 'out') conversa[d].out++;
+        } catch (x) {}
+      }
+    } catch (e) {}
+
+    const linhas = naColuna.map(f => {
+      const t = d8h(f.telefone);
+      const ps = f.passagensEntrarContato || [];
+      const lugares = outros[t] || [];
+      const cancelado = lugares.filter(x => x.cancelado);
+      const c = conversa[t];
+      return {
+        nome: f.nome || '?', tel: t, id: String(f.id || ''),
+        vezes: ps.length,
+        origens: ps.map(p => p.origem),
+        primeira: ps[0] ? ps[0].em : null,
+        ultima: ps.length ? ps[ps.length - 1].em : (f.entrarContatoEm || f.movedAt),
+        motivoUltima: ps.length ? ps[ps.length - 1].motivo : f.entrarContatoMotivo,
+        veioDe: ps.length ? ps[ps.length - 1].veioDe : null,
+        jaFoiExcluida: !!excl[t], excluidaEm: excl[t] || null,
+        cancelamentos: cancelado.map(x => x.banco + ':' + x.status),
+        outrosLugares: [...new Set(lugares.map(x => x.banco.replace('reparoeletro_', '') + ':' + x.status))],
+        msgs: c ? c.in + '↓/' + c.out + '↑' : 'nenhuma',
+      };
+    });
+
+    const repetidas = linhas.filter(l => l.vezes > 1);
+    const comCancelamento = linhas.filter(l => l.cancelamentos.length);
+    const jaExcluidas = linhas.filter(l => l.jaFoiExcluida);
+    const porOrigem = {};
+    for (const l of linhas) {
+      const o = l.origens[l.origens.length - 1] || '(sem registro)';
+      porOrigem[o] = (porOrigem[o] || 0) + 1;
+    }
+    return res.status(200).json({ ok: repetidas.length === 0,
+      sistema: sis.toUpperCase(), naColuna: linhas.length,
+      RESUMO: {
+        primeiraEntrada: linhas.filter(l => l.vezes <= 1).length,
+        jaEstiveramAntes: repetidas.length,
+        comCancelamentoEmOutroBanco: comCancelamento.length,
+        jaForamExcluidas: jaExcluidas.length,
+      },
+      ULTIMA_ORIGEM: porOrigem,
+      VOLTARAM: repetidas.map(l => l.nome.slice(0, 20) + ' ' + l.tel.slice(-4) +
+        ' | ' + l.vezes + ' entradas | ' + l.origens.join(' → ') +
+        ' | 1ª em ' + hh(l.primeira) + ' · última ' + hh(l.ultima) +
+        (l.motivoUltima ? ' | ' + String(l.motivoUltima).slice(0, 44) : '') +
+        (l.veioDe ? ' | veio de ' + l.veioDe : '')),
+      JA_EXCLUIDAS: jaExcluidas.map(l => l.nome.slice(0, 20) + ' ' + l.tel.slice(-4) +
+        ' | excluída em ' + hh(l.excluidaEm) + ' | voltou em ' + hh(l.ultima)),
+      COM_CANCELAMENTO: comCancelamento.map(l => l.nome.slice(0, 20) + ' ' + l.tel.slice(-4) +
+        ' | ' + l.cancelamentos.join(', ')),
+      TODAS: linhas.sort((a, b) => String(b.ultima).localeCompare(String(a.ultima)))
+        .map(l => hh(l.ultima) + ' | ' + l.nome.slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
+          ' | ' + (l.vezes > 1 ? '🔁 ' + l.vezes + 'ª' : '1ª') +
+          ' | ' + (l.origens[l.origens.length - 1] || 'sem registro') +
+          ' | msgs ' + l.msgs +
+          (l.outrosLugares.length ? ' | ' + l.outrosLugares.slice(0, 3).join(', ') : '')) });
+  }
+
   // ── 🚨 DIAGNOSTICO-ENTRAR-CONTATO: por que cada ficha está nesta coluna ──
   if (action === 'diagnostico-entrar-contato') {
     const d8e = t => String(t || '').replace(/\D/g, '').slice(-8);
