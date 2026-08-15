@@ -330,6 +330,158 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action;
 
+
+  // ── 📋 relatorio-motorista: coletas e entregas de cada motorista por dia ──
+  // A coleta o sistema já registra: o motorista clica em Coletado e fica o nome
+  // com a data. A entrega não passa pelo sistema — sai por mensagem — então é
+  // registrada aqui pela própria mensagem enviada, que já tem tudo: nome,
+  // telefone, o que entregar, quanto receber e o endereço.
+  if (action === 'relatorio-motorista') {
+    const quem = String(req.query.motorista || '').toLowerCase().trim();
+    const dia = String(req.query.dia || '');
+    const de = req.query.de ? new Date(req.query.de + 'T00:00:00-03:00').getTime() : null;
+    const ate = req.query.ate ? new Date(req.query.ate + 'T23:59:59-03:00').getTime() : null;
+    const iniD = dia ? new Date(dia + 'T00:00:00-03:00').getTime() : de;
+    const fimD = dia ? iniD + 86400000 - 1 : ate;
+    const dentroD = (d) => {
+      if (!d) return false;
+      const t = new Date(d).getTime();
+      if (iniD && t < iniD) return false;
+      if (fimD && t > fimD) return false;
+      return true;
+    };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const bate = (nome) => !quem ||
+      String(nome || '').toLowerCase().indexOf(quem) >= 0;
+
+    // ── coletas: fichas que passaram por Coleta Efetuada ──
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
+    const coletas = [];
+    for (const f of (db.fichas || [])) {
+      const q = f.coletadoEm || null;
+      if (!q || !dentroD(q)) continue;
+      const mot = f.coletadoPor || f.motoristaNome || '(sem motorista)';
+      if (!bate(mot)) continue;
+      coletas.push({ motorista: mot, quando: q,
+        nome: f.nome || '?', tel: String(f.telefone || '').slice(-4),
+        equipamento: String(f.equipamento || '').slice(0, 30),
+        endereco: String(f.endereco || '').slice(0, 46) });
+    }
+
+    // ── entregas: registradas a partir da mensagem enviada ao motorista ──
+    const edb = (await dbGet('tv_entregas_motorista')) || { itens: [] };
+    const entregas = [];
+    for (const e of (edb.itens || [])) {
+      if (!dentroD(e.em)) continue;
+      if (!bate(e.motorista)) continue;
+      entregas.push(e);
+    }
+
+    // ── totais por motorista ──
+    const porMot = {};
+    for (const c of coletas) {
+      const k = c.motorista;
+      porMot[k] = porMot[k] || { coletas: 0, entregas: 0, aReceber: 0 };
+      porMot[k].coletas++;
+    }
+    for (const e of entregas) {
+      const k = e.motorista || '(sem motorista)';
+      porMot[k] = porMot[k] || { coletas: 0, entregas: 0, aReceber: 0 };
+      porMot[k].entregas++;
+      porMot[k].aReceber += Number(e.valor || 0);
+    }
+
+    return res.status(200).json({ ok: true,
+      filtro: { motorista: quem || 'todos', dia: dia || null,
+        de: req.query.de || null, ate: req.query.ate || null },
+      TOTAIS: { coletas: coletas.length, entregas: entregas.length,
+        servicos: coletas.length + entregas.length,
+        aReceberNasEntregas: +entregas.reduce((s, e) => s + Number(e.valor || 0), 0).toFixed(2) },
+      POR_MOTORISTA: Object.entries(porMot)
+        .sort((a, b) => (b[1].coletas + b[1].entregas) - (a[1].coletas + a[1].entregas))
+        .map(([n, v]) => n.padEnd(14) + ' | ' + String(v.coletas).padStart(3) + ' coleta(s)' +
+          ' | ' + String(v.entregas).padStart(3) + ' entrega(s)' +
+          ' | total ' + String(v.coletas + v.entregas).padStart(3) +
+          (v.aReceber ? ' | R$ ' + v.aReceber.toFixed(2) + ' a receber' : '')),
+      COLETAS: coletas.sort((a, b) => String(a.quando).localeCompare(String(b.quando)))
+        .map(c => hh(c.quando) + ' | ' + c.motorista.padEnd(12) + ' | ' +
+          String(c.nome).slice(0, 20).padEnd(20) + ' ' + c.tel +
+          ' | ' + c.equipamento + (c.endereco ? ' | ' + c.endereco : '')),
+      ENTREGAS: entregas.sort((a, b) => String(a.em).localeCompare(String(b.em)))
+        .map(e => hh(e.em) + ' | ' + String(e.motorista || '?').padEnd(12) + ' | ' +
+          String(e.cliente || '?').slice(0, 20).padEnd(20) + ' ' +
+          String(e.telefone || '').slice(-4) +
+          ' | ' + String(e.oQue || '').slice(0, 28) +
+          (e.valor ? ' | R$ ' + Number(e.valor).toFixed(2) : ' | sem cobrança') +
+          (e.endereco ? ' | ' + String(e.endereco).slice(0, 40) : '')) });
+  }
+
+  // ── 📦 POST registrar-entrega: lê a mensagem enviada ao motorista ──
+  // A entrega é combinada por mensagem, no formato que a equipe já usa. Em vez
+  // de exigir um cadastro à parte, o texto é interpretado: cole a mensagem e
+  // o sistema extrai cliente, telefone, o que entregar, valor e endereço.
+  if (req.method === 'POST' && action === 'registrar-entrega') {
+    const { texto, motorista } = req.body || {};
+    if (!String(texto || '').trim()) {
+      return res.status(400).json({ ok: false, error: 'cole a mensagem da entrega' });
+    }
+    if (!String(motorista || '').trim()) {
+      return res.status(400).json({ ok: false, error: 'informe o motorista' });
+    }
+    // formato: 0303 Cristina - (31) 99647-0303 - ENTREGAR TV 43 E RECEBER 590,00
+    //          Av. Pedro Olímpio da Fonseca, 763 – Santa Cruz, Eldorado – Contagem
+    const linhas = String(texto).split(/\n+/).map(x => x.trim()).filter(Boolean);
+    const registradas = [], recusadas = [];
+    for (let i = 0; i < linhas.length; i++) {
+      const l = linhas[i];
+      // a linha da entrega tem telefone; a seguinte costuma ser o endereço
+      const mTel = l.match(/\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4}/);
+      if (!mTel) continue;
+      const tel = mTel[0].replace(/\D/g, '');
+      const partes = l.split(/\s+[-–]\s+/);
+      // nome: o que vem antes do telefone, sem o código inicial
+      let cliente = String(partes[0] || '').replace(/^\d{3,4}\s+/, '').trim();
+      if (!cliente) cliente = '?';
+      const resto = partes.slice(2).join(' - ') || partes.slice(1).join(' - ');
+      const mVal = resto.match(/receber\s*R?\$?\s*([\d.]+,\d{2}|[\d.]+)/i);
+      const valor = mVal
+        ? Number(String(mVal[1]).replace(/\./g, '').replace(',', '.')) : 0;
+      const proxima = linhas[i + 1] || '';
+      const ehEndereco = proxima && !/\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4}/.test(proxima);
+      const item = { id: 'ent_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        motorista: String(motorista).trim(),
+        cliente, telefone: tel,
+        oQue: resto.replace(/\s+/g, ' ').slice(0, 90),
+        valor, endereco: ehEndereco ? proxima.slice(0, 120) : '',
+        em: new Date().toISOString(), textoOriginal: l.slice(0, 200) };
+      registradas.push(item);
+      if (ehEndereco) i++;   // consumiu a linha do endereço
+    }
+    if (!registradas.length) {
+      return res.status(200).json({ ok: false,
+        error: 'não reconheci nenhuma entrega — a linha precisa ter o telefone do cliente',
+        exemplo: '0303 Cristina - (31) 99647-0303 - ENTREGAR TV 43 E RECEBER 590,00' });
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        quantas: registradas.length,
+        L: registradas.map(e => e.cliente + ' ' + e.telefone.slice(-4) +
+          ' | ' + e.oQue.slice(0, 40) +
+          (e.valor ? ' | R$ ' + e.valor.toFixed(2) : ' | sem cobrança') +
+          (e.endereco ? ' | ' + e.endereco.slice(0, 34) : ' | ⚠️ sem endereço')),
+        dica: 'para registrar: &aplicar=1' });
+    }
+    const edb = (await dbGet('tv_entregas_motorista')) || { itens: [] };
+    edb.itens = (edb.itens || []).concat(registradas).slice(-4000);
+    await dbSet('tv_entregas_motorista', edb);
+    const conf = await dbGet('tv_entregas_motorista');
+    const ok2 = (((conf || {}).itens) || []).some(x => x.id === registradas[0].id);
+    if (!ok2) return res.status(200).json({ ok: false, error: 'não persistiu — tente de novo' });
+    return res.status(200).json({ ok: true, registradas: registradas.length,
+      L: registradas.map(e => e.cliente + ' → ' + e.motorista) });
+  }
+
   // ── 🚚 MOTORISTAS: cadastro com telefone e regra de atendimento ──
   // Os nomes estavam fixos no código: incluir alguém exigia alterar o sistema,
   // e não havia onde guardar o telefone — sem ele não dá para avisar o

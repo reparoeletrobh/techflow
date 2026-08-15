@@ -274,6 +274,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;display:inline-block;}
 .selo-aten{background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.5);color:#fbbf24;
   font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;display:inline-block;}
+
+/* 🚚 quem fez a coleta, no card da coluna Coleta Efetuada */
+.mot-badge{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,monospace;
+  font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:7px;margin-top:4px;
+  background:rgba(34,197,94,.14);color:#22c55e;border:1px solid rgba(34,197,94,.35);
+  white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -284,7 +290,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <button class="hbtn cbtn-green" onclick="abrirCadastro()" style="background:rgba(34,197,94,.15);color:#22c55e;border-color:#22c55e;">+ Cadastrar</button>
 <button class="hbtn" onclick="mostrarRelatorio()" style="color:var(--yellow);">📊 Relatório</button>
 <a href="/tv-metricas" class="hbtn" style="color:var(--yellow);border-color:rgba(245,200,0,.4);background:rgba(245,200,0,.08);">📊 Métricas ERP</a>
-<button class="hbtn" onclick="load()">↻ Atualizar</button>
+<button class="hbtn" onclick="abrirRelatorioMotorista()" style="background:#22c55e;color:#052e16;font-weight:800;">📋 Motoristas</button>
+    <button class="hbtn" onclick="load()">↻ Atualizar</button>
 <button class="hbtn" onclick="abrirLogs()">📊 Logs</button>
     <a href="/adm" class="hbtn">← ADM</a>
   </div>
@@ -735,6 +742,17 @@ function cardHTML(f, phase) {
   }
   const col   = COLS.find(c => c.id === phase) || {};
   const barCor = col.cor || '#444';
+  // 🚚 quem coletou: sem isso a coluna mostra o que foi coletado mas não por quem,
+  // e a conferência com o motorista vira memória
+  let quemColetou = '';
+  if ((phase === 'coleta_efetuada' || phase === 'orc_registrado') && (f.coletadoPor || f.motoristaNome)) {
+    const _q = escHtml(String(f.coletadoPor || f.motoristaNome));
+    const _qd = f.coletadoEm
+      ? new Date(f.coletadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'})
+        + ' ' + new Date(f.coletadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})
+      : '';
+    quemColetou = `<div class="mot-badge" title="coletado por ${_q}${_qd ? ' em ' + _qd : ''}">🚚 ${_q}${_qd ? ' · ' + _qd : ''}</div>`;
+  }
 
   let btns = '';
   if (phase === 'liberado_coleta') {
@@ -852,7 +870,7 @@ function cardHTML(f, phase) {
     ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
     <div class="card-nome">${escHtml(nomeFormatado(f))}</div>
     ${f.telefone ? `<div class="card-tel">📞 ${escHtml(mascaraTel(f.telefone))}</div>` : ''}
-    ${relogio}
+    ${relogio}${quemColetou}
     ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
     ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
     ${f.observacao ? `<div class="card-obs">📌 ${escHtml(f.observacao).slice(0,140)}</div>` : ''}
@@ -1320,6 +1338,171 @@ async function carregarMotoristas(){
       + (m.telefone ? '' : '<div style="font-size:9px;font-weight:600;opacity:.8;">sem telefone</div>')
       + '</button>';
   }).join('');
+}
+
+
+// ── 📋 relatório do motorista: coletas e entregas por dia ──
+var _relMot = { motorista: '', dia: '' };
+function abrirRelatorioMotorista(){
+  var ov = document.getElementById('ov-rel-mot');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-rel-mot';
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;';
+  var hojeStr = new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+                : 'border-radius:16px;padding:20px 22px;')
+    + 'max-width:720px;width:100%;max-height:92vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
+      + '<div style="font-size:15px;font-weight:900;">📋 Coletas e entregas</div>'
+      + '<button onclick="document.getElementById(\'ov-rel-mot\').remove()" '
+        + 'style="margin-left:auto;background:#374151;border:none;border-radius:8px;padding:7px 14px;'
+        + 'color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">Fechar</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;">'
+      + '<select id="rm-mot" onchange="carregarRelMot()" style="flex:1;min-width:130px;background:#12161d;'
+        + 'border:1px solid #2a3140;border-radius:9px;padding:9px 11px;color:#f0f2f5;font-size:13px;">'
+        + '<option value="">todos os motoristas</option></select>'
+      + '<input id="rm-dia" type="date" value="' + hojeStr + '" onchange="carregarRelMot()" '
+        + 'style="background:#12161d;border:1px solid #2a3140;border-radius:9px;padding:9px 11px;'
+        + 'color:#f0f2f5;font-size:13px;">'
+      + '<button onclick="abrirRegistrarEntrega()" style="background:#8b5cf6;border:none;'
+        + 'border-radius:9px;padding:9px 14px;color:#fff;font-weight:800;cursor:pointer;'
+        + 'font-size:12.5px;">+ Entrega</button>'
+    + '</div>'
+    + '<div id="rm-corpo"><div style="color:#5a6270;padding:20px;text-align:center;">⏳</div></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  // preencher os motoristas do cadastro
+  fetch('/api/tv-logistica?action=motoristas').then(function(x){return x.json();})
+    .then(function(r){
+      var s = document.getElementById('rm-mot');
+      if(s && r && r.ok){
+        s.innerHTML = '<option value="">todos os motoristas</option>'
+          + (r.motoristas||[]).filter(function(m){return m.ativo!==false;})
+            .map(function(m){ return '<option>' + String(m.nome).replace(/</g,'&lt;') + '</option>'; }).join('');
+      }
+    }).catch(function(){});
+  carregarRelMot();
+}
+
+async function carregarRelMot(){
+  var cx = document.getElementById('rm-corpo');
+  if(!cx) return;
+  var mot = (document.getElementById('rm-mot')||{}).value || '';
+  var dia = (document.getElementById('rm-dia')||{}).value || '';
+  cx.innerHTML = '<div style="color:#5a6270;padding:20px;text-align:center;">⏳ carregando…</div>';
+  var r = null;
+  try {
+    r = await fetch('/api/tv-logistica?action=relatorio-motorista&motorista='
+      + encodeURIComponent(mot) + '&dia=' + encodeURIComponent(dia))
+      .then(function(x){ return x.json(); });
+  } catch(e){}
+  if(!r || !r.ok){ cx.innerHTML = '<div style="color:#f87171;">não consegui carregar</div>'; return; }
+  var t = r.TOTAIS || {};
+  var cartao = function(n,l,cor){
+    return '<div style="background:rgba(255,255,255,.03);border:1px solid #1e2430;border-radius:11px;'
+      + 'padding:12px 14px;flex:1;min-width:100px;">'
+      + '<div style="font-family:ui-monospace,monospace;font-size:23px;font-weight:700;color:'+cor+';'
+      + 'line-height:1;">'+n+'</div>'
+      + '<div style="font-size:9.5px;color:#5a6270;font-weight:750;letter-spacing:.05em;'
+      + 'text-transform:uppercase;margin-top:5px;">'+l+'</div></div>';
+  };
+  var lista = function(titulo, arr, cor){
+    if(!arr || !arr.length) return '';
+    return '<div style="margin-top:14px;">'
+      + '<div style="font-size:12px;font-weight:800;color:'+cor+';">'+titulo+' ('+arr.length+')</div>'
+      + '<div style="background:#0b0e13;border:1px solid #1e2430;border-radius:9px;padding:10px 12px;'
+      + 'margin-top:6px;font-family:ui-monospace,monospace;font-size:10.5px;color:#8b93a3;'
+      + 'line-height:1.9;max-height:280px;overflow-y:auto;white-space:pre-wrap;">'
+      + arr.map(function(x){ return String(x).replace(/</g,'&lt;'); }).join('\n') + '</div></div>';
+  };
+  cx.innerHTML =
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;">'
+      + cartao(t.coletas||0, 'coletas', '#22c55e')
+      + cartao(t.entregas||0, 'entregas', '#8b5cf6')
+      + cartao(t.servicos||0, 'total', '#60a5fa')
+      + (t.aReceberNasEntregas
+          ? cartao('R$ ' + Number(t.aReceberNasEntregas).toLocaleString('pt-BR',{minimumFractionDigits:2}),
+              'a receber', '#fbbf24') : '')
+    + '</div>'
+    + ((r.POR_MOTORISTA||[]).length
+        ? lista('Por motorista', r.POR_MOTORISTA, '#f0f2f5') : '')
+    + lista('🚚 Coletas', r.COLETAS, '#22c55e')
+    + lista('📦 Entregas', r.ENTREGAS, '#8b5cf6');
+}
+
+function abrirRegistrarEntrega(){
+  var ov = document.getElementById('ov-ent');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-ent';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10000;display:flex;'
+    + 'align-items:center;justify-content:center;padding:18px;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;border-radius:16px;'
+    + 'padding:20px 22px;max-width:520px;width:100%;">'
+    + '<div style="font-size:15px;font-weight:900;margin-bottom:4px;">📦 Registrar entrega</div>'
+    + '<div style="font-size:11.5px;color:#8b93a3;margin-bottom:11px;line-height:1.6;">'
+      + 'cole a mensagem que você mandou para o motorista, do jeito que ela é</div>'
+    + '<select id="ent-mot" style="width:100%;background:#12161d;border:1px solid #2a3140;'
+      + 'border-radius:9px;padding:10px 12px;color:#f0f2f5;font-size:13px;margin-bottom:8px;">'
+      + '<option value="">— escolha o motorista —</option></select>'
+    + '<textarea id="ent-txt" style="width:100%;min-height:120px;background:#12161d;'
+      + 'border:1px solid #2a3140;border-radius:9px;padding:11px 13px;color:#f0f2f5;'
+      + 'font-size:12.5px;line-height:1.6;font-family:ui-monospace,monospace;resize:vertical;" '
+      + 'placeholder="0303 Cristina - (31) 99647-0303 - ENTREGAR TV 43 E RECEBER 590,00&#10;'
+      + 'Av. Pedro Olímpio da Fonseca, 763 – Santa Cruz, Eldorado – Contagem"></textarea>'
+    + '<div id="ent-msg" style="font-size:11.5px;margin-top:8px;line-height:1.6;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:12px;">'
+      + '<button onclick="salvarEntrega()" style="flex:1;background:#8b5cf6;border:none;'
+        + 'border-radius:9px;padding:12px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">'
+        + 'Registrar</button>'
+      + '<button onclick="document.getElementById(\'ov-ent\').remove()" style="flex:1;'
+        + 'background:#374151;border:none;border-radius:9px;padding:12px;color:#fff;'
+        + 'font-weight:800;cursor:pointer;font-size:13px;">Cancelar</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  fetch('/api/tv-logistica?action=motoristas').then(function(x){return x.json();})
+    .then(function(r){
+      var s = document.getElementById('ent-mot');
+      if(s && r && r.ok){
+        s.innerHTML = '<option value="">— escolha o motorista —</option>'
+          + (r.motoristas||[]).filter(function(m){return m.ativo!==false;})
+            .map(function(m){ return '<option>' + String(m.nome).replace(/</g,'&lt;') + '</option>'; }).join('');
+      }
+    }).catch(function(){});
+}
+
+async function salvarEntrega(){
+  var mot = (document.getElementById('ent-mot')||{}).value || '';
+  var txt = (document.getElementById('ent-txt')||{}).value || '';
+  var msg = document.getElementById('ent-msg');
+  if(!mot){ if(msg){ msg.style.color='#f87171'; msg.textContent='escolha o motorista'; } return; }
+  if(!String(txt).trim()){ if(msg){ msg.style.color='#f87171'; msg.textContent='cole a mensagem'; } return; }
+  // primeiro a prévia, para conferir o que foi entendido
+  var p = await fetch('/api/tv-logistica?action=registrar-entrega',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:txt,motorista:mot})})
+    .then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(!p.ok){
+    if(msg){ msg.style.color='#f87171'; msg.textContent='🚨 ' + (p.error||'não entendi a mensagem'); }
+    return;
+  }
+  if(!confirm('Registrar ' + p.quantas + ' entrega(s)?\n\n' + (p.L||[]).join('\n'))) return;
+  var r = await fetch('/api/tv-logistica?action=registrar-entrega&aplicar=1',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:txt,motorista:mot})})
+    .then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    var ov = document.getElementById('ov-ent');
+    if(ov) ov.remove();
+    carregarRelMot();
+  } else if(msg){
+    msg.style.color='#f87171';
+    msg.textContent = '🚨 ' + (r.error||'não consegui registrar');
+  }
 }
 
 function abrirCadastroMotorista(){
