@@ -2483,6 +2483,135 @@ module.exports = async function handler(req, res) {
   // ── 🔎 r2-diagnostico: o que está impedindo o envio ──
   // A mensagem de erro sumia da tela antes de ser lida. Esta consulta responde
   // por escrito o que falta: credencial, permissão de escrita, bucket ou tamanho.
+  // ── 🔍 auditoria-lancamento: confere o ciclo antes de ele começar ──
+  // Campanha criada não é campanha veiculando: pode nascer sem texto, com
+  // segmentação diferente do campeão, com o vídeo faltando ou reprovada na
+  // revisão. Depois que o ciclo começa, cada hora parada é verba perdida.
+  if (action === 'auditoria-lancamento') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKA = String(req.query.token || '').trim() || TOKEN;
+    const selo = String(req.query.selo || '').trim() ||
+      (() => { const b = new Date(Date.now() - 3 * 3600000);
+        return String(b.getUTCDate()).padStart(2, '0') +
+          String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
+
+    // campanhas do ciclo
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name,status,effective_status,start_time,stop_time,daily_budget,lifetime_budget,objective,issues_info` +
+      `&limit=300&access_token=${TKA}`, 8);
+    const doCiclo = (camps.data || []).filter(c => String(c.name || '').includes(selo));
+    if (!doCiclo.length) return res.status(200).json({ ok: false,
+      error: 'nenhuma campanha com o selo ' + selo });
+
+    // conjuntos e anúncios de uma vez
+    const sets = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets` +
+      `?fields=id,name,campaign_id,targeting,start_time,end_time,daily_budget,lifetime_budget,` +
+      `optimization_goal,destination_type,promoted_object,effective_status,issues_info` +
+      `&limit=400&access_token=${TKA}`, 10);
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads` +
+      `?fields=id,name,adset_id,campaign_id,effective_status,issues_info,` +
+      `creative{id,title,body,video_id,object_story_spec},` +
+      `&limit=400&access_token=${TKA}`, 10);
+
+    const setsPorCamp = {}, adsPorCamp = {};
+    for (const s of (sets.data || [])) (setsPorCamp[s.campaign_id] = setsPorCamp[s.campaign_id] || []).push(s);
+    for (const a of (ads.data || [])) (adsPorCamp[a.campaign_id] = adsPorCamp[a.campaign_id] || []).push(a);
+
+    const resumoGeo = (t) => {
+      if (!t) return null;
+      const g = t.geo_locations || {};
+      const partes = [];
+      for (const c of (g.cities || [])) partes.push(c.name + (c.radius ? ' +' + c.radius + c.distance_unit : ''));
+      for (const r of (g.regions || [])) partes.push(r.name);
+      for (const p of (g.countries || [])) partes.push(p);
+      for (const cs of (g.custom_locations || [])) {
+        partes.push((cs.name || (cs.latitude + ',' + cs.longitude)) +
+          (cs.radius ? ' +' + cs.radius + (cs.distance_unit || 'km') : ''));
+      }
+      return { locais: partes.join(' · ') || '(sem local)',
+        idade: (t.age_min || '?') + '-' + (t.age_max || '?'),
+        genero: (t.genders || []).join(',') || 'todos',
+        plataformas: (t.publisher_platforms || []).join(',') || 'automático' };
+    };
+
+    const linhas = [], problemas = [];
+    for (const c of doCiclo) {
+      const meusSets = setsPorCamp[c.id] || [];
+      const meusAds = adsPorCamp[c.id] || [];
+      const s0 = meusSets[0];
+      const geo = s0 ? resumoGeo(s0.targeting) : null;
+      const verba = Number(c.lifetime_budget || c.daily_budget ||
+        (s0 && (s0.lifetime_budget || s0.daily_budget)) || 0) / 100;
+      const inicio = (s0 && s0.start_time) || c.start_time || null;
+      const fim = (s0 && s0.end_time) || c.stop_time || null;
+      // 🎨 o criativo tem texto e vídeo?
+      const semTexto = [], semVideo = [];
+      for (const a of meusAds) {
+        const cr = a.creative || {};
+        const spec = cr.object_story_spec || {};
+        const vd = spec.video_data || {};
+        const titulo = cr.title || vd.title || (vd.call_to_action && vd.call_to_action.value && vd.call_to_action.value.link_title) || '';
+        const corpo = cr.body || vd.message || '';
+        const vid = cr.video_id || vd.video_id || '';
+        if (!String(titulo).trim() || !String(corpo).trim()) semTexto.push(a.name || a.id);
+        if (!vid) semVideo.push(a.name || a.id);
+      }
+      const issues = []
+        .concat((c.issues_info || []).map(x => 'campanha: ' + (x.error_summary || x.error_message || '')))
+        .concat(meusSets.flatMap(s => (s.issues_info || []).map(x => 'conjunto: ' + (x.error_summary || x.error_message || ''))))
+        .concat(meusAds.flatMap(a => (a.issues_info || []).map(x => 'anúncio: ' + (x.error_summary || x.error_message || ''))));
+
+      const item = { id: c.id, nome: c.name, status: c.effective_status,
+        verba, inicio, fim, anuncios: meusAds.length, conjuntos: meusSets.length,
+        geo, semTexto, semVideo, issues,
+        emRevisao: meusAds.filter(a => String(a.effective_status || '') === 'PENDING_REVIEW').length,
+        reprovados: meusAds.filter(a => String(a.effective_status || '') === 'DISAPPROVED').length };
+      linhas.push(item);
+
+      if (!meusAds.length) problemas.push(c.name + ': SEM ANÚNCIO — não vai veicular');
+      if (semTexto.length) problemas.push(c.name + ': ' + semTexto.length + ' anúncio(s) sem título ou corpo');
+      if (semVideo.length) problemas.push(c.name + ': ' + semVideo.length + ' anúncio(s) sem vídeo');
+      if (item.reprovados) problemas.push(c.name + ': ' + item.reprovados + ' anúncio(s) REPROVADO(s)');
+      if (!verba) problemas.push(c.name + ': sem verba definida');
+      if (!geo || geo.locais === '(sem local)') problemas.push(c.name + ': SEM LOCALIZAÇÃO definida');
+      if (issues.length) problemas.push(c.name + ': ' + issues[0]);
+    }
+
+    // 📍 a segmentação bate entre as campanhas? compara com a mais frequente
+    const contaGeo = {};
+    for (const l of linhas) {
+      if (!l.geo) continue;
+      const k = l.geo.locais + ' | ' + l.geo.idade + ' | ' + l.geo.genero;
+      contaGeo[k] = (contaGeo[k] || 0) + 1;
+    }
+    const padrao = Object.entries(contaGeo).sort((a, b) => b[1] - a[1])[0];
+    const foraDoPadrao = linhas.filter(l => l.geo &&
+      (l.geo.locais + ' | ' + l.geo.idade + ' | ' + l.geo.genero) !== (padrao && padrao[0]));
+
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const porInicio = {};
+    for (const l of linhas) { const k = hh(l.inicio); porInicio[k] = (porInicio[k] || 0) + 1; }
+
+    return res.status(200).json({ ok: problemas.length === 0,
+      selo, campanhas: linhas.length,
+      verbaTotal: +linhas.reduce((s, l) => s + l.verba, 0).toFixed(2),
+      COMECAM_EM: porInicio,
+      SEGMENTACAO_PADRAO: padrao ? { configuracao: padrao[0], campanhas: padrao[1] } : null,
+      FORA_DO_PADRAO: foraDoPadrao.map(l => l.nome.slice(0, 40) + ' → ' +
+        l.geo.locais + ' | ' + l.geo.idade + ' | ' + l.geo.genero),
+      PROBLEMAS: problemas,
+      EM_REVISAO: linhas.filter(l => l.emRevisao).map(l => l.nome.slice(0, 40) +
+        ' — ' + l.emRevisao + ' anúncio(s) aguardando aprovação'),
+      TODAS: linhas.sort((a, b) => String(a.nome).localeCompare(String(b.nome)))
+        .map(l => (l.status === 'ACTIVE' ? '🟢' : l.status === 'PAUSED' ? '⏸️' : '⚠️') +
+          ' ' + String(l.nome).slice(0, 42).padEnd(42) +
+          ' | R$ ' + String(l.verba.toFixed(2)).padStart(7) +
+          ' | ' + l.anuncios + ' anúncio(s)' +
+          ' | ' + hh(l.inicio) + ' → ' + hh(l.fim) +
+          (l.geo ? ' | ' + l.geo.locais.slice(0, 30) : ' | SEM LOCAL')) });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
