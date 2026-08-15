@@ -77,10 +77,24 @@ export default async function handler(req, res) {
     };
     const ORIGENS = { tecnico: bloco('tecnico'), garantia: bloco('garantia'), avulsa: bloco('avulsa') };
 
-    // ── 2) a meta de 25 conta SÓ o que vem do setor técnico ──
+    // ── 2) as metas contam SÓ o que vem do setor técnico ──
+    // A diária zera todo dia; a semanal acompanha o ciclo comercial, de sábado
+    // 13h a sábado 13h, para poder ser lida junto com o resultado da semana.
     const doTecnicoHoje = insp.filter(i => origemDe(i) === 'tecnico' &&
       String(i.criadoEm || '').slice(0, 10) === hoje).length;
     const META = 25;
+    const META_SEMANA = 150;
+    const aBR = new Date(Date.now() - 3 * 3600000);
+    let voltarD = (aBR.getUTCDay() - 6 + 7) % 7;          // dias desde o último sábado
+    if (aBR.getUTCDay() === 6 && aBR.getUTCHours() < 13) voltarD = 7;
+    const iniSem = new Date(aBR.getTime() - voltarD * 86400000);
+    iniSem.setUTCHours(13, 0, 0, 0);
+    const iniSemMs = iniSem.getTime() + 3 * 3600000;      // de volta para UTC real
+    const doTecnicoSemana = insp.filter(i => origemDe(i) === 'tecnico' &&
+      i.criadoEm && new Date(i.criadoEm).getTime() >= iniSemMs).length;
+    // 📅 quanto do ciclo já passou, para saber se o ritmo dá conta
+    const diasCorridos = Math.max(0.1, (Date.now() - iniSemMs) / 86400000);
+    const esperadoAgora = Math.round(META_SEMANA * Math.min(1, diasCorridos / 7));
 
     // ── 3) produção por técnico, separada por categoria ──
     const porTec = {};
@@ -137,6 +151,18 @@ export default async function handler(req, res) {
         faltam: Math.max(0, META - doTecnicoHoje),
         observacao: 'conta apenas o que veio do setor técnico; garantia e avulsa ' +
           'são creditadas ao técnico mas ficam fora da meta' },
+      META_SEMANAL: { feitas: doTecnicoSemana, meta: META_SEMANA,
+        percentual: Math.round(doTecnicoSemana / META_SEMANA * 100),
+        faltam: Math.max(0, META_SEMANA - doTecnicoSemana),
+        cicloComecou: new Date(iniSemMs - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' '),
+        diaDoCiclo: Math.min(7, Math.ceil(diasCorridos)) + ' de 7',
+        esperadoAteAgora: esperadoAgora,
+        situacao: doTecnicoSemana >= esperadoAgora
+          ? 'no ritmo' : 'atrás em ' + (esperadoAgora - doTecnicoSemana),
+        faltamPorDia: (() => {
+          const diasRestantes = Math.max(0.5, 7 - diasCorridos);
+          return Math.ceil(Math.max(0, META_SEMANA - doTecnicoSemana) / diasRestantes);
+        })() },
       ORIGENS,
       TECNICOS: TECNICOS.map(t => ({ nome: t.nome, total: t.total,
         tecnico: t.tecnico, garantia: t.garantia, avulsa: t.avulsa,

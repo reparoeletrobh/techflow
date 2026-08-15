@@ -278,6 +278,12 @@ async function carregarPainelQualidade(){
     .then(function(x){ return x.json(); }); } catch(e){}
   if(!r || !r.ok){ cx.innerHTML = ''; return; }
   _pq = r;
+  // a meta semanal é desenhada junto da diária, no painel de cima
+  if(r.META_SEMANAL){
+    var mudou = !_semanal || _semanal.feitas !== r.META_SEMANAL.feitas;
+    _semanal = r.META_SEMANAL;
+    if(mudou && typeof carregarPainelMeta === 'function') carregarPainelMeta();
+  }
   var m = r.META_DIARIA || {}, o = r.ORIGENS || {}, f = r.FILA_TECNICO || {};
   var pct = Math.min(100, m.percentual || 0);
   var corBarra = pct >= 100 ? '#34d399' : pct >= 60 ? '#fbbf24' : '#f87171';
@@ -491,6 +497,40 @@ async function salvarAvulsa(){
 
 // ── 🎯 PAINEL DE META: 25 fichas por dia no controle de qualidade ──
 const META_DIA = 25;
+
+// ── 📅 meta semanal do setor técnico: 150 por ciclo comercial ──
+// A diária zera todo dia e não mostra se a semana fecha; esta acompanha o
+// ciclo inteiro e diz quantas faltam por dia para chegar lá.
+var _semanal = null;
+function _barraSemanal(){
+  var s = _semanal;
+  if(!s) return '';
+  var pctS = Math.min(100, s.percentual || 0);
+  var corS = pctS >= 100 ? '#34d399'
+    : (s.situacao === 'no ritmo' ? '#60a5fa' : pctS >= 50 ? '#fbbf24' : '#f87171');
+  return '<div style="margin-top:11px;padding-top:11px;border-top:1px solid #1e2430;">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span style="font-size:12.5px;font-weight:800;">📅 Meta da semana — ' + s.meta + ' fichas</span>'
+      + '<span style="font-size:11px;color:#5a6270;">dia ' + (s.diaDoCiclo||'') + ' · desde ' + (s.cicloComecou||'') + '</span>'
+      + '<span style="margin-left:auto;font-size:12.5px;font-weight:900;color:' + corS + ';">'
+        + s.feitas + ' / ' + s.meta + ' · ' + pctS + '%</span>'
+    + '</div>'
+    + '<div class="mt-barra" style="position:relative;">'
+      + '<div class="mt-fill" style="width:' + pctS + '%;background:' + corS + '"></div>'
+      // 📍 marca onde a equipe deveria estar a esta altura do ciclo
+      + (s.esperadoAteAgora ? '<div style="position:absolute;top:-2px;bottom:-2px;left:'
+          + Math.min(100, Math.round(s.esperadoAteAgora / s.meta * 100)) + '%;width:2px;'
+          + 'background:rgba(255,255,255,.45);" title="esperado a esta altura: '
+          + s.esperadoAteAgora + '"></div>' : '')
+    + '</div>'
+    + '<div style="font-size:10.5px;color:#5a6270;margin-top:5px;">'
+      + (s.situacao === 'no ritmo' ? '✅ no ritmo' : '⚠️ ' + s.situacao)
+      + ' · esperado até agora ' + s.esperadoAteAgora
+      + (s.faltam ? ' · faltam ' + s.faltam + ', cerca de ' + s.faltamPorDia + ' por dia' : ' · meta atingida')
+      + '</div>'
+    + '</div>';
+}
+
 async function carregarPainelMeta(){
   const el = document.getElementById('painel-meta');
   if(!el) return;
@@ -531,6 +571,7 @@ async function carregarPainelMeta(){
       + '<span style="margin-left:auto;font-size:12.5px;font-weight:900;color:'+cor+'">'+hoje+' / '+META_DIA+' · '+pct+'%</span>'
     + '</div>'
     + '<div class="mt-barra"><div class="mt-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>'
+    + _barraSemanal()
     + '<div class="mt-grid">'
       + kpi(hoje, 'ENTRARAM HOJE', cor)
       + kpi((c.ENTRARAM&&c.ENTRARAM.semana)||0, 'NA SEMANA', '#60a5fa')
