@@ -2625,8 +2625,11 @@ module.exports = async function handler(req, res) {
 
   // ── 🔑 assinatura AWS SigV4 — necessária para listar o bucket do R2 ──
   async function assinarR2(metodo, caminho, query) {
-    const AK = (process.env.R2_ACCESS_KEY || '31a48286ed15896e6201edadfa35aa87').trim();
-    const SK = (process.env.R2_SECRET_KEY || 'c3abe45aec10e95cdf1b65209b11122b1b5fcf3ca92c2947d216c508b823042c').trim();
+    // ⚠️ credenciais de reserva: as anteriores tinham permissão apenas de leitura
+    // e recusavam apagar e enviar arquivo. O certo é configurar R2_ACCESS_KEY e
+    // R2_SECRET_KEY na Vercel — enquanto isso não é feito, valem estas.
+    const AK = (process.env.R2_ACCESS_KEY || 'De8602844f5937f32d8158828617ba24').trim();
+    const SK = (process.env.R2_SECRET_KEY || '7b612219870b713a03bca3991f7d050bd29e6621009664891caf8c4c8b2d3db9').trim();
     const host = (process.env.R2_HOST || '1cef61647aff00cef531b60af8dbdf2b.r2.cloudflarestorage.com').trim();
     const cr = await import('node:crypto');
     const sha256 = (x) => cr.createHash('sha256').update(x).digest('hex');
