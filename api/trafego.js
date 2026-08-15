@@ -2508,21 +2508,26 @@ module.exports = async function handler(req, res) {
       `?fields=id,name,campaign_id,targeting,start_time,end_time,daily_budget,lifetime_budget,` +
       `optimization_goal,destination_type,promoted_object,effective_status,issues_info` +
       `&limit=400&access_token=${TKA}`, 10);
-    // ⚠️ a vírgula sobrando no fim de fields fazia a consulta voltar vazia, e
-    // todas as campanhas apareciam sem anúncio — inclusive as que têm
-    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads` +
-      `?fields=id,name,adset_id,campaign_id,effective_status,issues_info,` +
-      `creative{id,title,body,video_id,object_story_spec}` +
-      `&limit=400&access_token=${TKA}`, 10);
-    if (ads && ads.error) {
-      return res.status(200).json({ ok: false,
-        error: 'não consegui ler os anúncios: ' + (ads.error.message || ''),
-        observacao: 'sem isso a auditoria não sabe se as campanhas têm anúncio' });
-    }
-
     const setsPorCamp = {}, adsPorCamp = {};
     for (const s of (sets.data || [])) (setsPorCamp[s.campaign_id] = setsPorCamp[s.campaign_id] || []).push(s);
-    for (const a of (ads.data || [])) (adsPorCamp[a.campaign_id] = adsPorCamp[a.campaign_id] || []).push(a);
+    // 🎯 os anúncios são buscados DE CADA CAMPANHA do ciclo, não da conta toda:
+    // a conta tem centenas de anúncios antigos e a consulta geral não alcançava
+    // os recém-criados, fazendo todas as campanhas parecerem vazias
+    let erroAds = null;
+    for (const c of doCiclo) {
+      try {
+        const r = await fetch(`${GRAPH}/${c.id}/ads` +
+          `?fields=id,name,adset_id,effective_status,issues_info,` +
+          `creative{id,title,body,video_id,object_story_spec}` +
+          `&limit=50&access_token=${TKA}`).then(x => x.json());
+        if (r && r.error) { erroAds = erroAds || r.error.message; continue; }
+        adsPorCamp[c.id] = (r.data || []).map(a => ({ ...a, campaign_id: c.id }));
+      } catch (e) { erroAds = erroAds || e.message; }
+    }
+    if (erroAds && !Object.keys(adsPorCamp).length) {
+      return res.status(200).json({ ok: false,
+        error: 'não consegui ler os anúncios: ' + erroAds });
+    }
 
     const resumoGeo = (t) => {
       if (!t) return null;
