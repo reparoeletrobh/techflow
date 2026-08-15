@@ -2480,6 +2480,42 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 📤 R2-LISTAR / R2-UPLOAD: gerenciar os vídeos do bucket pela tela ──
+  // ── 🔎 r2-diagnostico: o que está impedindo o envio ──
+  // A mensagem de erro sumia da tela antes de ser lida. Esta consulta responde
+  // por escrito o que falta: credencial, permissão de escrita, bucket ou tamanho.
+  if (action === 'r2-diagnostico') {
+    const cfgR = {
+      contaId: (process.env.R2_ACCOUNT_ID || '').trim(),
+      chave: (process.env.R2_ACCESS_KEY_ID || '').trim(),
+      segredo: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
+      bucket: (process.env.R2_BUCKET || 'reparo-criativos').trim(),
+      publica: (process.env.R2_PUBLIC_URL || '').trim(),
+    };
+    const faltando = [];
+    if (!cfgR.contaId) faltando.push('R2_ACCOUNT_ID');
+    if (!cfgR.chave) faltando.push('R2_ACCESS_KEY_ID');
+    if (!cfgR.segredo) faltando.push('R2_SECRET_ACCESS_KEY');
+    if (faltando.length) {
+      return res.status(200).json({ ok: false,
+        problema: 'credenciais do Cloudflare ausentes', faltando,
+        ondeConfigurar: 'Vercel → Settings → Environment Variables → Redeploy' });
+    }
+    return res.status(200).json({ ok: true,
+      credenciais: 'presentes',
+      bucket: cfgR.bucket,
+      urlPublica: cfgR.publica || '(não configurada)',
+      chaveTermina: cfgR.chave.slice(-6),
+      metaToken: TOKEN ? 'presente' : 'ausente — não afeta o R2, só os anúncios',
+      leituraFunciona: 'confirme em r2-listar',
+      escritaFunciona: 'confirme em limpar-r2 — erro 403 em todos os arquivos significa ' +
+        'que a chave é somente leitura',
+      comoCorrigir403: 'Cloudflare → R2 → Manage API Tokens → criar token com ' +
+        'Object Read & Write no bucket ' + cfgR.bucket + ', trocar as duas chaves na ' +
+        'Vercel e clicar em Redeploy',
+      limiteDeTamanho: 'a função aceita corpo de até ~4,5 MB: vídeo maior precisa ir ' +
+        'por URL, com r2-url-upload' });
+  }
+
   if (action === 'r2-listar') {
     const pasta = String(req.query.pasta || 'Criativos Reparo Eletro');
     const prefixo = pasta ? (pasta.replace(/^\/|\/$/g, '') + '/') : '';
