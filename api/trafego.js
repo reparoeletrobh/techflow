@@ -2876,6 +2876,57 @@ module.exports = async function handler(req, res) {
       dica: String(req.query.aplicar || '') === '1' ? null : 'para aplicar: &aplicar=1' });
   }
 
+  // ── 🔎 ver-criativo: mostra o criativo por inteiro, em todos os formatos ──
+  // O texto pode estar em object_story_spec ou em asset_feed_spec, conforme o
+  // formato usado. Ler só um dos dois faz um anúncio com legenda parecer vazio.
+  if (action === 'ver-criativo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKV = String(req.query.token || '').trim() || TOKEN;
+    const alvo = String(req.query.campanha || '').toLowerCase().trim();
+    if (!alvo) return res.status(400).json({ ok: false, error: 'informe &campanha=parte-do-nome' });
+    const selo = String(req.query.selo || '').trim() ||
+      (() => { const b = new Date(Date.now() - 3 * 3600000);
+        return String(b.getUTCDate()).padStart(2, '0') +
+          String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name&limit=300&access_token=${TKV}`, 8);
+    const achadas = (camps.data || []).filter(c => String(c.name || '').includes(selo) &&
+      String(c.name || '').toLowerCase().includes(alvo));
+    if (!achadas.length) return res.status(200).json({ ok: false, error: 'não achei a campanha' });
+    const saida = [];
+    for (const c of achadas) {
+      const ra = await fetch(`${GRAPH}/${c.id}/ads?fields=id,name,creative{id}` +
+        `&limit=10&access_token=${TKV}`).then(x => x.json());
+      for (const a of ((ra || {}).data || [])) {
+        const cid = ((a.creative || {}).id);
+        if (!cid) continue;
+        const cr = await fetch(`${GRAPH}/${cid}` +
+          `?fields=id,name,title,body,video_id,image_hash,image_url,thumbnail_url,` +
+          `object_story_id,object_story_spec,asset_feed_spec,degrees_of_freedom_spec,` +
+          `effective_object_story_id,source_instagram_media_id&access_token=${TKV}`)
+          .then(x => x.json());
+        const afs = cr.asset_feed_spec || null;
+        saida.push({ campanha: c.name, anuncio: a.name, criativoId: cid,
+          // onde o texto realmente está
+          textoEm: afs && ((afs.titles || []).length || (afs.bodies || []).length)
+            ? 'asset_feed_spec (formato Advantage+)'
+            : (cr.object_story_spec ? 'object_story_spec' : 'nenhum dos dois'),
+          tituloDireto: cr.title || null,
+          corpoDireto: cr.body || null,
+          titulosAssetFeed: afs ? (afs.titles || []).map(t => t.text) : null,
+          corposAssetFeed: afs ? (afs.bodies || []).map(t => t.text) : null,
+          descricoesAssetFeed: afs ? (afs.descriptions || []).map(t => t.text) : null,
+          videosAssetFeed: afs ? (afs.videos || []).map(v => v.video_id) : null,
+          temStoryId: !!(cr.object_story_id || cr.effective_object_story_id),
+          storyId: cr.object_story_id || cr.effective_object_story_id || null,
+          instagramMedia: cr.source_instagram_media_id || null,
+          objectStorySpec: cr.object_story_spec || null,
+        });
+      }
+    }
+    return res.status(200).json({ ok: true, encontrados: saida.length, criativos: saida });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
