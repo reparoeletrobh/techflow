@@ -2817,13 +2817,25 @@ module.exports = async function handler(req, res) {
           continue;
         }
         // cria o criativo novo com o MESMO vídeo e a mesma página
+        // 🖼️ o criativo de vídeo exige uma capa: sem ela a Meta recusa com
+        // 'Invalid parameter' sem dizer o que falta. Busca a do próprio vídeo.
+        let capa = vd.image_url || null;
+        if (!capa && !vd.image_hash) {
+          try {
+            const tb = await fetch(`${GRAPH}/${vid}/thumbnails?access_token=${TKC}`)
+              .then(x => x.json());
+            const pref = ((tb || {}).data || []).find(t => t.is_preferred) ||
+              ((tb || {}).data || [])[0];
+            if (pref && pref.uri) capa = pref.uri;
+          } catch (e) {}
+        }
         const spec2 = {
           page_id: pagina,
           video_data: {
             video_id: vid,
             title: titulo,
             message: corpo,
-            image_url: vd.image_url || undefined,
+            image_url: capa || undefined,
             image_hash: vd.image_hash || undefined,
             call_to_action: vd.call_to_action ||
               { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } },
@@ -2839,8 +2851,13 @@ module.exports = async function handler(req, res) {
             access_token: TKC }).toString(),
         }).then(x => x.json());
         if (!novo || !novo.id) {
+          // ⚠️ 'Invalid parameter' é genérico: o detalhe vem em outros campos
+          const e2 = (novo && novo.error) || {};
           resultados.push({ campanha: c.name, ok: false,
-            erro: 'não consegui criar o criativo: ' + ((novo && novo.error && novo.error.message) || '?') });
+            erro: e2.error_user_title || e2.error_user_msg || e2.message || 'recusado sem motivo',
+            detalhe: e2.error_data || e2.error_subcode || null,
+            oQueEnviei: { video: vid, pagina, titulo, corpo,
+              botao: (spec2.video_data.call_to_action || {}).type } });
           continue;
         }
         const troca = await fetch(`${GRAPH}/${a.id}`, {
