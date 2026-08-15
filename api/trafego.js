@@ -2927,6 +2927,88 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, encontrados: saida.length, criativos: saida });
   }
 
+  // ── 🎬 conferir-videos: o vídeo de cada campanha é o que o nome promete? ──
+  // A campanha leva o nome do vídeo mais o selo do ciclo. Se o criativo aponta
+  // para outro vídeo, o anúncio mostra uma coisa e o texto fala de outra — e
+  // dois anúncios com o mesmo vídeo competem entre si pelo mesmo público.
+  if (action === 'conferir-videos') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKW = String(req.query.token || '').trim() || TOKEN;
+    const selo = String(req.query.selo || '').trim() ||
+      (() => { const b = new Date(Date.now() - 3 * 3600000);
+        return String(b.getUTCDate()).padStart(2, '0') +
+          String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
+
+    // biblioteca de vídeos da conta: id → título
+    const vids = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos` +
+      `?fields=id,title,created_time&limit=200&access_token=${TKW}`, 8);
+    const tituloDe = {};
+    for (const v of ((vids || {}).data || [])) {
+      tituloDe[String(v.id)] = String(v.title || '').replace(/\.(mov|mp4|avi|mkv|webm)$/i, '').trim();
+    }
+
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name&limit=300&access_token=${TKW}`, 8);
+    const doCiclo = (camps.data || []).filter(c => String(c.name || '').includes(selo));
+    if (!doCiclo.length) return res.status(200).json({ ok: false,
+      error: 'nenhuma campanha com o selo ' + selo });
+
+    // normaliza para comparar: sem acento, sem pontuação, minúsculo
+    const chave = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+    const linhas = [], usoDoVideo = {};
+    for (const c of doCiclo) {
+      const nomeSemSelo = String(c.name || '').replace(new RegExp('\\s*' + selo + '\\s*$'), '').trim();
+      let vidId = null, nomeAnuncio = null;
+      try {
+        const ra = await fetch(`${GRAPH}/${c.id}/ads` +
+          `?fields=id,name,creative{id,video_id,object_story_spec}&limit=10&access_token=${TKW}`)
+          .then(x => x.json());
+        const a0 = ((ra || {}).data || [])[0];
+        if (a0) {
+          nomeAnuncio = a0.name;
+          const cr = a0.creative || {};
+          const vd = (cr.object_story_spec || {}).video_data || {};
+          vidId = cr.video_id || vd.video_id || null;
+        }
+      } catch (e) {}
+      const tituloVideo = vidId ? (tituloDe[String(vidId)] || null) : null;
+      const bate = tituloVideo != null && chave(tituloVideo) === chave(nomeSemSelo);
+      // vídeo desconhecido na biblioteca não é erro: pode ser anterior ao limite lido
+      const situacao = !vidId ? 'sem vídeo no criativo'
+        : tituloVideo == null ? 'vídeo não está entre os mais recentes da biblioteca'
+        : bate ? 'confere'
+        : 'DIVERGE — a campanha se chama uma coisa e o vídeo é outro';
+      if (vidId) (usoDoVideo[vidId] = usoDoVideo[vidId] || []).push(c.name);
+      linhas.push({ campanha: c.name, nomeSemSelo, anuncio: nomeAnuncio,
+        videoId: vidId, tituloDoVideo: tituloVideo, bate, situacao });
+    }
+
+    // 🔁 o mesmo vídeo em mais de uma campanha
+    const repetidos = Object.entries(usoDoVideo).filter(([, cs]) => cs.length > 1)
+      .map(([vid, cs]) => ({ videoId: vid, titulo: tituloDe[vid] || '(desconhecido)',
+        campanhas: cs }));
+    const divergentes = linhas.filter(l => l.situacao.startsWith('DIVERGE'));
+    const semVideo = linhas.filter(l => !l.videoId);
+
+    return res.status(200).json({ ok: divergentes.length === 0 && repetidos.length === 0,
+      selo, campanhas: linhas.length,
+      videosNaBiblioteca: Object.keys(tituloDe).length,
+      VEREDITO: (divergentes.length || repetidos.length)
+        ? '🚨 ' + divergentes.length + ' com vídeo trocado · ' +
+          repetidos.length + ' vídeo(s) repetido(s) em campanhas diferentes'
+        : '✅ cada campanha usa o vídeo do próprio nome',
+      VIDEO_TROCADO: divergentes.map(l => l.campanha + ' → usa "' +
+        (l.tituloDoVideo || '?') + '" (id ' + l.videoId + ')'),
+      VIDEO_REPETIDO: repetidos.map(r => '"' + r.titulo + '" (id ' + r.videoId + ') está em: ' +
+        r.campanhas.join(' · ')),
+      SEM_VIDEO: semVideo.map(l => l.campanha),
+      TODAS: linhas.map(l => (l.bate ? '✅' : l.videoId ? '🚨' : '⚠️') + ' ' +
+        String(l.campanha).slice(0, 44).padEnd(44) + ' | vídeo: ' +
+        String(l.tituloDoVideo || l.videoId || 'nenhum').slice(0, 40)) });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
