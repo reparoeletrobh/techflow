@@ -2534,7 +2534,29 @@ module.exports = async function handler(req, res) {
     const q = { 'list-type': '2', 'max-keys': '200' };
     if (prefixo) q.prefix = prefixo;
     const ass = await assinarR2('GET', '/' + bucket, q);
-    const xml = await fetch(ass.url, { headers: ass.headers }).then(x => x.text()).catch(() => '');
+    // 🔊 a falha era engolida e devolvia lista vazia: o painel mostrava zero
+    // arquivos como se o bucket estivesse limpo, quando na verdade a consulta
+    // tinha sido recusada
+    let xml = '', erroL = null, statusL = null;
+    try {
+      const rr = await fetch(ass.url, { headers: ass.headers });
+      statusL = rr.status;
+      xml = await rr.text();
+      if (!rr.ok) erroL = 'HTTP ' + rr.status + ' — ' + String(xml).slice(0, 220);
+    } catch (e) { erroL = e.message; }
+    if (erroL) {
+      return res.status(200).json({ ok: false,
+        error: 'não consegui consultar o bucket: ' + erroL,
+        status: statusL,
+        host: (process.env.R2_HOST || '').trim() || '(usando o embutido)',
+        bucket,
+        dica: statusL === 401
+          ? 'credencial recusada — o Access Key ou o Secret está incorreto, ou o token '
+            + 'não é do tipo R2. Gere um novo em Cloudflare → R2 → Manage API Tokens'
+          : statusL === 403
+          ? 'credencial válida mas sem permissão — o token precisa de Object Read & Write'
+          : 'confira o host e o nome do bucket' });
+    }
     const chaves = [...String(xml).matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1]);
     const tams = [...String(xml).matchAll(/<Size>(\d+)<\/Size>/g)].map(m => Number(m[1]));
     const datas = [...String(xml).matchAll(/<LastModified>([^<]+)<\/LastModified>/g)].map(m => m[1]);
