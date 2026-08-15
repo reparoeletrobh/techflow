@@ -65,7 +65,13 @@ module.exports = async function handler(req, res) {
   }
   const TOKEN = (process.env.META_ADS_TOKEN || '').trim();
   const CONTA = String(process.env.META_ADS_ACCOUNT || '').trim().replace(/^act_/, '');
-  if (!TOKEN) return res.status(200).json({ ok: false, error: 'META_ADS_TOKEN não configurado na Vercel (Settings → Environment Variables → Redeploy)' });
+  // 🔓 guardar e apagar arquivo no Cloudflare não usa o token da Meta. Exigi-lo
+  // aqui derrubava a ferramenta inteira quando o token estava ausente ou
+  // vencido — inclusive as ações que nada têm a ver com anúncios.
+  const SEM_META = ['r2-listar', 'r2-apagar', 'r2-url-upload', 'limpar-r2',
+    'r2-diagnostico'].includes(action);
+  if (!TOKEN && !SEM_META) return res.status(200).json({ ok: false,
+    error: 'META_ADS_TOKEN não configurado na Vercel (Settings → Environment Variables → Redeploy)' });
 
   // ── TESTE + AUTODIAGNÓSTICO: valida o token e lista as contas acessíveis ──
   if (action === 'meta-teste') {
