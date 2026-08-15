@@ -2939,13 +2939,25 @@ module.exports = async function handler(req, res) {
         return String(b.getUTCDate()).padStart(2, '0') +
           String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
 
-    // biblioteca de vídeos da conta: id → título
+    // 📚 biblioteca inteira: com 657 vídeos, ler só as primeiras páginas deixava
+    // a maioria sem título e a comparação de nomes não acontecia de verdade
     const vids = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos` +
-      `?fields=id,title,created_time&limit=200&access_token=${TKW}`, 8);
+      `?fields=id,title,created_time&limit=500&access_token=${TKW}`, 25);
     const tituloDe = {};
     for (const v of ((vids || {}).data || [])) {
       tituloDe[String(v.id)] = String(v.title || '').replace(/\.(mov|mp4|avi|mkv|webm)$/i, '').trim();
     }
+    // vídeo citado por alguma campanha e ausente da lista: busca direto
+    const buscarTitulo = async (id) => {
+      if (tituloDe[String(id)] !== undefined) return tituloDe[String(id)];
+      try {
+        const r = await fetch(`${GRAPH}/${id}?fields=id,title&access_token=${TKW}`)
+          .then(x => x.json());
+        tituloDe[String(id)] = r && r.title
+          ? String(r.title).replace(/\.(mov|mp4|avi|mkv|webm)$/i, '').trim() : null;
+      } catch (e) { tituloDe[String(id)] = null; }
+      return tituloDe[String(id)];
+    };
 
     const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
       `?fields=id,name&limit=300&access_token=${TKW}`, 8);
@@ -2960,7 +2972,7 @@ module.exports = async function handler(req, res) {
     const linhas = [], usoDoVideo = {};
     for (const c of doCiclo) {
       const nomeSemSelo = String(c.name || '').replace(new RegExp('\\s*' + selo + '\\s*$'), '').trim();
-      let vidId = null, nomeAnuncio = null;
+      let vidId = null, nomeAnuncio = null, vidNaPublicacao = null, vidNoCampo = null;
       try {
         const ra = await fetch(`${GRAPH}/${c.id}/ads` +
           `?fields=id,name,creative{id,video_id,object_story_spec}&limit=10&access_token=${TKW}`)
@@ -2970,10 +2982,14 @@ module.exports = async function handler(req, res) {
           nomeAnuncio = a0.name;
           const cr = a0.creative || {};
           const vd = (cr.object_story_spec || {}).video_data || {};
+          // ⚠️ o campo direto e o da publicação podem apontar para vídeos
+          // diferentes — o que o cliente vê é o da publicação
           vidId = cr.video_id || vd.video_id || null;
+          vidNaPublicacao = vd.video_id || null;
+          vidNoCampo = cr.video_id || null;
         }
       } catch (e) {}
-      const tituloVideo = vidId ? (tituloDe[String(vidId)] || null) : null;
+      const tituloVideo = vidId ? (await buscarTitulo(vidId)) : null;
       const bate = tituloVideo != null && chave(tituloVideo) === chave(nomeSemSelo);
       // vídeo desconhecido na biblioteca não é erro: pode ser anterior ao limite lido
       const situacao = !vidId ? 'sem vídeo no criativo'
@@ -2981,8 +2997,15 @@ module.exports = async function handler(req, res) {
         : bate ? 'confere'
         : 'DIVERGE — a campanha se chama uma coisa e o vídeo é outro';
       if (vidId) (usoDoVideo[vidId] = usoDoVideo[vidId] || []).push(c.name);
+      const divergemEntreSi = vidNaPublicacao && vidNoCampo &&
+        String(vidNaPublicacao) !== String(vidNoCampo);
       linhas.push({ campanha: c.name, nomeSemSelo, anuncio: nomeAnuncio,
-        videoId: vidId, tituloDoVideo: tituloVideo, bate, situacao });
+        videoId: vidId, tituloDoVideo: tituloVideo, bate,
+        videoNoCampo: vidNoCampo, videoNaPublicacao: vidNaPublicacao,
+        divergemEntreSi,
+        situacao: divergemEntreSi
+          ? 'DOIS VÍDEOS diferentes no mesmo anúncio — o cliente vê o da publicação'
+          : situacao });
     }
 
     // 🔁 o mesmo vídeo em mais de uma campanha
@@ -3004,6 +3027,11 @@ module.exports = async function handler(req, res) {
       VIDEO_REPETIDO: repetidos.map(r => '"' + r.titulo + '" (id ' + r.videoId + ') está em: ' +
         r.campanhas.join(' · ')),
       SEM_VIDEO: semVideo.map(l => l.campanha),
+      DOIS_VIDEOS_NO_MESMO_ANUNCIO: linhas.filter(l => l.divergemEntreSi)
+        .map(l => l.campanha + ' → campo ' + l.videoNoCampo +
+          ' · publicação ' + l.videoNaPublicacao),
+      NAO_ENCONTRADOS_NA_BIBLIOTECA: linhas
+        .filter(l => l.videoId && l.tituloDoVideo == null).map(l => l.campanha),
       TODAS: linhas.map(l => (l.bate ? '✅' : l.videoId ? '🚨' : '⚠️') + ' ' +
         String(l.campanha).slice(0, 44).padEnd(44) + ' | vídeo: ' +
         String(l.tituloDoVideo || l.videoId || 'nenhum').slice(0, 40)) });
