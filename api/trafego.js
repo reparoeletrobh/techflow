@@ -2761,6 +2761,104 @@ module.exports = async function handler(req, res) {
       FICHAS: fichas });
   }
 
+  // ── 🔧 corrigir-anuncio: repõe título e corpo de um anúncio existente ──
+  // Alguns criativos duplicados vêm sem legenda, e anúncio sem texto entrega
+  // pior. Em vez de recriar a campanha, troca-se o criativo mantendo o vídeo,
+  // o público e o histórico de aprendizado que a campanha já acumulou.
+  if (action === 'corrigir-anuncio') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKC = String(req.query.token || '').trim() || TOKEN;
+    const alvo = String(req.query.campanha || '').toLowerCase().trim();
+    const tituloNovo = String(req.query.titulo || '').trim();
+    const corpoNovo = String(req.query.corpo || '').trim();
+    if (!alvo) return res.status(400).json({ ok: false, error: 'informe &campanha=parte-do-nome' });
+
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name&limit=300&access_token=${TKC}`, 8);
+    const selo = String(req.query.selo || '').trim() ||
+      (() => { const b = new Date(Date.now() - 3 * 3600000);
+        return String(b.getUTCDate()).padStart(2, '0') +
+          String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
+    const achadas = (camps.data || []).filter(c => String(c.name || '').includes(selo) &&
+      String(c.name || '').toLowerCase().includes(alvo));
+    if (!achadas.length) return res.status(200).json({ ok: false,
+      error: 'nenhuma campanha do ciclo com "' + alvo + '"' });
+
+    const resultados = [];
+    for (const c of achadas) {
+      const ra = await fetch(`${GRAPH}/${c.id}/ads` +
+        `?fields=id,name,creative{id,title,body,video_id,object_story_spec}` +
+        `&limit=10&access_token=${TKC}`).then(x => x.json());
+      for (const a of ((ra || {}).data || [])) {
+        const cr = a.creative || {};
+        const spec = cr.object_story_spec || {};
+        const vd = spec.video_data || {};
+        const vid = cr.video_id || vd.video_id;
+        const pagina = spec.page_id;
+        if (!vid || !pagina) {
+          resultados.push({ campanha: c.name, ok: false,
+            erro: 'anúncio sem vídeo ou sem página — não dá para recriar o criativo' });
+          continue;
+        }
+        // 🎨 usa o texto informado, ou o do dicionário da categoria
+        const cat = categoriaDe(String(c.name || ''), 'anuncio');
+        const dic = textoPorDefeito(String(c.name || ''), cat) || {};
+        const titulo = tituloNovo || dic.titulo || '';
+        const corpo = corpoNovo || dic.corpo || '';
+        if (!titulo || !corpo) {
+          resultados.push({ campanha: c.name, ok: false,
+            erro: 'sem texto para aplicar — informe &titulo= e &corpo=' });
+          continue;
+        }
+        if (String(req.query.aplicar || '') !== '1') {
+          resultados.push({ campanha: c.name, modo: 'prévia',
+            de: { titulo: cr.title || vd.title || '(vazio)', corpo: cr.body || vd.message || '(vazio)' },
+            para: { titulo, corpo }, video: vid });
+          continue;
+        }
+        // cria o criativo novo com o MESMO vídeo e a mesma página
+        const spec2 = {
+          page_id: pagina,
+          video_data: {
+            video_id: vid,
+            title: titulo,
+            message: corpo,
+            image_url: vd.image_url || undefined,
+            image_hash: vd.image_hash || undefined,
+            call_to_action: vd.call_to_action ||
+              { type: 'WHATSAPP_MESSAGE', value: { app_destination: 'WHATSAPP' } },
+          },
+        };
+        const novo = await fetch(`${GRAPH}/act_${CONTA}/adcreatives`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ name: String(c.name).slice(0, 60) + ' - criativo',
+            object_story_spec: JSON.stringify(spec2),
+            degrees_of_freedom_spec: JSON.stringify({
+              creative_features_spec: { standard_enhancements: { enroll_status: 'OPT_OUT' } } }),
+            access_token: TKC }).toString(),
+        }).then(x => x.json());
+        if (!novo || !novo.id) {
+          resultados.push({ campanha: c.name, ok: false,
+            erro: 'não consegui criar o criativo: ' + ((novo && novo.error && novo.error.message) || '?') });
+          continue;
+        }
+        const troca = await fetch(`${GRAPH}/${a.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ creative: JSON.stringify({ creative_id: novo.id }),
+            access_token: TKC }).toString(),
+        }).then(x => x.json());
+        resultados.push({ campanha: c.name, ok: !!(troca && troca.success !== false),
+          criativoNovo: novo.id, titulo, corpo,
+          erro: (troca && troca.error && troca.error.message) || null });
+      }
+    }
+    return res.status(200).json({ ok: resultados.every(r => r.ok !== false),
+      campanhas: achadas.length, resultados,
+      dica: String(req.query.aplicar || '') === '1' ? null : 'para aplicar: &aplicar=1' });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
