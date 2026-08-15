@@ -3037,6 +3037,63 @@ module.exports = async function handler(req, res) {
         String(l.tituloDoVideo || l.videoId || 'nenhum').slice(0, 40)) });
   }
 
+  // ── 🗑️ apagar-campanha: remove campanha do ciclo pelo nome ──
+  // Existe para desfazer campanha criada errada — apontando para o criativo de
+  // outra, com conjunto pausado e verba zero. Só alcança campanhas do ciclo
+  // atual e recusa qualquer uma que já tenha gasto, para não apagar histórico.
+  if (action === 'apagar-campanha') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKD = String(req.query.token || '').trim() || TOKEN;
+    const alvo = String(req.query.campanha || '').toLowerCase().trim();
+    if (!alvo) return res.status(400).json({ ok: false, error: 'informe &campanha=parte-do-nome' });
+    const selo = String(req.query.selo || '').trim() ||
+      (() => { const b = new Date(Date.now() - 3 * 3600000);
+        return String(b.getUTCDate()).padStart(2, '0') +
+          String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name&limit=300&access_token=${TKD}`, 8);
+    const achadas = (camps.data || []).filter(c => String(c.name || '').includes(selo) &&
+      String(c.name || '').toLowerCase().includes(alvo));
+    if (!achadas.length) return res.status(200).json({ ok: false,
+      error: 'nenhuma campanha do ciclo ' + selo + ' com "' + alvo + '"' });
+
+    // 🛡 campanha que já gastou não é apagada: o histórico se perderia
+    const comGasto = [];
+    for (const c of achadas) {
+      try {
+        const ri = await fetch(`${GRAPH}/${c.id}/insights?fields=spend&date_preset=maximum` +
+          `&access_token=${TKD}`).then(x => x.json());
+        const g = Number((((ri || {}).data || [])[0] || {}).spend || 0);
+        if (g > 0) comGasto.push({ nome: c.name, gasto: g });
+      } catch (e) {}
+    }
+    if (comGasto.length && String(req.query.mesmoComGasto || '') !== '1') {
+      return res.status(200).json({ ok: false,
+        error: 'estas já gastaram e não serão apagadas',
+        L: comGasto.map(x => x.nome + ' — R$ ' + x.gasto.toFixed(2)),
+        dica: 'se realmente quiser apagar, acrescente &mesmoComGasto=1' });
+    }
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSerApagadas: achadas.length,
+        L: achadas.map(c => c.name),
+        dica: 'para apagar: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const c of achadas) {
+      try {
+        const r = await fetch(`${GRAPH}/${c.id}?access_token=${TKD}`, { method: 'DELETE' })
+          .then(x => x.json());
+        if (r && (r.success === true || r.success === undefined)) feitos.push(c.name);
+        else erros.push(c.name + ': ' + ((r.error && r.error.message) || 'recusado'));
+      } catch (e) { erros.push(c.name + ': ' + e.message); }
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      apagadas: feitos.length, L: feitos, erros,
+      proximoPasso: 'agora rode subir-agora da categoria para recriar com o vídeo certo' });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
