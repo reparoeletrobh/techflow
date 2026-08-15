@@ -2484,34 +2484,44 @@ module.exports = async function handler(req, res) {
   // A mensagem de erro sumia da tela antes de ser lida. Esta consulta responde
   // por escrito o que falta: credencial, permissão de escrita, bucket ou tamanho.
   if (action === 'r2-diagnostico') {
+    // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
+    // de nomes em outra parte do arquivo, e conferir os errados fazia o
+    // diagnóstico acusar ausência de credencial que estava configurada.
     const cfgR = {
-      contaId: (process.env.R2_ACCOUNT_ID || '').trim(),
-      chave: (process.env.R2_ACCESS_KEY_ID || '').trim(),
-      segredo: (process.env.R2_SECRET_ACCESS_KEY || '').trim(),
+      chave: (process.env.R2_ACCESS_KEY || '').trim(),
+      segredo: (process.env.R2_SECRET_KEY || '').trim(),
+      host: (process.env.R2_HOST || '').trim(),
       bucket: (process.env.R2_BUCKET || 'reparo-criativos').trim(),
       publica: (process.env.R2_PUBLIC_URL || '').trim(),
     };
-    const faltando = [];
-    if (!cfgR.contaId) faltando.push('R2_ACCOUNT_ID');
-    if (!cfgR.chave) faltando.push('R2_ACCESS_KEY_ID');
-    if (!cfgR.segredo) faltando.push('R2_SECRET_ACCESS_KEY');
-    if (faltando.length) {
-      return res.status(200).json({ ok: false,
-        problema: 'credenciais do Cloudflare ausentes', faltando,
-        ondeConfigurar: 'Vercel → Settings → Environment Variables → Redeploy' });
-    }
+    // o código tem credenciais de reserva embutidas: se a variável não existe,
+    // é a reserva que está em uso — e é ela que pode estar sem permissão
+    const usandoReserva = [];
+    if (!cfgR.chave) usandoReserva.push('R2_ACCESS_KEY');
+    if (!cfgR.segredo) usandoReserva.push('R2_SECRET_KEY');
+    if (!cfgR.host) usandoReserva.push('R2_HOST');
     return res.status(200).json({ ok: true,
-      credenciais: 'presentes',
+      variaveisConfiguradas: {
+        R2_ACCESS_KEY: cfgR.chave ? 'sim (termina em ' + cfgR.chave.slice(-6) + ')' : 'NÃO',
+        R2_SECRET_KEY: cfgR.segredo ? 'sim' : 'NÃO',
+        R2_HOST: cfgR.host || 'NÃO',
+        R2_BUCKET: cfgR.bucket,
+        R2_PUBLIC_URL: cfgR.publica || 'NÃO',
+      },
+      usandoCredencialDeReserva: usandoReserva.length
+        ? '⚠️ estas variáveis não existem na Vercel, então o sistema está usando as ' +
+          'credenciais embutidas no código: ' + usandoReserva.join(', ') +
+          ' — trocar apenas no Cloudflare não resolve, é preciso criar estas variáveis'
+        : null,
       bucket: cfgR.bucket,
       urlPublica: cfgR.publica || '(não configurada)',
-      chaveTermina: cfgR.chave.slice(-6),
       metaToken: TOKEN ? 'presente' : 'ausente — não afeta o R2, só os anúncios',
       leituraFunciona: 'confirme em r2-listar',
       escritaFunciona: 'confirme em limpar-r2 — erro 403 em todos os arquivos significa ' +
         'que a chave é somente leitura',
       comoCorrigir403: 'Cloudflare → R2 → Manage API Tokens → criar token com ' +
-        'Object Read & Write no bucket ' + cfgR.bucket + ', trocar as duas chaves na ' +
-        'Vercel e clicar em Redeploy',
+        'Object Read & Write no bucket ' + cfgR.bucket + '. Depois, na Vercel, criar ou ' +
+        'atualizar R2_ACCESS_KEY e R2_SECRET_KEY (estes nomes exatos) e clicar em Redeploy',
       limiteDeTamanho: 'a função aceita corpo de até ~4,5 MB: vídeo maior precisa ir ' +
         'por URL, com r2-url-upload' });
   }
