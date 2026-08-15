@@ -2624,6 +2624,143 @@ module.exports = async function handler(req, res) {
           (l.geo ? ' | ' + l.geo.locais.slice(0, 30) : ' | SEM LOCAL')) });
   }
 
+  // ── 🔬 raio-x-ciclo: cada campanha por inteiro, campo a campo ──
+  // A auditoria resume; esta traz o conteúdo real de cada anúncio — o texto que
+  // o cliente vê, o vídeo, o destino do clique, a segmentação completa e o
+  // estado de entrega. É o que permite conferir sem abrir o Gerenciador.
+  if (action === 'raio-x-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKX = String(req.query.token || '').trim() || TOKEN;
+    const selo = String(req.query.selo || '').trim() ||
+      (() => { const b = new Date(Date.now() - 3 * 3600000);
+        return String(b.getUTCDate()).padStart(2, '0') +
+          String(b.getUTCMonth() + 1).padStart(2, '0') + b.getUTCFullYear(); })();
+    const soUma = String(req.query.campanha || '').toLowerCase().trim();
+
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name,status,effective_status,objective,start_time,stop_time,` +
+      `daily_budget,lifetime_budget,bid_strategy,special_ad_categories` +
+      `&limit=300&access_token=${TKX}`, 8);
+    let doCiclo = (camps.data || []).filter(c => String(c.name || '').includes(selo));
+    if (soUma) doCiclo = doCiclo.filter(c => String(c.name || '').toLowerCase().includes(soUma));
+    if (!doCiclo.length) return res.status(200).json({ ok: false,
+      error: 'nenhuma campanha com o selo ' + selo + (soUma ? ' e nome contendo "' + soUma + '"' : '') });
+
+    const dinheiro = v => v ? +(Number(v) / 100).toFixed(2) : 0;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(0, 16).replace('T', ' ') : null;
+
+    const fichas = [];
+    for (const c of doCiclo) {
+      const ficha = { campanha: c.name, id: c.id,
+        status: c.effective_status, objetivo: c.objective,
+        verba: dinheiro(c.lifetime_budget) || dinheiro(c.daily_budget),
+        tipoVerba: c.lifetime_budget ? 'total do período' : 'diária',
+        estrategia: c.bid_strategy || null,
+        inicio: hh(c.start_time), fim: hh(c.stop_time),
+        conjuntos: [], anuncios: [], gasto: 0, conversas: 0, alertas: [] };
+
+      // conjunto
+      try {
+        const rs = await fetch(`${GRAPH}/${c.id}/adsets` +
+          `?fields=id,name,effective_status,targeting,start_time,end_time,daily_budget,` +
+          `lifetime_budget,optimization_goal,billing_event,destination_type,promoted_object,` +
+          `attribution_spec&limit=25&access_token=${TKX}`).then(x => x.json());
+        for (const s of ((rs || {}).data || [])) {
+          const t = s.targeting || {};
+          const g = t.geo_locations || {};
+          const locais = []
+            .concat((g.cities || []).map(x => x.name + (x.radius ? ' +' + x.radius + (x.distance_unit || '') : '')))
+            .concat((g.regions || []).map(x => x.name))
+            .concat((g.countries || []))
+            .concat((g.custom_locations || []).map(x =>
+              (x.name || (x.latitude + ',' + x.longitude)) +
+              (x.radius ? ' +' + x.radius + (x.distance_unit || 'km') : '')));
+          ficha.conjuntos.push({
+            nome: s.name, status: s.effective_status,
+            verba: dinheiro(s.lifetime_budget) || dinheiro(s.daily_budget),
+            inicio: hh(s.start_time), fim: hh(s.end_time),
+            otimizacao: s.optimization_goal, cobranca: s.billing_event,
+            destino: s.destination_type || (s.promoted_object && s.promoted_object.page_id
+              ? 'página ' + s.promoted_object.page_id : null),
+            local: locais.join(' · ') || '(nenhum)',
+            idade: (t.age_min || '?') + '-' + (t.age_max || '?'),
+            genero: (t.genders || []).length ? (t.genders || []).join(',') : 'todos',
+            plataformas: (t.publisher_platforms || []).join(',') || 'automático',
+            posicionamentos: []
+              .concat(t.facebook_positions || []).concat(t.instagram_positions || [])
+              .join(',') || 'automático',
+            interesses: ((t.flexible_spec || []).flatMap(f =>
+              (f.interests || []).map(i => i.name))).join(', ') || 'nenhum',
+          });
+          if (!locais.length) ficha.alertas.push('conjunto sem localização');
+        }
+      } catch (e) { ficha.alertas.push('não consegui ler o conjunto: ' + e.message); }
+
+      // anúncios com o conteúdo real
+      try {
+        const ra = await fetch(`${GRAPH}/${c.id}/ads` +
+          `?fields=id,name,effective_status,issues_info,` +
+          `creative{id,name,title,body,video_id,image_url,thumbnail_url,object_story_spec,` +
+          `asset_feed_spec,degrees_of_freedom_spec}&limit=25&access_token=${TKX}`)
+          .then(x => x.json());
+        for (const a of ((ra || {}).data || [])) {
+          const cr = a.creative || {};
+          const spec = cr.object_story_spec || {};
+          const vd = spec.video_data || spec.link_data || {};
+          const cta = vd.call_to_action || {};
+          const titulo = cr.title || vd.title || vd.name ||
+            (cta.value && cta.value.link_title) || '';
+          const corpo = cr.body || vd.message || vd.description || '';
+          const vid = cr.video_id || vd.video_id || '';
+          ficha.anuncios.push({
+            nome: a.name, status: a.effective_status,
+            titulo: titulo || '(vazio)',
+            corpo: corpo || '(vazio)',
+            videoId: vid || '(sem vídeo)',
+            miniatura: cr.thumbnail_url || vd.image_url || null,
+            acao: cta.type || null,
+            destinoWhats: (cta.value && (cta.value.app_destination || cta.value.link)) || null,
+            pagina: spec.page_id || null,
+            impedimentos: (a.issues_info || []).map(x =>
+              x.error_summary || x.error_message || JSON.stringify(x)),
+          });
+          if (!titulo) ficha.alertas.push('anúncio sem título');
+          if (!corpo) ficha.alertas.push('anúncio sem corpo');
+          if (!vid) ficha.alertas.push('anúncio sem vídeo');
+          if (!spec.page_id) ficha.alertas.push('anúncio sem página vinculada');
+        }
+        if (!((ra || {}).data || []).length) ficha.alertas.push('SEM ANÚNCIO');
+      } catch (e) { ficha.alertas.push('não consegui ler os anúncios: ' + e.message); }
+
+      // já gastou?
+      try {
+        const ri = await fetch(`${GRAPH}/${c.id}/insights` +
+          `?fields=spend,impressions,actions&date_preset=today&access_token=${TKX}`)
+          .then(x => x.json());
+        const d0 = ((ri || {}).data || [])[0] || {};
+        ficha.gasto = Number(d0.spend || 0);
+        ficha.impressoes = Number(d0.impressions || 0);
+        const conv = (d0.actions || []).find(x =>
+          /messaging_conversation_started|onsite_conversion.messaging_conversation_started/.test(x.action_type));
+        ficha.conversas = conv ? Number(conv.value || 0) : 0;
+      } catch (e) {}
+      fichas.push(ficha);
+    }
+
+    const comAlerta = fichas.filter(f => f.alertas.length);
+    const semEntrega = fichas.filter(f => !f.impressoes);
+    return res.status(200).json({ ok: comAlerta.length === 0,
+      selo, campanhas: fichas.length,
+      verbaTotal: +fichas.reduce((s, f) => s + f.verba, 0).toFixed(2),
+      gastoAteAgora: +fichas.reduce((s, f) => s + f.gasto, 0).toFixed(2),
+      impressoesAteAgora: fichas.reduce((s, f) => s + (f.impressoes || 0), 0),
+      conversasAteAgora: fichas.reduce((s, f) => s + f.conversas, 0),
+      AINDA_SEM_ENTREGA: semEntrega.length,
+      COM_ALERTA: comAlerta.map(f => f.campanha + ' → ' + [...new Set(f.alertas)].join(' · ')),
+      FICHAS: fichas });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
