@@ -159,6 +159,89 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, ficha: f });
   }
 
+  // ── 🧹 POST limpar-analises: esvazia a coluna Em Análise ──
+  // As análises acumuladas vieram da sincronização automática com o quadro e
+  // não passaram pela avaliação de compra. A partir de agora a entrada é pelo
+  // botão Comprar no Conflitos Bot, com preço confirmado.
+  if (req.method === "POST" && action === "limpar-analises") {
+    const db = (await dbGet(COMPRA_KEY)) || { fichas: [] };
+    const antes = (db.fichas || []).length;
+    const emAnalise = (db.fichas || []).filter(f => String(f.status || "") === "analise");
+    if (String(req.query.aplicar || "") !== "1") {
+      return res.status(200).json({ ok: true, modo: "prévia",
+        vaoSerRemovidas: emAnalise.length, totalNaBase: antes,
+        L: emAnalise.slice(0, 60).map(f => String(f.cliente || f.nome || "?").slice(0, 24) +
+          " " + String(f.telefone || "").slice(-4) +
+          " | " + String(f.equipamento || f.descricao || "").slice(0, 30)),
+        oQueVaiAcontecer: "as fichas em análise saem; comprados e não comprados ficam",
+        dica: "para limpar: &aplicar=1" });
+    }
+    // 🗄️ guarda cópia antes de remover: dado apagado sem backup não volta
+    try {
+      await dbSet("reparoeletro_compra_equip_lixeira",
+        { itens: emAnalise, removidoEm: new Date().toISOString() });
+    } catch (e) {}
+    db.fichas = (db.fichas || []).filter(f => String(f.status || "") !== "analise");
+    await dbSet(COMPRA_KEY, db);
+    const conf = (await dbGet(COMPRA_KEY)) || { fichas: [] };
+    const restou = (conf.fichas || []).filter(f => String(f.status || "") === "analise").length;
+    if (restou) return res.status(200).json({ ok: false,
+      error: "a limpeza não persistiu — ainda há " + restou + " em análise" });
+    return res.status(200).json({ ok: true,
+      removidas: antes - (conf.fichas || []).length,
+      restaram: (conf.fichas || []).length,
+      backup: "cópia em reparoeletro_compra_equip_lixeira" });
+  }
+
+  // ── 🛒 POST avaliar-compra: entra em Em Análise com preço confirmado ──
+  // Chamado pelo botão Comprar do Conflitos Bot. A análise só existe quando
+  // alguém decidiu avaliar e informou por quanto — sem preço não há o que
+  // analisar, e era isso que enchia a coluna de fichas sem decisão.
+  if (req.method === "POST" && action === "avaliar-compra") {
+    const b = req.body || {};
+    const preco = Number(String(b.preco || "").toString().replace(/[^\d,.-]/g, "")
+      .replace(/\./g, "").replace(",", "."));
+    if (!(preco > 0)) {
+      return res.status(400).json({ ok: false, error: "informe o preço da avaliação" });
+    }
+    if (!String(b.cliente || b.nome || "").trim()) {
+      return res.status(400).json({ ok: false, error: "informe o cliente" });
+    }
+    const db = (await dbGet(COMPRA_KEY)) || { fichas: [] };
+    db.fichas = db.fichas || [];
+    const d8v = t => String(t || "").replace(/\D/g, "").slice(-8);
+    const tel = d8v(b.telefone);
+    // não duplica avaliação aberta do mesmo cliente e equipamento
+    const ja = db.fichas.find(f => String(f.status || "") === "analise" &&
+      d8v(f.telefone) === tel && tel.length >= 8);
+    if (ja) {
+      return res.status(200).json({ ok: false,
+        error: "este cliente já tem uma avaliação em análise",
+        existente: { cliente: ja.cliente, preco: ja.precoAvaliado || ja.preco || 0 } });
+    }
+    const ficha = {
+      id: "ava_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      cliente: String(b.cliente || b.nome).trim().slice(0, 60),
+      telefone: String(b.telefone || "").replace(/\D/g, ""),
+      equipamento: String(b.equipamento || b.descricao || "").slice(0, 90),
+      descricao: String(b.descricao || b.equipamento || "").slice(0, 200),
+      precoAvaliado: preco,
+      preco: preco,
+      origem: String(b.origem || "conflitos_bot"),
+      conflitoId: b.conflitoId || null,
+      avaliadoPor: String(b.quem || "").slice(0, 40),
+      fotos: [], recomendacao: null,
+      status: "analise",
+      createdAt: new Date().toISOString(),
+    };
+    db.fichas.unshift(ficha);
+    await dbSet(COMPRA_KEY, db);
+    const conf = (await dbGet(COMPRA_KEY)) || { fichas: [] };
+    const ok2 = (conf.fichas || []).some(f => f.id === ficha.id);
+    if (!ok2) return res.status(200).json({ ok: false, error: "não persistiu — tente de novo" });
+    return res.status(200).json({ ok: true, ficha });
+  }
+
   // ── POST status — marca comprado / nao_comprado
   if (req.method === "POST" && action === "status") {
     const { id, status } = req.body || {};
@@ -166,10 +249,53 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(COMPRA_KEY) || defaultDB();
     const f  = db.fichas.find(x => x.id === id);
     if (!f) return res.status(404).json({ ok: false, error: "Ficha nao encontrada" });
+    const antesStatus = String(f.status || "");
     f.status    = status;
     f.statusAt  = new Date().toISOString();
     await dbSet(COMPRA_KEY, db);
-    return res.status(200).json({ ok: true, ficha: f });
+
+    // ── 📦 equipamento comprado: avisa o almoxarifado ──
+    // Sem este aviso o equipamento chega e ninguém sabe para qual setor levar,
+    // e ele fica parado na recepção até alguém perguntar.
+    let almox = null;
+    if (status === "comprado" && antesStatus !== "comprado") {
+      try {
+        const KA = "reparoeletro_almoxarifado";
+        const adb = (await dbGet(KA)) || { itens: [] };
+        adb.itens = adb.itens || [];
+        // não duplica se já houver entrada desta compra
+        const jaTem = adb.itens.some(x => String(x.compraEquipId || "") === String(f.id));
+        if (!jaTem) {
+          const txt = String(f.equipamento || f.descricao || "").toLowerCase();
+          // 🏷️ o setor decide para onde o equipamento vai fisicamente
+          const setor = /\btv\b|televis|monitor|smart/.test(txt) ? "TV"
+            : /micro-?ondas|forno|fog[ãa]o|cooktop/.test(txt) ? "Linha Branca — cocção"
+            : /purificador|bebedouro|filtro/.test(txt) ? "Linha Branca — água"
+            : /adega|climatiza|geladeira|freezer/.test(txt) ? "Linha Branca — refrigeração"
+            : "A definir";
+          const item = {
+            id: "alm_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            compraEquipId: f.id,
+            origem: "compra de equipamento",
+            cliente: f.cliente || f.nome || "—",
+            telefone: f.telefone || "",
+            equipamento: String(f.equipamento || f.descricao || "").slice(0, 90),
+            valorPago: Number(f.precoAvaliado || f.preco || 0),
+            setorDestino: setor,
+            status: "aguardando_recebimento",
+            criadoEm: new Date().toISOString(),
+            observacao: "equipamento comprado do cliente — levar para " + setor,
+          };
+          adb.itens.unshift(item);
+          await dbSet(KA, adb);
+          const confA = (await dbGet(KA)) || { itens: [] };
+          const okA = (confA.itens || []).some(x => x.id === item.id);
+          almox = okA ? { criado: true, setor, id: item.id }
+                      : { criado: false, erro: "a ficha do almoxarifado não persistiu" };
+        } else { almox = { criado: false, motivo: "já existe ficha no almoxarifado" }; }
+      } catch (e) { almox = { criado: false, erro: e.message }; }
+    }
+    return res.status(200).json({ ok: true, ficha: f, almoxarifado: almox });
   }
 
   // ── POST add-foto — adiciona URL de foto à ficha

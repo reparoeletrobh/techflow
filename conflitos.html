@@ -563,6 +563,12 @@ function cardHTML(c){
     btns+='<button class="cc-btn" data-id="'+c.id+'" onclick="abrirEditar(this.dataset.id)">✏️ Editar</button>';
   } else if(!resolved){
     if(c.status==='aberto') btns+='<button class="cc-btn assumir" data-id="'+c.id+'" onclick="assumir(this.dataset.id)">▶ Assumir</button>';
+    // 🛒 avaliação de compra: entra na análise com o preço confirmado
+    if(/compra|vender|avalia|quanto pagam|comprar/i.test(String(c.motivo||'') + ' ' + String(c.descricao||''))){
+      btns+='<button class="cc-btn" style="background:rgba(139,92,246,.16);color:#a78bfa;'
+        + 'border-color:rgba(139,92,246,.45);font-weight:800;" data-id="'+c.id+'" '
+        + 'onclick="abrirComprar(this.dataset.id)">🛒 Comprar</button>';
+    }
     btns+='<button class="cc-btn resolver" data-id="'+c.id+'" onclick="abrirResolver(this.dataset.id)">✓ Resolver</button>';
     btns+='<button class="cc-btn" data-id="'+c.id+'" onclick="abrirEditar(this.dataset.id)">✏️ Editar</button>';
   }
@@ -794,6 +800,77 @@ function desvincularFicha(){
   document.getElementById('f-ficha').value='';
   var v=document.getElementById('f-vinculo'); if(v)v.style.display='none';
 }
+
+// ── 🛒 avaliação de compra: confirma o preço e envia para Em Análise ──
+function abrirComprar(id){
+  var c = (_dados||[]).find(function(x){ return x.id===id; });
+  if(!c) return;
+  var ov = document.getElementById('ov-comprar');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-comprar';
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;';
+  var eq = String(c.equipamento||c.descricao||'').replace(/"/g,'');
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+                : 'border-radius:16px;padding:20px 22px;')
+    + 'max-width:460px;width:100%;">'
+    + '<div style="font-size:15px;font-weight:900;margin-bottom:3px;">🛒 Avaliação de compra</div>'
+    + '<div style="font-size:12px;color:#8b93a3;margin-bottom:13px;line-height:1.6;">'
+      + String(c.cliente||c.ficha||'?').replace(/</g,'&lt;')
+      + (eq ? ' · ' + eq.replace(/</g,'&lt;').slice(0,60) : '') + '</div>'
+    + '<label style="font-size:11px;font-weight:800;color:#8b93a3;">EQUIPAMENTO</label>'
+    + '<input id="cp-eq" value="' + eq.slice(0,80) + '" style="width:100%;background:#12161d;'
+      + 'border:1px solid #2a3140;border-radius:9px;padding:10px 12px;color:#f0f2f5;'
+      + 'font-size:13px;margin:5px 0 10px;">'
+    + '<label style="font-size:11px;font-weight:800;color:#8b93a3;">POR QUANTO VAMOS COMPRAR?</label>'
+    + '<input id="cp-preco" inputmode="decimal" placeholder="450,00" style="width:100%;'
+      + 'background:#12161d;border:1px solid #2a3140;border-radius:9px;padding:12px;'
+      + 'color:#f0f2f5;font-size:17px;font-weight:700;font-family:ui-monospace,monospace;'
+      + 'margin:5px 0 6px;">'
+    + '<div style="font-size:11px;color:#5a6270;line-height:1.6;">'
+      + 'a ficha entra em Em Análise com este valor</div>'
+    + '<div id="cp-msg" style="font-size:11.5px;margin-top:9px;line-height:1.6;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:13px;'+(estreito?'flex-direction:column;':'')+'">'
+      + '<button onclick="confirmarCompra(\''+id+'\')" style="flex:1;background:#8b5cf6;'
+        + 'border:none;border-radius:9px;padding:12px;color:#fff;font-weight:800;'
+        + 'cursor:pointer;font-size:13px;">Enviar para análise</button>'
+      + '<button onclick="document.getElementById(\'ov-comprar\').remove()" style="flex:1;'
+        + 'background:#374151;border:none;border-radius:9px;padding:12px;color:#fff;'
+        + 'font-weight:800;cursor:pointer;font-size:13px;">Cancelar</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){ var i2=document.getElementById('cp-preco'); if(i2) i2.focus(); }, 90);
+}
+
+async function confirmarCompra(id){
+  var c = (_dados||[]).find(function(x){ return x.id===id; });
+  var preco = (document.getElementById('cp-preco')||{}).value || '';
+  var eq = (document.getElementById('cp-eq')||{}).value || '';
+  var msg = document.getElementById('cp-msg');
+  if(!String(preco).trim()){
+    if(msg){ msg.style.color='#f87171'; msg.textContent='informe o preço'; } return;
+  }
+  var r = await fetch('/api/compra-equip?action=avaliar-compra',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ cliente:c.cliente||c.ficha, telefone:c.telefone||c.tel,
+      equipamento:eq, descricao:c.descricao||'', preco:preco, conflitoId:id,
+      origem:'conflitos_bot' })})
+    .then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha de rede'};});
+  if(r.ok){
+    var ov=document.getElementById('ov-comprar'); if(ov) ov.remove();
+    if(typeof toast==='function') toast('✅ enviado para Em Análise');
+    else alert('✅ enviado para Em Análise em Compra de Equipamento');
+  } else if(msg){
+    msg.style.color='#f87171';
+    msg.textContent = '🚨 ' + (r.error||'não consegui enviar')
+      + (r.existente ? ' (R$ ' + r.existente.preco + ')' : '');
+  }
+}
+
 async function relatarCliente(id){
   var c=(_dados||[]).find(function(x){return x.id===id;});
   if(!c)return;
