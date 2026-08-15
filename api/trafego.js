@@ -2508,10 +2508,17 @@ module.exports = async function handler(req, res) {
       `?fields=id,name,campaign_id,targeting,start_time,end_time,daily_budget,lifetime_budget,` +
       `optimization_goal,destination_type,promoted_object,effective_status,issues_info` +
       `&limit=400&access_token=${TKA}`, 10);
+    // ⚠️ a vírgula sobrando no fim de fields fazia a consulta voltar vazia, e
+    // todas as campanhas apareciam sem anúncio — inclusive as que têm
     const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads` +
       `?fields=id,name,adset_id,campaign_id,effective_status,issues_info,` +
-      `creative{id,title,body,video_id,object_story_spec},` +
+      `creative{id,title,body,video_id,object_story_spec}` +
       `&limit=400&access_token=${TKA}`, 10);
+    if (ads && ads.error) {
+      return res.status(200).json({ ok: false,
+        error: 'não consegui ler os anúncios: ' + (ads.error.message || ''),
+        observacao: 'sem isso a auditoria não sabe se as campanhas têm anúncio' });
+    }
 
     const setsPorCamp = {}, adsPorCamp = {};
     for (const s of (sets.data || [])) (setsPorCamp[s.campaign_id] = setsPorCamp[s.campaign_id] || []).push(s);
