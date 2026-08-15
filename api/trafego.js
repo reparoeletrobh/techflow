@@ -2585,10 +2585,47 @@ module.exports = async function handler(req, res) {
     const q = { 'list-type': '2', 'max-keys': '200' };
     if (prefixo) q.prefix = prefixo;
     const ass = await assinarR2('GET', '/' + bucket, q);
-    const xml = await fetch(ass.url, { headers: ass.headers }).then(x => x.text()).catch(() => '');
+    // 🔊 a falha de leitura era engolida e devolvia texto vazio, que o código
+    // lia como bucket vazio — dizendo que estava tudo certo quando na verdade
+    // nem tinha conseguido consultar
+    let xml = '', erroLeitura = null, statusLeitura = null;
+    try {
+      const rr = await fetch(ass.url, { headers: ass.headers });
+      statusLeitura = rr.status;
+      xml = await rr.text();
+      if (!rr.ok) erroLeitura = 'HTTP ' + rr.status + ' — ' + String(xml).slice(0, 200);
+    } catch (e) { erroLeitura = e.message; }
+    if (erroLeitura) {
+      return res.status(200).json({ ok: false,
+        error: 'não consegui listar o bucket: ' + erroLeitura,
+        status: statusLeitura,
+        dica: statusLeitura === 403
+          ? 'a credencial foi recusada — confira R2_ACCESS_KEY e R2_SECRET_KEY'
+          : 'confira o host e o nome do bucket' });
+    }
     const chaves = [...String(xml).matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1])
       .filter(k => /\.(mp4|mov|avi|mkv|webm)$/i.test(k));
-    if (!chaves.length) return res.status(200).json({ ok: true, msg: 'bucket já está vazio' });
+    if (!chaves.length) return res.status(200).json({ ok: true,
+      msg: 'nenhum vídeo encontrado na pasta',
+      pastaConsultada: prefixo || '(raiz)',
+      totalNoXml: [...String(xml).matchAll(/<Key>/g)].length,
+      observacao: 'se você esperava encontrar arquivos, confira o nome da pasta em &pasta=' });
+    // 🧹 apagar tudo, sem exigir que já exista como anúncio: é o que se quer ao
+    // trocar os criativos de um ciclo inteiro
+    if (String(req.query.tudo || '') === '1') {
+      const feitosT = [], errosT = [];
+      for (const k of chaves) {
+        try {
+          const a2 = await assinarR2('DELETE', '/' + bucket + '/' + k.split('/').map(encodeURIComponent).join('/'));
+          const r2 = await fetch(a2.url, { method: 'DELETE', headers: a2.headers });
+          if (r2.ok || r2.status === 204) feitosT.push(k.split('/').pop());
+          else errosT.push(k.split('/').pop() + ' (HTTP ' + r2.status + ')');
+        } catch (e) { errosT.push(k.split('/').pop() + ': ' + e.message); }
+      }
+      return res.status(200).json({ ok: errosT.length === 0,
+        modo: 'apagou tudo, sem conferir anúncios',
+        apagados: feitosT.length, L: feitosT, erros: errosT });
+    }
     // 2) quais desses viraram anúncio na Meta
     const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status&limit=400&access_token=${TKL}`, 10);
     const nomesNaMeta = new Set((ads.data || []).map(a => String(a.name || '').toLowerCase()));
