@@ -162,7 +162,7 @@ footer{text-align:center;font-size:12px;color:var(--muted);padding:22px 16px 30p
 <script>
 // ── Config por domínio ─────────────────────────────────────────────────────
 var DOMINIOS = {
-  'riorefrigeracao':  { empresa:'Rio Refrigeração',      cidade:'Rio de Janeiro', tel:'5521974961883', telFmt:'(21) 9 7496-1883', aw:'AW-16654495741', label:'AW-16654495741/lmdaCOvPxMUcEP3fvYU-' },
+  'riorefrigeracao':  { empresa:'Rio Refrigeração',      cidade:'Rio de Janeiro', tel:'5521974961883', telFmt:'(21) 9 7496-1883', aw:'AW-16587199538', label:'' },
   'rjgeladeiras':     { empresa:'RJ Geladeiras',          cidade:'Rio de Janeiro', tel:'5521995868358', telFmt:'(21) 9 9586-8358', aw:'AW-18354414853', label:'AW-18354414853/DgH3COX60dgcEIXKiLBE' },
   'cabofriogeladeiras':{ empresa:'Cabo Frio Geladeiras',  cidade:'Cabo Frio',      tel:'5522998408927', telFmt:'(22) 9 9840-8927', aw:'AW-17036833483', label:'AW-17036833483/LimUCNXfr8UcEMvl5bs_' },
   '_default':         { empresa:'Reparo Eletro',          cidade:'Belo Horizonte', tel:'5531997856023', telFmt:'(31) 9 9785-6023', aw:'AW-11030361270', label:'AW-11030361270/ODexCNHJyuobELbp14sp' }
@@ -237,7 +237,9 @@ track('hit');
 
 function clique(tipo,el){
   track('click','&t='+tipo);
-  try{ gtag('event','conversion',{send_to:CFG.label}); }catch(e){}
+  // só dispara conversão quando o domínio tem rótulo configurado: enviar
+  // rótulo vazio registra evento sem destino e polui a conta
+  try{ if(CFG.label) gtag('event','conversion',{send_to:CFG.label}); }catch(e){}
   // Deixa o navegador seguir o href normalmente após registrar
   setTimeout(function(){ location.href=el.href; },150);
   return false;
