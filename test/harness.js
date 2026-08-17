@@ -989,6 +989,26 @@ function check(nome, cond, extra) {
     }
   }
 
+  // ── 📄 todo caminho que lança valor precisa carimbar a data do orçamento ──
+  // O botão de diagnóstico existe em quatro lugares e só um gravava a data;
+  // como a contagem exige data própria, vinte e sete orçamentos viravam seis.
+  console.log('▶ Cenário OR — diagnóstico carimba a data do orçamento');
+  {
+    const fsO = require('fs');
+    const faltando = [];
+    for (const arq of ['api/logistica.js', 'api/tv-logistica.js',
+                       'api/board.js', 'api/frenteloja.js']) {
+      const c = fsO.readFileSync(arq, 'utf8');
+      if (!/orcamentoEm\s*=\s*now/.test(c)) faltando.push(arq);
+    }
+    check('os quatro caminhos do diagnóstico carimbam o orçamento',
+      faltando.length === 0, faltando.join(', '));
+    // e o carimbo só vale para o PRIMEIRO valor: reajuste não muda a data
+    const lg = fsO.readFileSync('api/logistica.js', 'utf8');
+    check('o carimbo não é sobrescrito em alteração de valor',
+      /!card\.orcamentoEm && card\.valor>0/.test(lg));
+  }
+
   console.log('▶ Cenário LW — espelho da corrida na rota do almoxarifado');
   {
     const w = carregarHandler('api/lalamove-webhook.js');

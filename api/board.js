@@ -41,7 +41,12 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
     card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
     card.phase=novaFase; card.movedAt=now;
     if(novaFase==='aguardando_aprovacao') card.aguardandoDesde=now;
-    if(dados){if(dados.valor!==undefined)card.valor=parseFloat(dados.valor)||0;if(dados.nomeContato)card.nomeContato=dados.nomeContato;}
+    if(dados){if(dados.valor!==undefined){
+      const _vAntes=Number(card.valor||0);
+      card.valor=parseFloat(dados.valor)||0;
+      // 📄 primeiro valor lançado é o momento do orçamento
+      if(!card.orcamentoEm && card.valor>0 && _vAntes<=0) card.orcamentoEm=now;
+    }if(dados.nomeContato)card.nomeContato=dados.nomeContato;}
     await _ps(PIPE_KEY_H,db);
   } catch(e){console.error('[pipe-mover]',novaFase,e.message);}
 }
@@ -98,7 +103,12 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
     card.phase   = novaFase;
     card.movedAt = now;
     if (dados) {
-      if (dados.valor !== undefined) card.valor = parseFloat(dados.valor) || 0;
+      if (dados.valor !== undefined) {
+        const _vAnt = Number(card.valor || 0);
+        card.valor = parseFloat(dados.valor) || 0;
+        // 📄 primeiro valor lançado é o momento do orçamento
+        if (!card.orcamentoEm && card.valor > 0 && _vAnt <= 0) card.orcamentoEm = now;
+      }
       if (dados.nomeContato)         card.nomeContato = dados.nomeContato;
     }
     await _pipeSet(PIPE_KEY, db);

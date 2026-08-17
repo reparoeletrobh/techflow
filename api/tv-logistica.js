@@ -124,7 +124,13 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
     card.phase=novaFase; card.movedAt=now;
     if(novaFase==='aguardando_aprovacao') card.aguardandoDesde=now;
     if(dados){
-      if(dados.valor!==undefined) card.valor=parseFloat(dados.valor)||0;
+      if(dados.valor!==undefined){
+        const _vAnt=Number(card.valor||0);
+        card.valor=parseFloat(dados.valor)||0;
+        // 📄 primeiro valor lançado é o momento do orçamento: sem esta data o
+        // painel não sabe quando ele saiu e deixa o card fora da contagem
+        if(!card.orcamentoEm && card.valor>0 && _vAnt<=0) card.orcamentoEm=now;
+      }
       if(dados.nomeContato) card.nomeContato=dados.nomeContato;
       if(dados.diagnosticoResumo!==undefined) card.diagnosticoResumo=dados.diagnosticoResumo;
       if(dados.modeloTv!==undefined) card.modeloTv=dados.modeloTv;
