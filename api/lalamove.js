@@ -696,6 +696,158 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
   }
 
 
+
+  // ── 🛵 acompanhar — segue as corridas e grava motorista e marcos ──
+  // O pedido é criado e depois ninguém olha: quando o entregador aceita, chega
+  // à loja e coleta, nada disso fica registrado. Sem esses dados não há como
+  // saber quanto tempo a corrida esperou nem quem levou cada equipamento.
+  if (action === "acompanhar") {
+    if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
+      return res.status(400).json({ ok: false, error: "API key não configurada" });
+    const db = (await dbGet(LALA_KEY)) || { fichas: [] };
+    const livro = (await dbGet("lalamove_corridas")) || { corridas: {} };
+    livro.corridas = livro.corridas || {};
+
+    // corridas ainda em andamento: as concluídas não precisam ser consultadas
+    const FINAIS = ["COMPLETED", "CANCELED", "REJECTED", "EXPIRED"];
+    const ativos = {};
+    for (const f of (db.fichas || [])) {
+      if (!f.orderId) continue;
+      const reg = livro.corridas[f.orderId];
+      if (reg && FINAIS.includes(String(reg.status || ""))) continue;
+      (ativos[f.orderId] = ativos[f.orderId] || []).push(f);
+    }
+    const ids = Object.keys(ativos);
+    if (!ids.length) return res.status(200).json({ ok: true,
+      msg: "nenhuma corrida em andamento", totalNoLivro: Object.keys(livro.corridas).length });
+
+    const atualizadas = [], erros = [];
+    for (const orderId of ids.slice(0, 20)) {
+      try {
+        const path = "/v3/orders/" + orderId;
+        const hdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "GET", path, "");
+        const { status, body } = await lalaFetch(LALA_HOST, path, "GET", hdrs, null);
+        if (status !== 200) { erros.push(orderId + ": HTTP " + status); continue; }
+        const d = (JSON.parse(body) || {}).data || {};
+        const antes = livro.corridas[orderId] || { marcos: {} };
+        const agora = new Date().toISOString();
+        const st = String(d.status || "");
+
+        // 🏍️ dados do entregador: só aparecem depois que ele aceita
+        let motorista = antes.motorista || null;
+        if (d.driverId && (!motorista || !motorista.nome)) {
+          try {
+            const dp = "/v3/drivers/" + d.driverId + "?orderId=" + orderId;
+            const dh = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "GET", dp, "");
+            const { status: ds, body: dbody } = await lalaFetch(LALA_HOST, dp, "GET", dh, null);
+            if (ds === 200) {
+              const dd = (JSON.parse(dbody) || {}).data || {};
+              motorista = { id: d.driverId, nome: dd.name || null, telefone: dd.phone || null,
+                placa: (dd.plateNumber || dd.plate || null),
+                veiculo: dd.vehicleType || null, foto: dd.photo || null };
+            }
+          } catch (e) {}
+          if (!motorista) motorista = { id: d.driverId };
+        }
+
+        // 📍 marcos: gravados na primeira vez que cada estado é visto
+        const marcos = Object.assign({}, antes.marcos || {});
+        if (!marcos.criadaEm) marcos.criadaEm = antes.criadaEm || agora;
+        if (d.driverId && !marcos.aceitaEm) marcos.aceitaEm = agora;
+        if (["PICKED_UP", "ON_GOING", "COMPLETED"].includes(st) && !marcos.coletadaEm) {
+          marcos.coletadaEm = agora;
+        }
+        if (st === "COMPLETED" && !marcos.concluidaEm) marcos.concluidaEm = agora;
+        if (["CANCELED", "REJECTED", "EXPIRED"].includes(st) && !marcos.encerradaEm) {
+          marcos.encerradaEm = agora;
+        }
+
+        livro.corridas[orderId] = {
+          orderId, status: st,
+          criadaEm: marcos.criadaEm,
+          motorista, marcos,
+          shareLink: d.shareLink || antes.shareLink || null,
+          valor: d.priceBreakdown ? Number(d.priceBreakdown.total || 0) : (antes.valor || null),
+          fichas: ativos[orderId].map(f => ({ os: f.osCode || null,
+            cliente: f.nomeContato || f.nome || "?",
+            telefone: String(f.telefone || "").slice(-4),
+            endereco: String(f.endereco || "").slice(0, 60) })),
+          atualizadoEm: agora,
+        };
+
+        // grava também na ficha, para quem olha o almoxarifado
+        for (const f of ativos[orderId]) {
+          f.lalaStatus = st;
+          if (motorista) {
+            f.motoristaLala = motorista.nome || null;
+            f.motoristaTel = motorista.telefone || null;
+            f.motoristaPlaca = motorista.placa || null;
+          }
+          if (marcos.aceitaEm) f.corridaAceitaEm = marcos.aceitaEm;
+          if (marcos.coletadaEm) f.corridaColetadaEm = marcos.coletadaEm;
+          if (marcos.concluidaEm) f.corridaConcluidaEm = marcos.concluidaEm;
+        }
+        atualizadas.push(orderId + " | " + st +
+          (motorista && motorista.nome ? " | " + motorista.nome : "") +
+          (motorista && motorista.placa ? " · " + motorista.placa : ""));
+      } catch (e) { erros.push(orderId + ": " + e.message); }
+    }
+    // 🧹 guarda 90 dias de corridas
+    const corte = Date.now() - 90 * 86400000;
+    for (const [id, c] of Object.entries(livro.corridas)) {
+      if (new Date(c.criadaEm || 0).getTime() < corte) delete livro.corridas[id];
+    }
+    await dbSet("lalamove_corridas", livro);
+    await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok: erros.length === 0,
+      consultadas: ids.length, atualizadas: atualizadas.length,
+      L: atualizadas, erros,
+      totalNoLivro: Object.keys(livro.corridas).length });
+  }
+
+  // ── 📋 corridas — o histórico gravado, com motorista e tempos ──
+  if (action === "corridas") {
+    const livro = (await dbGet("lalamove_corridas")) || { corridas: {} };
+    const dia = String(req.query.dia || "");
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace("T", " ") : "—";
+    const mins = (a, b) => (a && b)
+      ? Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000) : null;
+
+    let lista = Object.values(livro.corridas || {});
+    if (dia) lista = lista.filter(c => String(c.criadaEm || "").slice(0, 10) === dia ||
+      String((c.marcos || {}).criadaEm || "").slice(0, 10) === dia);
+    lista.sort((a, b) => String(b.criadaEm).localeCompare(String(a.criadaEm)));
+
+    const comMotorista = lista.filter(c => c.motorista && c.motorista.nome);
+    const esperas = lista.map(c => mins((c.marcos || {}).criadaEm, (c.marcos || {}).aceitaEm))
+      .filter(x => x != null);
+    const coletas = lista.map(c => mins((c.marcos || {}).aceitaEm, (c.marcos || {}).coletadaEm))
+      .filter(x => x != null);
+    const media = a => a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : null;
+
+    return res.status(200).json({ ok: true,
+      corridas: lista.length,
+      comMotoristaIdentificado: comMotorista.length,
+      tempoMedioAteAceitarMin: media(esperas),
+      tempoMedioAteColetarMin: media(coletas),
+      LISTA: lista.slice(0, 60).map(c => {
+        const m = c.marcos || {};
+        return hh(m.criadaEm) + " | " + String(c.status || "?").padEnd(12) +
+          " | " + (c.motorista && c.motorista.nome
+            ? String(c.motorista.nome).slice(0, 20) +
+              (c.motorista.placa ? " (" + c.motorista.placa + ")" : "")
+            : "sem entregador ainda") +
+          " | aceite " + (mins(m.criadaEm, m.aceitaEm) != null
+            ? mins(m.criadaEm, m.aceitaEm) + "min" : "—") +
+          " | coleta " + (mins(m.aceitaEm, m.coletadaEm) != null
+            ? mins(m.aceitaEm, m.coletadaEm) + "min" : "—") +
+          " | " + (c.fichas || []).length + " ficha(s)" +
+          (c.valor ? " | R$ " + Number(c.valor).toFixed(2) : "");
+      }),
+      DETALHE: lista.slice(0, 30) });
+  }
+
   // ── GET status-pedido ─────────────────────────────────────────
   if (action === "status-pedido") {
     if (!LALA_KEY_ENV || !LALA_SECRET_ENV)

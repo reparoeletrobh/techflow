@@ -70,6 +70,13 @@ module.exports = async function handler(req, res) {
         'wa-bot?action=disparar-orcamentos-pendentes&aplicar=1'));
     }
 
+    // 🛵 acompanha as corridas em andamento e grava quem as pegou: o pedido
+    // era criado e ninguém mais olhava, então não se sabia quanto tempo
+    // esperou por entregador nem quem levou cada equipamento
+    if (horaBR >= 7 && horaBR < 21) {
+      feitos.push(await chamar('corridas em andamento', 'lalamove?action=acompanhar'));
+    }
+
     // 📒 livro de entradas no ERP: gravado ao longo do dia, é o que permite
     // saber quem recebeu ontem — o histórico do cartão perde essa informação
     // na limpeza semanal de domingo
