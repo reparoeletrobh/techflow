@@ -2278,9 +2278,24 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST' && action === 'excluir') {
     const { id, sistema } = req.body || {};
-    const key = sistema === 'tv' ? KEY_TV : KEY_ADM;
-    const db  = (await dbGet(key)) || { fichas:[] };
-    const alvo = (db.fichas || []).find(x => x.id === id);
+    // 🔎 procura nos DOIS bancos quando o sistema não vem informado: sem isso a
+    // busca ia direto para a linha branca, não achava a ficha de TV e a resposta
+    // era de sucesso sem nada ter sido feito — a ficha continuava na fila e o
+    // telefone nunca entrava na lista que impede o retorno
+    let key = sistema === 'tv' ? KEY_TV : KEY_ADM;
+    let db = (await dbGet(key)) || { fichas: [] };
+    let alvo = (db.fichas || []).find(x => x.id === id);
+    if (!alvo) {
+      const outra = key === KEY_TV ? KEY_ADM : KEY_TV;
+      const dbOutra = (await dbGet(outra)) || { fichas: [] };
+      const achou = (dbOutra.fichas || []).find(x => x.id === id);
+      if (achou) { key = outra; db = dbOutra; alvo = achou; }
+    }
+    if (!alvo) {
+      return res.status(404).json({ ok: false,
+        error: 'ficha não encontrada em nenhum dos sistemas',
+        procuradoEm: [KEY_ADM, KEY_TV], id });
+    }
     // 🔒 REGISTRO DO TELEFONE: é esta lista que impede o retorno pela régua e
     // pela remarcação. A exclusão gravava apenas a linha da planilha, então a
     // ficha sumia da tela e reaparecia horas depois, trazida por outra rotina.

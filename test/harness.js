@@ -963,6 +963,32 @@ function check(nome, cond, extra) {
   // A corrida é criada à mão no aplicativo com os mesmos endereços da rota; o
   // encontro é feito pelos telefones dos destinos, e o motorista só é gravado
   // no momento da coleta, que é quando ele de fato leva os equipamentos.
+  // ── 🗑️ excluir ficha de TV sem informar o sistema ──
+  // A busca ia direto para a base da linha branca; não achando a ficha, a
+  // resposta era de sucesso sem nada ter sido feito, e a ficha continuava na
+  // fila com o telefone fora da lista que impede o retorno.
+  console.log('▶ Cenário EX4 — exclusão encontra a ficha nos dois sistemas');
+  {
+    const fi = carregarHandler('api/fichas.js');
+    for (const [caso, corpo] of [
+      ['com sistema informado', { id: 'TVX', sistema: 'tv', motivo: 't' }],
+      ['sem informar o sistema', { id: 'TVX', motivo: 't' }],
+    ]) {
+      KV['prospeccao_excluidos'] = { tels: {} };
+      KV['fichas_adm'] = { fichas: [] };
+      KV['fichas_tv'] = { fichas: [{ id: 'TVX', nome: 'Cliente TV',
+        telefone: '5531955557777', status: 'entrar_contato',
+        criadoEm: new Date().toISOString(), sheetRow: 7 }] };
+      await fi(req({ action: 'excluir', ...K }, corpo, 'POST'), res());
+      await new Promise(s => setTimeout(s, 130));
+      const saiu = ((KV['fichas_tv'] || {}).fichas || []).length === 0;
+      const gravou = Object.keys((KV['prospeccao_excluidos'] || {}).tels || {})
+        .some(t => t.endsWith('7777'));
+      check('exclusão de ficha de TV ' + caso, saiu && gravou,
+        'saiu=' + saiu + ' gravou=' + gravou);
+    }
+  }
+
   console.log('▶ Cenário LW — espelho da corrida na rota do almoxarifado');
   {
     const w = carregarHandler('api/lalamove-webhook.js');
