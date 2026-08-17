@@ -70,6 +70,19 @@ module.exports = async function handler(req, res) {
         'wa-bot?action=disparar-orcamentos-pendentes&aplicar=1'));
     }
 
+    // ⭐ pesquisa de satisfação de quem recebeu o serviço ontem: sai às 8h,
+    // antes do expediente encher, e a resposta abre a janela para o dia
+    if (horaBR === 8 && diaSem >= 1 && diaSem <= 6) {
+      feitos.push(await chamar('pesquisa de satisfação',
+        'wa-bot?action=pesquisa-satisfacao&aplicar=1'));
+    }
+    // ⭐ e a leitura das respostas ao longo do dia: só quem elogiou sem
+    // ressalva recebe o pedido de avaliação
+    if (horaBR >= 9 && horaBR < 20) {
+      feitos.push(await chamar('respostas da pesquisa',
+        'wa-bot?action=respostas-satisfacao&aplicar=1'));
+    }
+
     // 🔁 a régua de recuperação tinha uma passagem por dia e enviava cerca de
     // vinte por vez, então uma fila de oitenta e seis levava quatro dias para
     // dar a volta — e o cliente ficava sem contato justamente no intervalo em

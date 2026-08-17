@@ -1237,6 +1237,270 @@ export default async function handler(req, res) {
       observacao: 'o WhatsApp exige o número com código do país, DDD e o nono dígito' });
   }
 
+  // ── ⭐ PESQUISA-SATISFACAO: pergunta a quem recebeu o serviço ontem ──
+  // Sai antes das 9h porque é a hora em que a pessoa lembra do aparelho — e
+  // porque a resposta abre a janela de conversa para o dia inteiro.
+  // ── ⭐ RESPOSTAS-SATISFACAO: só quem elogiou sem ressalva recebe o pedido ──
+  // O critério é estrito de propósito. Pedir avaliação a quem fez uma sugestão
+  // ou relatou um problema, ainda que de leve, é convidar a pessoa a escrever
+  // isso publicamente — e machuca justamente onde a nota importa.
+  if (action === 'respostas-satisfacao') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const d8p = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const LINK = 'https://g.page/r/CUDbfbB2xOBHEBM/review';
+    const controle = (await dbGet('wa_pesquisa_satisfacao')) || { clientes: {} };
+    const clientes = controle.clientes || {};
+
+    // a última mensagem de cada cliente que ainda aguarda resposta
+    const respostas = {};
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'in') continue;
+        const d = d8p(e.tel); if (!d) continue;
+        const c = clientes[d];
+        if (!c || !c.aguardandoResposta || c.avaliacaoPedida) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (q <= new Date(c.em || 0).getTime()) continue;   // anterior à pergunta
+        const txt = String(e.texto || '').trim();
+        if (!txt || txt.startsWith('🎤 [')) continue;        // áudio sem transcrição
+        if (!respostas[d] || q > respostas[d].ts) respostas[d] = { ts: q, texto: txt, c };
+      }
+    } catch (e) {}
+
+    const CHAVE = (process.env.ANTHROPIC_API_KEY || '').trim();
+    const elogios = [], comRessalva = [], indefinidos = [];
+
+    for (const [d, r] of Object.entries(respostas)) {
+      let veredito = null;
+      if (CHAVE) {
+        try {
+          const rr = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'x-api-key': CHAVE, 'anthropic-version': '2023-06-01',
+              'content-type': 'application/json' },
+            body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 12, temperature: 0,
+              system: 'Você classifica a resposta de um cliente a uma pesquisa de satisfação ' +
+                'de assistência técnica.\n\n' +
+                'Responda APENAS uma palavra:\n' +
+                'ELOGIO — se a pessoa diz que está tudo certo, funcionando, satisfeita, ' +
+                'agradece ou elogia, E NÃO acrescenta nada além disso.\n' +
+                'RESSALVA — se há qualquer observação, sugestão, crítica, dúvida, ' +
+                'reclamação, pedido, relato de problema, condição ("está bom MAS...", ' +
+                '"funcionando, só que..."), ou se ela ainda não usou o equipamento.\n' +
+                'INDEFINIDO — se a resposta é ambígua, vazia de conteúdo, ou não responde ' +
+                'à pergunta.\n\n' +
+                'Na dúvida entre ELOGIO e RESSALVA, responda RESSALVA.',
+              messages: [{ role: 'user', content: r.texto.slice(0, 600) }] }),
+          }).then(x => x.json());
+          const t = ((rr.content || []).filter(b => b.type === 'text')
+            .map(b => b.text).join('') || '').trim().toUpperCase();
+          if (t.includes('ELOGIO')) veredito = 'elogio';
+          else if (t.includes('RESSALVA')) veredito = 'ressalva';
+          else veredito = 'indefinido';
+        } catch (e) { veredito = null; }
+      }
+      // 🔒 sem classificação não se pede avaliação: o silêncio é mais seguro
+      if (veredito === null) veredito = 'indefinido';
+      const linha = String(r.c.nome || '?').slice(0, 22) + ' ' + d.slice(-4) +
+        ' → "' + r.texto.slice(0, 60).replace(/\n/g, ' ') + '"';
+      if (veredito === 'elogio') elogios.push({ d, r, linha });
+      else if (veredito === 'ressalva') comRessalva.push(linha);
+      else indefinidos.push(linha);
+    }
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        responderam: Object.keys(respostas).length,
+        vaoReceberPedidoDeAvaliacao: elogios.length,
+        ELOGIO_PURO: elogios.map(x => x.linha),
+        COM_RESSALVA_NAO_RECEBEM: comRessalva,
+        INDEFINIDOS_NAO_RECEBEM: indefinidos,
+        observacao: 'quem fez qualquer observação não recebe o pedido de avaliação; ' +
+          'na dúvida, o sistema não pede',
+        dica: 'para enviar: &aplicar=1' });
+    }
+
+    const cfg = (await dbGet('wa_credenciais')) || {};
+    const pid = cfg.phoneId || process.env.WA_PHONE_ID;
+    const tk = cfg.token || process.env.WA_TOKEN;
+    if (!pid || !tk) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+
+    const texto = 'Maravilha! A qualquer momento que precisar de algo pode me chamar aqui ' +
+      'que estaremos prontos pra te atender.\n\n' +
+      'Quero apenas te fazer um último pedido, que me ajuda demais a continuar fazendo ' +
+      'um bom trabalho. Sua avaliação no nosso Google é muito importante pro nosso ' +
+      'crescimento. Se possível nos avalie por favor:\n\n' + LINK;
+
+    const feitos = [], erros = [];
+    for (const x of elogios) {
+      let tel = x.d;
+      // recompõe o número completo a partir do registro
+      const cli = clientes[x.d] || {};
+      const cheio = String(cli.telefone || '').replace(/\D/g, '');
+      if (!cheio || cheio.length < 12) {
+        erros.push(x.linha + ' — não tenho o número completo registrado');
+        continue;
+      }
+      try {
+        const r = await fetch('https://graph.facebook.com/v20.0/' + pid + '/messages', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: cheio,
+            type: 'text', text: { body: texto, preview_url: true } }),
+        }).then(y => y.json());
+        if (r && r.messages && r.messages[0]) {
+          clientes[x.d].avaliacaoPedida = true;
+          clientes[x.d].avaliacaoPedidaEm = new Date().toISOString();
+          clientes[x.d].aguardandoResposta = false;
+          clientes[x.d].respostaCliente = String(x.r.texto).slice(0, 300);
+          feitos.push(x.linha);
+        } else {
+          erros.push(x.linha + ' — ' + ((r && r.error && r.error.message) || 'falha'));
+        }
+      } catch (e) { erros.push(x.linha + ' — ' + e.message); }
+      await new Promise(s => setTimeout(s, 400));
+    }
+    // quem respondeu com ressalva sai da espera: o caso é da equipe, não do robô
+    for (const linha of comRessalva) {
+      const fin = linha.match(/\s(\d{4})\s→/);
+      if (!fin) continue;
+      for (const [d, c] of Object.entries(clientes)) {
+        if (d.slice(-4) === fin[1] && c.aguardandoResposta) {
+          c.aguardandoResposta = false; c.teveRessalva = true;
+        }
+      }
+    }
+    await dbSet('wa_pesquisa_satisfacao', controle);
+    return res.status(200).json({ ok: erros.length === 0,
+      pedidosEnviados: feitos.length, L: feitos, erros,
+      comRessalvaParaAEquipe: comRessalva });
+  }
+
+  if (action === 'pesquisa-satisfacao') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const d8s = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // o dia anterior, em horário de Brasília
+    const ontem = String(req.query.dia ||
+      new Date(Date.now() - 3 * 3600000 - 86400000).toISOString().slice(0, 10));
+    const iniS = new Date(ontem + 'T00:00:00-03:00').getTime();
+    const fimS = iniS + 86400000 - 1;
+    const naData = d => { if (!d) return false;
+      const t = new Date(d).getTime(); return t >= iniS && t <= fimS; };
+
+    // 🎯 quem entrou em ERP ontem, nas duas frentes e no balcão
+    const [ppA, ppT, flS, ctrlS] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_frenteloja'), dbGet('wa_pesquisa_satisfacao'),
+    ]);
+    const controle = ctrlS || { clientes: {} };
+    const candidatos = [];
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        if (String(c.phaseId || c.phase || '') !== 'erp') continue;
+        // quando entrou no ERP: carimbo, ou a última movimentação
+        const q = c.erpEm || c.movedAt || null;
+        if (!naData(q)) continue;
+        candidatos.push({ sis, nome: c.nomeContato || c.nome || '', telefone: c.telefone,
+          equipamento: c.equipamento || c.descricao || '', quando: q });
+      }
+    }
+    for (const f of (((flS || {}).fichas) || [])) {
+      if (String(f.phase || '') !== 'erp') continue;
+      const q = f.erpEm || f.movedAt || null;
+      if (!naData(q)) continue;
+      candidatos.push({ sis: 'LOJA', nome: f.nomeContato || f.nome || '',
+        telefone: f.telefone, equipamento: f.equipamento || '', quando: q });
+    }
+
+    // um por cliente, e nunca duas vezes
+    const fila = [], jaPerguntado = [];
+    const vistos = new Set();
+    for (const c of candidatos) {
+      const d = d8s(c.telefone);
+      if (d.length < 8 || vistos.has(d)) continue;
+      vistos.add(d);
+      if ((controle.clientes || {})[d]) { jaPerguntado.push(c.nome + ' ' + d.slice(-4)); continue; }
+      fila.push(c);
+    }
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        diaConsultado: ontem, entraramNoErp: candidatos.length,
+        vaoReceber: fila.length, jaPerguntado,
+        L: fila.map(c => c.sis + ' | ' + String(c.nome).slice(0, 22).padEnd(22) +
+          ' ' + String(c.telefone || '').slice(-4) + ' | ' +
+          String(c.equipamento).slice(0, 28)),
+        textoQueSai: 'Bom dia, NOME! Pedro aqui da Reparo Eletro.\n\nGostaria de saber ' +
+          'se está tudo certinho com o seu equipamento e se você já conseguiu utilizar. ' +
+          'Qualquer dúvida que tiver estou pronto pra te atender.\n\nAguardo sua resposta.',
+        dica: 'para enviar: &aplicar=1' });
+    }
+
+    const cfg = (await dbGet('wa_credenciais')) || {};
+    const pid = cfg.phoneId || process.env.WA_PHONE_ID;
+    const tk = cfg.token || process.env.WA_TOKEN;
+    if (!pid || !tk) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+
+    // quem tem janela aberta recebe texto; os demais, o modelo
+    const ultimaIn = {};
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'in') continue;
+        const d = d8s(e.tel); if (!d) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (!ultimaIn[d] || q > ultimaIn[d]) ultimaIn[d] = q;
+      }
+    } catch (e) {}
+
+    const feitos = [], erros = [];
+    controle.clientes = controle.clientes || {};
+    for (const c of fila) {
+      if (feitos.length >= 25) break;      // lote curto: a função tem tempo limitado
+      let tel = String(c.telefone || '').replace(/\D/g, '');
+      if (tel.length === 10 || tel.length === 11) tel = '55' + tel;
+      if (tel.length < 12) { erros.push(c.nome + ': telefone inválido'); continue; }
+      const primeiro = String(c.nome || '').trim().split(/\s+/)[0] || 'tudo bem';
+      const d = d8s(tel);
+      const janelaAberta = ultimaIn[d] && (Date.now() - ultimaIn[d]) < 24 * 3600000;
+      const texto = 'Bom dia, ' + primeiro + '! Pedro aqui da Reparo Eletro.\n\n' +
+        'Gostaria de saber se está tudo certinho com o seu equipamento e se você já ' +
+        'conseguiu utilizar. Qualquer dúvida que tiver estou pronto pra te atender.\n\n' +
+        'Aguardo sua resposta.';
+      try {
+        const corpo = janelaAberta
+          ? { messaging_product: 'whatsapp', to: tel, type: 'text', text: { body: texto } }
+          : { messaging_product: 'whatsapp', to: tel, type: 'template',
+              template: { name: 'pesquisa_satisfacao', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [{ type: 'text', text: primeiro }] }] } };
+        const r = await fetch('https://graph.facebook.com/v20.0/' + pid + '/messages', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+          body: JSON.stringify(corpo),
+        }).then(x => x.json());
+        if (r && r.messages && r.messages[0]) {
+          // 🏷️ marca que a pergunta foi feita: a resposta será classificada depois
+          controle.clientes[d] = { em: new Date().toISOString(),
+            nome: c.nome, equipamento: c.equipamento, sis: c.sis,
+            telefone: tel,          // 📞 guarda o número completo: recompor por
+                                    // DDD suposto erraria em cliente de fora
+
+            via: janelaAberta ? 'mensagem' : 'modelo',
+            aguardandoResposta: true, avaliacaoPedida: false };
+          feitos.push(c.sis + ' | ' + String(c.nome).slice(0, 22) + ' ' + d.slice(-4));
+        } else {
+          erros.push(String(c.nome).slice(0, 20) + ': ' +
+            ((r && r.error && r.error.message) || 'falha no envio'));
+        }
+      } catch (e) { erros.push(String(c.nome).slice(0, 20) + ': ' + e.message); }
+      await new Promise(s => setTimeout(s, 400));
+    }
+    if (feitos.length) await dbSet('wa_pesquisa_satisfacao', controle);
+    return res.status(200).json({ ok: erros.length === 0,
+      diaConsultado: ontem, enviados: feitos.length,
+      faltam: Math.max(0, fila.length - feitos.length - erros.length),
+      L: feitos, erros });
+  }
+
   // ── 🏪 RETIRADA-LOJA: lembra o cliente de buscar o equipamento pronto ──
   // Vale para quem foi aprovado no controle de qualidade e ainda não chegou ao
   // ERP. Um lembrete por dia, com texto diferente a cada etapa, até a retirada.
