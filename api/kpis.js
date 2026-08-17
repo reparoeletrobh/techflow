@@ -400,7 +400,115 @@ module.exports = async function handler(req, res) {
       comoLer: 'o painel deve mostrar clientesDistintos, não a soma das fontes' });
   }
 
-  if ((req.query || {}).action === 'quem-orcou') {
+
+  // ── 🔍 orcamentos-perdidos: quem tem valor mas não é contado ──
+  // A contagem exige data própria do orçamento — carimbo ou histórico. Card
+  // antigo pode ter valor e nenhuma das duas coisas, e some da conta sem que
+  // isso apareça em lugar nenhum.
+  if ((req.query || {}).action === 'orcamentos-perdidos') {
+    const per = String(req.query.periodo || 'semana');
+    const agora = Date.now();
+    const aBR = new Date(agora - 3 * 3600000);
+    let voltar = (aBR.getUTCDay() - 6 + 7) % 7;
+    if (aBR.getUTCDay() === 6 && aBR.getUTCHours() < 13) voltar = 7;
+    const iniSem = new Date(aBR.getTime() - voltar * 86400000);
+    iniSem.setUTCHours(13, 0, 0, 0);
+    const ini = per === 'hoje'
+      ? new Date(new Date(agora - 3 * 3600000).toISOString().slice(0, 10) + 'T00:00:00-03:00').getTime()
+      : per === 'mes' ? agora - 30 * 86400000
+      : iniSem.getTime() + 3 * 3600000;
+    const dentroP = d => { const t = new Date(d || 0).getTime(); return t >= ini && t <= agora; };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+
+    const saida = {};
+    for (const [chave, nome] of [['reparoeletro_pipe', 'ADM'], ['tv_pipe', 'TV']]) {
+      const db = await dbGet(chave);
+      const comCarimbo = [], porHistorico = [], semData = [], semValor = [];
+      for (const c of (((db || {}).cards) || [])) {
+        const valor = Number(c.valor || 0);
+        const linha = String(c.nomeContato || c.nome || '?').slice(0, 22) + ' ' +
+          String(c.telefone || '').slice(-4) + ' | R$ ' + valor.toFixed(2) +
+          ' | fase ' + String(c.phaseId || c.phase || '?');
+        if (c.orcamentoEm) {
+          if (dentroP(c.orcamentoEm)) comCarimbo.push(linha + ' | ' + hh(c.orcamentoEm));
+          continue;
+        }
+        const h2 = (c.history || [])
+          .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
+            .includes(String(x.phase || x.phaseId || '')))
+          .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+        if (h2.length) {
+          if (dentroP(h2[0])) porHistorico.push(linha + ' | ' + hh(h2[0]));
+          continue;
+        }
+        // 🚨 tem valor, mas nenhuma data que prove quando o orçamento saiu
+        if (valor > 0) {
+          if (dentroP(c.criadoEm)) {
+            semData.push(linha + ' | criado ' + hh(c.criadoEm) +
+              ' | ⚠️ sem carimbo nem histórico — NÃO É CONTADO');
+          }
+        } else if (dentroP(c.criadoEm)) {
+          semValor.push(linha + ' | criado ' + hh(c.criadoEm));
+        }
+      }
+      saida[nome] = {
+        contados: comCarimbo.length + porHistorico.length,
+        comCarimbo: comCarimbo.length,
+        pelaHistorico: porHistorico.length,
+        NAO_CONTADOS_COM_VALOR: semData.length,
+        semValorNenhum: semValor.length,
+        L_NAO_CONTADOS: semData.slice(0, 50),
+      };
+    }
+    const perdidos = Object.values(saida).reduce((s, x) => s + x.NAO_CONTADOS_COM_VALOR, 0);
+    return res.status(200).json({ ok: perdidos === 0, periodo: per,
+      de: hh(ini),
+      POR_FRENTE: saida,
+      VEREDITO: perdidos
+        ? '🚨 ' + perdidos + ' card(s) têm valor mas não entram na contagem por não ' +
+          'terem data de orçamento — é a diferença que você está vendo'
+        : '✅ todo card com valor tem data e está sendo contado',
+      comoCorrigir: perdidos
+        ? 'action=carimbar-orcamentos&aplicar=1 — usa a data de criação como referência'
+        : null });
+  }
+
+  // ── 🔧 carimbar-orcamentos: repõe a data faltante ──
+  if ((req.query || {}).action === 'carimbar-orcamentos') {
+    const feitos = [], erros = [];
+    for (const chave of ['reparoeletro_pipe', 'tv_pipe']) {
+      const db = (await dbGet(chave)) || { cards: [] };
+      let mexeu = 0;
+      for (const c of (db.cards || [])) {
+        if (c.orcamentoEm) continue;
+        if (!(Number(c.valor || 0) > 0)) continue;
+        const h2 = (c.history || [])
+          .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
+            .includes(String(x.phase || x.phaseId || '')))
+          .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+        if (h2.length) continue;                    // já tem como ser datado
+        if (!c.criadoEm) continue;
+        if (String(req.query.aplicar || '') === '1') {
+          c.orcamentoEm = c.criadoEm;
+          c.orcamentoEmSuposto = true;   // 🏷️ a data é aproximada, não medida
+          mexeu++;
+        }
+        feitos.push(chave + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 20) +
+          ' | R$ ' + Number(c.valor).toFixed(2) + ' → ' + String(c.criadoEm).slice(0, 10));
+      }
+      if (mexeu) await dbSet(chave, db);
+    }
+    return res.status(200).json({
+      ok: true,
+      modo: String(req.query.aplicar || '') === '1' ? 'aplicado' : 'prévia',
+      cards: feitos.length, L: feitos.slice(0, 60), erros,
+      observacao: 'a data usada é a da criação do card, que é aproximada: o orçamento ' +
+        'pode ter sido lançado depois. Serve para o card voltar a ser contado.',
+      dica: String(req.query.aplicar || '') === '1' ? null : 'para aplicar: &aplicar=1' });
+  }
+
+    if ((req.query || {}).action === 'quem-orcou') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
     const frente = String(req.query.frente || '').toLowerCase();
     const ini = new Date(dia + 'T00:00:00-03:00').getTime();
