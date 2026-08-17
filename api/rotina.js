@@ -70,6 +70,12 @@ module.exports = async function handler(req, res) {
         'wa-bot?action=disparar-orcamentos-pendentes&aplicar=1'));
     }
 
+    // 📒 livro de entradas no ERP: gravado ao longo do dia, é o que permite
+    // saber quem recebeu ontem — o histórico do cartão perde essa informação
+    // na limpeza semanal de domingo
+    feitos.push(await chamar('registrar entradas no ERP',
+      'satisfacao?action=registrar-erp'));
+
     // ⭐ pesquisa de satisfação de quem recebeu o serviço ontem: sai às 8h,
     // antes do expediente encher, e a resposta abre a janela para o dia
     if (horaBR === 8 && diaSem >= 1 && diaSem <= 6) {

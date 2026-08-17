@@ -55,6 +55,64 @@ export default async function handler(req, res) {
   }
   const action = String((req.query || {}).action || '').trim();
 
+  // ── 📒 REGISTRAR-ERP: livro de quem entrou no sistema de gestão ──
+  // O histórico do cartão não serve como data de entrada: todo domingo à
+  // meia-noite uma limpeza move os finalizados em massa, e o registro passa a
+  // marcar a hora do processamento em vez do dia em que o cliente recebeu.
+  // Este livro é escrito ao longo do dia, quando a entrada de fato acontece.
+  if (action === 'registrar-erp') {
+    const agora = new Date();
+    const hojeBR = new Date(agora.getTime() - 3 * 3600000).toISOString().slice(0, 10);
+    const d8e = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [ppA, ppT, flE, livroAtual] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_frenteloja'), dbGet('erp_entradas'),
+    ]);
+    const livro = livroAtual || { registros: {} };
+    livro.registros = livro.registros || {};
+
+    // 🕛 a limpeza semanal roda domingo às 23h59: o que for visto nessa janela
+    // não é entrada real e não deve ser gravado
+    const bBR = new Date(agora.getTime() - 3 * 3600000);
+    const ehLimpeza = bBR.getUTCDay() === 0 && bBR.getUTCHours() === 23;
+    if (ehLimpeza && String(req.query.forcar || '') !== '1') {
+      return res.status(200).json({ ok: true, ignorado: true,
+        motivo: 'janela da limpeza semanal — movimentação em massa não é entrada real' });
+    }
+
+    let novos = 0;
+    const registrados = [];
+    for (const [db, sis, lista] of [[ppA, 'ADM', 'cards'], [ppT, 'TV', 'cards'],
+                                     [flE, 'LOJA', 'fichas']]) {
+      for (const c of (((db || {})[lista]) || [])) {
+        if (String(c.phaseId || c.phase || '') !== 'erp') continue;
+        const tel = d8e(c.telefone);
+        if (tel.length < 8) continue;
+        const id = String(c.id || tel);
+        if (livro.registros[id]) continue;      // já registrado antes
+        livro.registros[id] = {
+          em: agora.toISOString(), dia: hojeBR, sis,
+          nome: c.nomeContato || c.nome || '?',
+          telefone: String(c.telefone || '').replace(/\D/g, ''),
+          equipamento: String(c.equipamento || c.descricao || '').slice(0, 60),
+          valor: Number(c.valor || 0),
+        };
+        novos++;
+        registrados.push(sis + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 22) +
+          ' ' + tel.slice(-4));
+      }
+    }
+    // 🧹 o livro guarda 90 dias: passado isso a pesquisa já não interessa
+    const corte = Date.now() - 90 * 86400000;
+    for (const [id, r] of Object.entries(livro.registros)) {
+      if (new Date(r.em || 0).getTime() < corte) delete livro.registros[id];
+    }
+    if (novos) await dbSet('erp_entradas', livro);
+    return res.status(200).json({ ok: true, dia: hojeBR,
+      novasEntradas: novos, totalNoLivro: Object.keys(livro.registros).length,
+      L: registrados.slice(0, 40) });
+  }
+
   // ── ⭐ RESPOSTAS-SATISFACAO: só quem elogiou sem ressalva recebe o pedido ──
   // O critério é estrito de propósito. Pedir avaliação a quem fez uma sugestão
   // ou relatou um problema, ainda que de leve, é convidar a pessoa a escrever
@@ -286,41 +344,20 @@ export default async function handler(req, res) {
     const naData = d => { if (!d) return false;
       const t = new Date(d).getTime(); return t >= iniS && t <= fimS; };
 
-    // 🎯 quem entrou em ERP ontem, nas duas frentes e no balcão
-    const [ppA, ppT, flS, ctrlS] = await Promise.all([
-      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
-      dbGet('reparoeletro_frenteloja'), dbGet('wa_pesquisa_satisfacao'),
-    ]);
+    // 🎯 quem entrou no ERP no dia consultado, segundo o LIVRO DE ENTRADAS —
+    // escrito ao longo do dia, quando a entrada acontece. O histórico do cartão
+    // não serve: a limpeza semanal move tudo em massa e apaga a distinção
+    // entre quem recebeu ontem e quem recebeu na semana passada.
+    const livroE = (await dbGet('erp_entradas')) || { registros: {} };
+    const ctrlS = await dbGet('wa_pesquisa_satisfacao');
     const controle = ctrlS || { clientes: {} };
     const candidatos = [];
-    // 📅 quando o card ENTROU no ERP: vem do histórico, que registra cada
-    // passagem de fase. A última movimentação não serve — ela muda a cada
-    // alteração posterior e faria o card parecer ter entrado hoje.
+    for (const r of Object.values(livroE.registros || {})) {
+      if (String(r.dia || '') !== ontem) continue;
+      candidatos.push({ sis: r.sis || 'ADM', nome: r.nome || '',
+        telefone: r.telefone, equipamento: r.equipamento || '', quando: r.em });
+    }
     const semHistorico = [];
-    const entrouNoErp = (c) => {
-      const hs = (c.history || [])
-        .filter(x => String(x.phase || x.phaseId || '') === 'erp')
-        .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
-      return hs.length ? hs[0] : null;
-    };
-    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
-      for (const c of (((db || {}).cards) || [])) {
-        if (String(c.phaseId || c.phase || '') !== 'erp') continue;
-        const q = entrouNoErp(c);
-        if (!q) { semHistorico.push(sis + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 24) +
-          ' — está em ERP mas o histórico não registra quando entrou'); continue; }
-        if (!naData(q)) continue;
-        candidatos.push({ sis, nome: c.nomeContato || c.nome || '', telefone: c.telefone,
-          equipamento: c.equipamento || c.descricao || '', quando: q });
-      }
-    }
-    for (const f of (((flS || {}).fichas) || [])) {
-      if (String(f.phase || '') !== 'erp') continue;
-      const q = entrouNoErp(f);
-      if (!naData(q)) continue;
-      candidatos.push({ sis: 'LOJA', nome: f.nomeContato || f.nome || '',
-        telefone: f.telefone, equipamento: f.equipamento || '', quando: q });
-    }
 
     // um por cliente, e nunca duas vezes
     const fila = [], jaPerguntado = [];
