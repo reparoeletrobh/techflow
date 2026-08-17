@@ -1260,6 +1260,13 @@ export default async function handler(req, res) {
       return incluirAntigas ? true : f.reguaRetirada === true;
     });
 
+    // 💬 quem já respondeu e mesmo assim não retirou merece outro tom: repetir
+    // o lembrete padrão dá a entender que ninguém leu o que a pessoa escreveu
+    const TEXTO_APOS_RESPOSTA = (n, e) =>
+      'Oi, ' + n + '! Voltando aqui sobre o seu ' + e + '.\n\n' +
+      'Você chegou a nos responder e o aparelho continua guardado na loja, ' +
+      'esperando você.\n\n' +
+      'Ficou mais difícil de vir? Me conta que a gente vê o melhor jeito.';
     const TEXTOS = [
       (n, e) => 'Oi, ' + n + '! Aqui é da Reparo Eletro 😊\n\n' +
         'Seu ' + e + ' já passou pela conferência final e está prontinho, ' +
@@ -1311,20 +1318,38 @@ export default async function handler(req, res) {
         if (!respondeuDepois[d] || q > respondeuDepois[d]) respondeuDepois[d] = q;
       }
     } catch (e) {}
-    const responderam = [];
+    // 🔇 a resposta faz a régua SILENCIAR POR 3 DIAS, não parar para sempre.
+    // Antes, quem respondia "busco amanhã" e não vinha nunca mais era cobrado:
+    // a resposta ficava eternamente mais recente que o último lembrete, e o
+    // equipamento envelhecia na loja sem ninguém tocar no assunto.
+    const SILENCIO_HORAS = 72;
+    const responderam = [], paraLigar = [];
     const fila = Object.values(porCliente).filter(x => {
       const t = d8r(x.f.telefone);
-      const ultimoLembrete = new Date(x.ctrl.ultimo || 0).getTime();
-      if (ultimoLembrete && respondeuDepois[t] && respondeuDepois[t] > ultimoLembrete) {
-        responderam.push(String(x.f.nomeContato || '?').slice(0, 24) +
-          ' — respondeu após o último lembrete');
+      const resp = respondeuDepois[t];
+      if (!resp) return true;
+      const hDesde = (Date.now() - resp) / 3600000;
+      const nome = String(x.f.nomeContato || '?').slice(0, 24);
+      if (hDesde < SILENCIO_HORAS) {
+        responderam.push(nome + ' — respondeu há ' + Math.round(hDesde) +
+          'h, volta a receber em ' + Math.ceil(SILENCIO_HORAS - hDesde) + 'h');
         return false;
       }
+      // 📞 respondeu, o prazo passou e o equipamento continua aqui: a essa
+      // altura outra mensagem automática rende menos que uma ligação
+      if (hDesde >= 7 * 24) {
+        paraLigar.push(nome + ' ' + t.slice(-4) + ' — respondeu há ' +
+          Math.round(hDesde / 24) + ' dia(s) e não retirou · ' +
+          String(x.f.equipamento || '').slice(0, 28));
+        return false;
+      }
+      x.jaRespondeu = true;   // o texto reconhece que a pessoa já falou
       return true;
     });
 
     if (!aplicar) {
       return res.status(200).json({ ok: true, modo: 'prévia',
+        PARA_A_EQUIPE_LIGAR: paraLigar,
         equipamentosProntos: prontos.length,
         clientesQueReceberiam: fila.length,
         modo2: incluirAntigas ? 'incluindo fichas anteriores à régua' : 'apenas fichas novas',
@@ -1373,7 +1398,10 @@ export default async function handler(req, res) {
       const equip = eqs.length > 1 ? 'seus ' + eqs.length + ' equipamentos'
         : String(f.equipamento || 'equipamento').slice(0, 30);
       const idx = Math.min(ctrl.enviados || 0, TEXTOS.length - 1);
-      const texto = TEXTOS[idx](nome, equip);
+      const item = fila.find(x => x.f === f) || {};
+      const texto = item.jaRespondeu
+        ? TEXTO_APOS_RESPOSTA(nome, equip)
+        : TEXTOS[idx](nome, equip);
       const janelaAberta = ultimaEntrada[d8r(tel)] &&
         (Date.now() - ultimaEntrada[d8r(tel)]) < 24 * 3600000;
       try {
@@ -1417,7 +1445,9 @@ export default async function handler(req, res) {
     }
     if (feitos.length) await dbSet('reparoeletro_frenteloja', FL);
     return res.status(200).json({ ok: erros.length === 0,
-      enviados: feitos.length, porTemplate: porTemplate.length, L: feitos, erros });
+      enviados: feitos.length, porTemplate: porTemplate.length, L: feitos, erros,
+      PARA_A_EQUIPE_LIGAR: paraLigar,
+      silenciadosPorTerRespondido: responderam.length });
   }
 
   // ── 📺 TV-CONDENADA: avisa o cliente e oferece os caminhos possíveis ──
