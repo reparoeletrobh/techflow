@@ -27,9 +27,11 @@ async function dbSet(k, v) {
 }
 
 // ── PRIORIDADE (ordem definida pelo Pedro) ──────────────────────────
-// 1 Entrar em Contato · 2 Conflito de REPROVAÇÃO · 3 Cliente Loja VERMELHO
-// 4 Retornar · 5 Lead
-const PRIO = { entrar_contato: 1, conflito_reprovacao: 2, cliente_loja_vermelho: 3, retornar: 4, lead: 5 };
+// 1 Entrar em Contato · 2 Conflito de REPROVAÇÃO · 3 Retornar
+// 4 Cliente Loja VERMELHO · 5 Lead
+// Ordem: quem está esperando contato vem primeiro; o lead, que é o mais frio,
+// por último. Retornar vem antes de Cliente Loja porque é compromisso marcado.
+const PRIO = { entrar_contato: 1, conflito_reprovacao: 2, retornar: 3, cliente_loja_vermelho: 4, lead: 5 };
 const ROTULO = {
   entrar_contato: 'Entrar em Contato', conflito_reprovacao: 'Conflito — reprovou orçamento',
   cliente_loja_vermelho: 'Cliente Loja — prometeu e não veio', retornar: 'Retornar', lead: 'Lead',
