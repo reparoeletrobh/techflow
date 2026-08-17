@@ -265,6 +265,7 @@ export default async function handler(req, res) {
     // 📅 quando o card ENTROU no ERP: vem do histórico, que registra cada
     // passagem de fase. A última movimentação não serve — ela muda a cada
     // alteração posterior e faria o card parecer ter entrado hoje.
+    const semHistorico = [];
     const entrouNoErp = (c) => {
       const hs = (c.history || [])
         .filter(x => String(x.phase || x.phaseId || '') === 'erp')
@@ -275,6 +276,8 @@ export default async function handler(req, res) {
       for (const c of (((db || {}).cards) || [])) {
         if (String(c.phaseId || c.phase || '') !== 'erp') continue;
         const q = entrouNoErp(c);
+        if (!q) { semHistorico.push(sis + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 24) +
+          ' — está em ERP mas o histórico não registra quando entrou'); continue; }
         if (!naData(q)) continue;
         candidatos.push({ sis, nome: c.nomeContato || c.nome || '', telefone: c.telefone,
           equipamento: c.equipamento || c.descricao || '', quando: q });
@@ -302,6 +305,12 @@ export default async function handler(req, res) {
     if (!aplicar) {
       return res.status(200).json({ ok: true, modo: 'prévia',
         diaConsultado: ontem, entraramNoErp: candidatos.length,
+        // 🔍 de onde veio a data de cada um, para conferir contra a realidade
+        COMO_FOI_DATADO: candidatos.map(c => c.sis + ' | ' +
+          String(c.nome).slice(0, 22).padEnd(22) + ' | entrou no ERP em ' +
+          String(c.quando).slice(0, 16).replace('T', ' ')),
+        SEM_HISTORICO_DE_ERP: (semHistorico || []).length,
+        LISTA_SEM_HISTORICO: (semHistorico || []).slice(0, 40),
         vaoReceber: fila.length, jaPerguntado,
         L: fila.map(c => c.sis + ' | ' + String(c.nome).slice(0, 22).padEnd(22) +
           ' ' + String(c.telefone || '').slice(-4) + ' | ' +
