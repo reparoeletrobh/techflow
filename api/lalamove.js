@@ -711,15 +711,34 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
     // corridas ainda em andamento: as concluídas não precisam ser consultadas
     const FINAIS = ["COMPLETED", "CANCELED", "REJECTED", "EXPIRED"];
     const ativos = {};
+    // ⏳ corrida entregue ou cancelada some do registro da transportadora em
+    // poucos dias: insistir em pedido antigo só gera erro repetido
+    const LIMITE_DIAS = 7;
+    const antigos = [];
     for (const f of (db.fichas || [])) {
       if (!f.orderId) continue;
       const reg = livro.corridas[f.orderId];
       if (reg && FINAIS.includes(String(reg.status || ""))) continue;
+      const quando = f.enviadoAt ? new Date(f.enviadoAt).getTime() : 0;
+      if (quando && (Date.now() - quando) > LIMITE_DIAS * 86400000) {
+        if (!antigos.includes(f.orderId)) antigos.push(f.orderId);
+        // marca para não voltar a ser consultado
+        livro.corridas[f.orderId] = livro.corridas[f.orderId] ||
+          { orderId: f.orderId, status: "EXPIRED", criadaEm: f.enviadoAt,
+            marcos: { criadaEm: f.enviadoAt },
+            observacao: "pedido anterior ao limite de consulta — não acompanhado" };
+        continue;
+      }
       (ativos[f.orderId] = ativos[f.orderId] || []).push(f);
     }
     const ids = Object.keys(ativos);
-    if (!ids.length) return res.status(200).json({ ok: true,
-      msg: "nenhuma corrida em andamento", totalNoLivro: Object.keys(livro.corridas).length });
+    if (!ids.length) {
+      if (antigos.length) await dbSet("lalamove_corridas", livro);
+      return res.status(200).json({ ok: true,
+        msg: "nenhuma corrida recente para acompanhar",
+        pedidosAntigosIgnorados: antigos.length,
+        totalNoLivro: Object.keys(livro.corridas).length });
+    }
 
     const atualizadas = [], erros = [];
     for (const orderId of ids.slice(0, 20)) {
@@ -811,6 +830,7 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
     await dbSet(LALA_KEY, db);
     return res.status(200).json({ ok: erros.length === 0,
       consultadas: ids.length, atualizadas: atualizadas.length,
+      pedidosAntigosIgnorados: antigos.length,
       L: atualizadas, erros,
       totalNoLivro: Object.keys(livro.corridas).length });
   }
