@@ -92,6 +92,7 @@ export default async function handler(req, res) {
         if (livro.registros[id]) continue;      // já registrado antes
         livro.registros[id] = {
           em: agora.toISOString(), dia: hojeBR, sis,
+          cardId: String(c.id || ''),   // permite baixar a ficha certa no GMB
           nome: c.nomeContato || c.nome || '?',
           telefone: String(c.telefone || '').replace(/\D/g, ''),
           equipamento: String(c.equipamento || c.descricao || '').slice(0, 60),
@@ -231,6 +232,19 @@ export default async function handler(req, res) {
           clientes[x.d].avaliacaoPedidaEm = new Date().toISOString();
           clientes[x.d].aguardandoResposta = false;
           clientes[x.d].respostaCliente = String(x.r.texto).slice(0, 300);
+          // ⭐ o pedido saiu: a ficha correspondente sai da fila do Google Meu
+          // Negócio pelo mesmo caminho do botão Copiar e Enviar. Sem isso a
+          // pessoa apareceria lá como pendente e receberia o pedido de novo.
+          try {
+            await fetch('https://reparoeletroadm.com/api/orcamento?action=gmb-marcar-enviado&k=' +
+              ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: cli.cardId || cli.id || x.d,
+                nome: cli.nome || '?', tel: cheio,
+                desc: (cli.equipamento || '') + ' · pedido enviado pela pesquisa de satisfação' }),
+            });
+            clientes[x.d].gmbBaixado = true;
+          } catch (e) { clientes[x.d].gmbBaixado = false; }
           feitos.push(x.linha);
         } else {
           erros.push(x.linha + ' — ' + ((r && r.error && r.error.message) || 'falha'));
@@ -354,7 +368,7 @@ export default async function handler(req, res) {
     const candidatos = [];
     for (const r of Object.values(livroE.registros || {})) {
       if (String(r.dia || '') !== ontem) continue;
-      candidatos.push({ sis: r.sis || 'ADM', nome: r.nome || '',
+      candidatos.push({ sis: r.sis || 'ADM', nome: r.nome || '', cardId: r.cardId || '',
         telefone: r.telefone, equipamento: r.equipamento || '', quando: r.em });
     }
     const semHistorico = [];
@@ -433,7 +447,7 @@ export default async function handler(req, res) {
         if (r && r.messages && r.messages[0]) {
           // 🏷️ marca que a pergunta foi feita: a resposta será classificada depois
           controle.clientes[d] = { em: new Date().toISOString(),
-            nome: c.nome, equipamento: c.equipamento, sis: c.sis,
+            nome: c.nome, equipamento: c.equipamento, sis: c.sis, cardId: c.cardId || '',
             telefone: tel,          // 📞 guarda o número completo: recompor por
                                     // DDD suposto erraria em cliente de fora
 
