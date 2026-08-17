@@ -1268,7 +1268,7 @@ export default async function handler(req, res) {
     } catch (e) {}
 
     const CHAVE = (process.env.ANTHROPIC_API_KEY || '').trim();
-    const elogios = [], comRessalva = [], indefinidos = [];
+    const elogios = [], comRessalva = [], indefinidos = [], reclamacoes = [];
 
     for (const [d, r] of Object.entries(respostas)) {
       let veredito = null;
@@ -1284,9 +1284,11 @@ export default async function handler(req, res) {
                 'Responda APENAS uma palavra:\n' +
                 'ELOGIO — se a pessoa diz que está tudo certo, funcionando, satisfeita, ' +
                 'agradece ou elogia, E NÃO acrescenta nada além disso.\n' +
-                'RESSALVA — se há qualquer observação, sugestão, crítica, dúvida, ' +
-                'reclamação, pedido, relato de problema, condição ("está bom MAS...", ' +
-                '"funcionando, só que..."), ou se ela ainda não usou o equipamento.\n' +
+                'RECLAMACAO — se a pessoa relata que algo NÃO está funcionando, voltou ' +
+                'a apresentar defeito, está insatisfeita, ou cobra uma solução.\n' +
+                'RESSALVA — se há observação, sugestão, dúvida, pedido, condição ' +
+                '("está bom MAS...", "funcionando, só que..."), ou se ela ainda não ' +
+                'usou o equipamento — mas sem relatar defeito nem insatisfação.\n' +
                 'INDEFINIDO — se a resposta é ambígua, vazia de conteúdo, ou não responde ' +
                 'à pergunta.\n\n' +
                 'Na dúvida entre ELOGIO e RESSALVA, responda RESSALVA.',
@@ -1294,7 +1296,8 @@ export default async function handler(req, res) {
           }).then(x => x.json());
           const t = ((rr.content || []).filter(b => b.type === 'text')
             .map(b => b.text).join('') || '').trim().toUpperCase();
-          if (t.includes('ELOGIO')) veredito = 'elogio';
+          if (t.includes('RECLAMACAO') || t.includes('RECLAMAÇÃO')) veredito = 'reclamacao';
+          else if (t.includes('ELOGIO')) veredito = 'elogio';
           else if (t.includes('RESSALVA')) veredito = 'ressalva';
           else veredito = 'indefinido';
         } catch (e) { veredito = null; }
@@ -1304,6 +1307,7 @@ export default async function handler(req, res) {
       const linha = String(r.c.nome || '?').slice(0, 22) + ' ' + d.slice(-4) +
         ' → "' + r.texto.slice(0, 60).replace(/\n/g, ' ') + '"';
       if (veredito === 'elogio') elogios.push({ d, r, linha });
+      else if (veredito === 'reclamacao') reclamacoes.push({ d, r, linha });
       else if (veredito === 'ressalva') comRessalva.push(linha);
       else indefinidos.push(linha);
     }
@@ -1313,6 +1317,7 @@ export default async function handler(req, res) {
         responderam: Object.keys(respostas).length,
         vaoReceberPedidoDeAvaliacao: elogios.length,
         ELOGIO_PURO: elogios.map(x => x.linha),
+        RECLAMACOES_VAO_PARA_CONFLITOS: reclamacoes.map(x => x.linha),
         COM_RESSALVA_NAO_RECEBEM: comRessalva,
         INDEFINIDOS_NAO_RECEBEM: indefinidos,
         observacao: 'quem fez qualquer observação não recebe o pedido de avaliação; ' +
@@ -1360,6 +1365,45 @@ export default async function handler(req, res) {
       } catch (e) { erros.push(x.linha + ' — ' + e.message); }
       await new Promise(s => setTimeout(s, 400));
     }
+    // 🚨 reclamação na pesquisa é conflito: o cliente acabou de dizer que algo
+    // não está certo, e isso precisa chegar a quem resolve, não morrer no log
+    const conflitosAbertos = [];
+    for (const x of reclamacoes) {
+      const cli = clientes[x.d] || {};
+      try {
+        const r = await fetch('https://reparoeletroadm.com/api/conflitos?action=criar&k=' +
+          ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            // ⚠️ os nomes dos campos são os que o registro de conflitos espera:
+            // título e prioridade são obrigatórios
+            titulo: 'Reclamação na pesquisa — ' + String(cli.nome || '?').slice(0, 30),
+            tipo: 'qualidade',
+            prioridade: 'alto',
+            setor: cli.sis === 'TV' ? 'TV' : 'Assistência',
+            ficha: String(cli.nome || '?') + ' ' + String(cli.telefone || x.d).slice(-4),
+            cliente: cli.nome || '?',
+            telefone: cli.telefone || x.d,
+            equipamento: cli.equipamento || '',
+            descricao: 'Respondeu à pesquisa do dia seguinte à entrega: "' +
+              String(x.r.texto).slice(0, 400) + '"' +
+              (cli.equipamento ? '\n\nEquipamento: ' + cli.equipamento : ''),
+            registradoPor: 'pesquisa de satisfação',
+          }),
+        }).then(y => y.json());
+        if (r && r.ok) {
+          clientes[x.d].aguardandoResposta = false;
+          clientes[x.d].reclamou = true;
+          clientes[x.d].conflitoId = r.id || r.conflito && r.conflito.id || null;
+          clientes[x.d].respostaCliente = String(x.r.texto).slice(0, 300);
+          conflitosAbertos.push(x.linha);
+        } else {
+          erros.push(x.linha + ' — não consegui abrir o conflito: ' +
+            ((r && r.error) || 'sem retorno'));
+        }
+      } catch (e) { erros.push(x.linha + ' — conflito: ' + e.message); }
+    }
+
     // quem respondeu com ressalva sai da espera: o caso é da equipe, não do robô
     for (const linha of comRessalva) {
       const fin = linha.match(/\s(\d{4})\s→/);
@@ -1373,6 +1417,8 @@ export default async function handler(req, res) {
     await dbSet('wa_pesquisa_satisfacao', controle);
     return res.status(200).json({ ok: erros.length === 0,
       pedidosEnviados: feitos.length, L: feitos, erros,
+      conflitosAbertos: conflitosAbertos.length,
+      RECLAMACOES: conflitosAbertos,
       comRessalvaParaAEquipe: comRessalva });
   }
 
