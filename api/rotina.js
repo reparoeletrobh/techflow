@@ -43,11 +43,10 @@ module.exports = async function handler(req, res) {
     // 📺 TV condenada: avisa quem foi para retirada e recolhe a escolha do cliente
     feitos.push(await chamar('avisar TV condenada', 'wa-bot?action=tv-condenada-avisar&aplicar=1'));
     feitos.push(await chamar('escolhas da TV condenada', 'wa-bot?action=tv-condenada-respostas'));
-    // 📣 avisos de conflito ao cliente — EM ESPERA até os modelos serem
-    // aprovados na Meta. Sem eles, o cliente fora da janela de 24h não recebe
-    // nada e o registro marcaria como avisado quem nunca foi.
-    // Para ligar: trocar false por true.
-    const AVISOS_CONFLITO_LIGADOS = false;
+    // 📣 avisos de conflito ao cliente: os modelos chamado_aberto e
+    // chamado_resolvido estão aprovados, então quem está fora da janela de
+    // conversa também recebe
+    const AVISOS_CONFLITO_LIGADOS = true;
     if (AVISOS_CONFLITO_LIGADOS) {
       feitos.push(await chamar('avisos de conflito ao cliente',
         'conflitos?action=avisar-clientes&aplicar=1'));
