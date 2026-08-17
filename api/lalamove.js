@@ -727,7 +727,17 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
         const path = "/v3/orders/" + orderId;
         const hdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "GET", path, "");
         const { status, body } = await lalaFetch(LALA_HOST, path, "GET", hdrs, null);
-        if (status !== 200) { erros.push(orderId + ": HTTP " + status); continue; }
+        if (status !== 200) {
+          // 🔎 o código sozinho não diz nada: 404 pode ser pedido de outro
+          // ambiente, credencial de outra conta ou identificador inválido
+          let detalhe = String(body || "").slice(0, 200);
+          try { const e2 = JSON.parse(body);
+            detalhe = (e2.errors && e2.errors[0] && (e2.errors[0].message || e2.errors[0].id))
+              || e2.message || detalhe; } catch (e) {}
+          erros.push(orderId + ": HTTP " + status + " — " + detalhe +
+            " | consultando em " + LALA_HOST);
+          continue;
+        }
         const d = (JSON.parse(body) || {}).data || {};
         const antes = livro.corridas[orderId] || { marcos: {} };
         const agora = new Date().toISOString();
@@ -803,6 +813,25 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
       consultadas: ids.length, atualizadas: atualizadas.length,
       L: atualizadas, erros,
       totalNoLivro: Object.keys(livro.corridas).length });
+  }
+
+  // ── 🔎 diagnostico — em que ambiente estamos e o que há para acompanhar ──
+  if (action === "diagnostico-lala") {
+    const db = (await dbGet(LALA_KEY)) || { fichas: [] };
+    const comOrder = (db.fichas || []).filter(f => f.orderId);
+    const porOrder = {};
+    for (const f of comOrder) (porOrder[f.orderId] = porOrder[f.orderId] || []).push(f);
+    return res.status(200).json({ ok: true,
+      ambiente: LALA_HOST,
+      ehSandbox: !!SANDBOX,
+      credencialConfigurada: !!(LALA_KEY_ENV && LALA_SECRET_ENV),
+      chaveTermina: LALA_KEY_ENV ? String(LALA_KEY_ENV).slice(-6) : null,
+      fichasNaFila: (db.fichas || []).length,
+      fichasComPedido: comOrder.length,
+      PEDIDOS: Object.entries(porOrder).map(([id, fs]) => id + ' | ' + fs.length +
+        ' ficha(s) | enviado ' + String(fs[0].enviadoAt || '').slice(0, 16).replace('T', ' ')),
+      observacao: 'pedido criado em um ambiente não existe no outro: se o envio foi ' +
+        'feito com SANDBOX ligado e a consulta roda em produção, a resposta é 404' });
   }
 
   // ── 📋 corridas — o histórico gravado, com motorista e tempos ──
