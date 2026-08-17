@@ -129,6 +129,62 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔬 rastrear-cliente: tudo que o sistema sabe sobre um telefone ──
+  // Quando alguém diz que excluiu e a ficha voltou, é preciso ver o registro
+  // inteiro: em que bancos ele existe, com que identificadores, o que cada um
+  // guarda e se a exclusão chegou a ser gravada.
+  if (action === 'rastrear-cliente') {
+    const alvo = String(req.query.tel || '').replace(/\D/g, '');
+    if (alvo.length < 4) return res.status(400).json({ ok: false,
+      error: 'informe &tel= com ao menos 4 dígitos' });
+    const bate = t => String(t || '').replace(/\D/g, '').endsWith(alvo);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+
+    const achados = [];
+    const BANCOS = ['fichas_adm', 'fichas_tv', 'prospeccao_adm',
+      'reparoeletro_logistica', 'tv_logistica', 'reparoeletro_pipe', 'tv_pipe',
+      'reparoeletro_arquivo', 'tv_arquivo'];
+    for (const chave of BANCOS) {
+      const db = await dbGet(chave);
+      for (const L of ['fichas', 'cards']) {
+        for (const x of (((db || {})[L]) || [])) {
+          if (!bate(x.telefone)) continue;
+          achados.push({ banco: chave, id: x.id,
+            nome: x.nome || x.nomeContato || '?',
+            status: x.status || x.phase || x.phaseId || '?',
+            criadoEm: hh(x.criadoEm), movedAt: hh(x.movedAt),
+            contatoFeitoEm: hh(x.contatoFeitoEm),
+            excluidoDaFilaEm: x.excluidoDaFilaEm ? hh(x.excluidoDaFilaEm) : null,
+            origem: x.origem || null,
+            reagendarColeta: x.reagendarColeta || false,
+            passagens: (x.passagensEntrarContato || [])
+              .map(p => p.origem + '@' + hh(p.em)) });
+        }
+      }
+    }
+    // consta na lista de excluídos?
+    let excluidoEm = null;
+    try {
+      const ex = await dbGet('prospeccao_excluidos');
+      for (const [t, q] of Object.entries(((ex || {}).tels) || {})) {
+        if (String(t).replace(/\D/g, '').endsWith(alvo)) excluidoEm = q;
+      }
+    } catch (e) {}
+
+    return res.status(200).json({ ok: true, telefone: alvo,
+      registrosEncontrados: achados.length,
+      NA_LISTA_DE_EXCLUIDOS: excluidoEm ? hh(excluidoEm) : '🚨 NÃO — a exclusão não foi gravada',
+      ONDE_ESTA: achados.map(a => a.banco + ' | id ' + a.id +
+        ' | ' + a.status + ' | criado ' + a.criadoEm +
+        (a.origem ? ' | origem ' + a.origem : '') +
+        (a.excluidoDaFilaEm ? ' | excluído da fila em ' + a.excluidoDaFilaEm : '')),
+      DETALHE: achados,
+      leitura: !excluidoEm
+        ? 'sem registro de exclusão: ou ela não foi feita, ou falhou antes de gravar'
+        : 'a exclusão está gravada; se a ficha voltou, foi por um caminho que não a consulta' });
+  }
+
   // ── 🔬 CICLO-DE-VIDA: por que cada ficha da fila está lá agora ──
   // Cruza o registro de passagens da ficha com as exclusões manuais, mostrando
   // quando saiu, por quê, e o que a trouxe de volta.
