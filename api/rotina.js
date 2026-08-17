@@ -48,6 +48,23 @@ module.exports = async function handler(req, res) {
     // que é onde a equipe dá o caso por encerrado — o campo de solução guarda
     // o andamento da produção e não servia como critério.
     const AVISOS_CONFLITO_LIGADOS = true;
+
+    // 📄 orçamento pronto e cliente sem saber: o disparo só acontecia quando
+    // alguém rodava à mão, e os casos iam se acumulando dia após dia. Roda em
+    // horário comercial; a própria ação recusa fora dele.
+    if (horaBR >= 9 && horaBR < 18) {
+      feitos.push(await chamar('orçamentos pendentes de aviso',
+        'wa-bot?action=disparar-orcamentos-pendentes&aplicar=1'));
+    }
+
+    // 🔁 a régua de recuperação tinha uma passagem por dia e enviava cerca de
+    // vinte por vez, então uma fila de oitenta e seis levava quatro dias para
+    // dar a volta — e o cliente ficava sem contato justamente no intervalo em
+    // que a negociação esfria. Passa a rodar mais vezes ao longo do dia.
+    if ([10, 14, 17].includes(horaBR)) {
+      feitos.push(await chamar('régua de recuperação',
+        'wa-bot?action=recuperacao-7d&aplicar=1'));
+    }
     if (AVISOS_CONFLITO_LIGADOS) {
       feitos.push(await chamar('avisos de conflito ao cliente',
         'conflitos?action=avisar-clientes&aplicar=1'));
