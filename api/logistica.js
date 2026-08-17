@@ -239,6 +239,8 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     const nova = {
       id: 'fic_reag_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
       nome: ficha.nome || ficha.nomeContato || '?',
+      // marcado abaixo se o cliente já foi retirado da fila à mão
+
       telefone: String(ficha.telefone || '').replace(/\D/g, ''),
       waNum: String(ficha.telefone || '').replace(/\D/g, ''),
       equipamento: ficha.equipamento || ficha.descricao || '',
@@ -263,6 +265,13 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     const jaEsta = (db) => ((db || {}).fichas || []).some(x =>
       d8(x.telefone) === d8(ficha.telefone) &&
       (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
+    // 🚫 quem a equipe retirou da fila de ligação não volta pela remarcação:
+    // a ficha nova nasce com outro identificador e escapava da proteção
+    if (await foiExcluidoDaFila(ficha.telefone)) {
+      nova.status = 'prospeccao';
+      nova.excluidoDaFilaEm = new Date().toISOString();
+      nova.excluidoDaFilaPor = 'cliente já havia sido retirado da fila à mão';
+    }
     const rG = await _gravar.acrescentar(KEYP, 'fichas', nova,
       (a, b2) => d8(a.telefone) === d8(b2.telefone) &&
         (String(a.origem || '') === 'remarcar' || a.reagendarColeta === true),
@@ -300,6 +309,34 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     } catch (e) {}
     return { ok: true };
   } catch (e) { return { ok: false, erro: e.message }; }
+}
+
+
+/**
+ * Este cliente foi retirado da fila de ligação à mão?
+ * A devolução do Remarcar cria ficha NOVA, com id novo, então a proteção por
+ * id não a alcança — a exclusão precisa ser verificada pelo telefone, senão
+ * quem a equipe tirou da fila reaparece na primeira remarcação.
+ */
+async function foiExcluidoDaFila(telefone) {
+  const d = String(telefone || '').replace(/\D/g, '').slice(-8);
+  if (d.length < 8) return false;
+  try {
+    const ex = await dbGet('prospeccao_excluidos');
+    for (const t of Object.keys(((ex || {}).tels) || {})) {
+      if (String(t).replace(/\D/g, '').slice(-8) === d) return true;
+    }
+  } catch (e) {}
+  // e a própria ficha pode trazer a marca da exclusão
+  try {
+    for (const chave of ['fichas_adm', 'fichas_tv']) {
+      const fdb = await dbGet(chave);
+      const achou = (((fdb || {}).fichas) || []).find(f =>
+        String(f.telefone || '').replace(/\D/g, '').slice(-8) === d && f.excluidoDaFilaEm);
+      if (achou) return true;
+    }
+  } catch (e) {}
+  return false;
 }
 
 module.exports = async function handler(req, res) {
@@ -650,7 +687,10 @@ module.exports = async function handler(req, res) {
         const jaLa = dst.fichas.some(x => dg(x.telefone) === dg(f.telefone) &&
           String(x.status || '') === 'entrar_contato');
         if (!jaLa) {
-          dst.fichas.unshift({ ...f, status: 'entrar_contato' });
+          const excl = await foiExcluidoDaFila(f.telefone);
+          dst.fichas.unshift({ ...f, status: excl ? 'prospeccao' : 'entrar_contato',
+            ...(excl ? { excluidoDaFilaEm: new Date().toISOString(),
+              excluidoDaFilaPor: 'retirado da fila antes da migração' } : {}) });
           lista.push((f.nome || '?') + ' ' + dg(f.telefone).slice(-4) + ' → ' + certo);
           movidas++;
         }
@@ -920,7 +960,7 @@ module.exports = async function handler(req, res) {
       equipamento: ficha.equipamento || '', defeito: ficha.defeito || '',
       endereco: ficha.endereco || '',
       waNum: String(ficha.telefone||'').replace(/\D/g,''),
-      status: 'entrar_contato',
+      status: (await foiExcluidoDaFila(ficha.telefone)) ? 'prospeccao' : 'entrar_contato',
       passagensEntrarContato: [{ em: new Date().toISOString(),
         origem: 'devolução do remarcar', veioDe: '(nova)', motivo: 'ficha criada já nesta coluna' }],
       vezesEmEntrarContato: 1,

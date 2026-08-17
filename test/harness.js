@@ -951,6 +951,40 @@ function check(nome, cond, extra) {
       dep2.status !== 'entrar_contato', dep2.status);
   }
 
+  // ── 🔁 a remarcação não pode ressuscitar quem foi tirado da fila ──
+  // A devolução do Remarcar cria ficha NOVA, com identificador novo, então a
+  // proteção por id não a alcançava: o cliente excluído reaparecia na primeira
+  // remarcação, e a equipe voltava a ligar para quem já havia decidido não ligar.
+  console.log('▶ Cenário RM — remarcar respeita a exclusão da fila');
+  {
+    const pr = carregarHandler('api/prospeccao.js');
+    const lg = carregarHandler('api/logistica.js');
+    const ont = new Date(Date.now() - 30 * 3600000).toISOString();
+    KV['prospeccao_adm'] = { fichas: [] };
+    KV['prospeccao_excluidos'] = { tels: {} };
+    KV['fichas_adm'] = { fichas: [{ id: 'RM1', nome: 'Excluído', telefone: '5531955552222',
+      status: 'entrar_contato', contatoFeitoEm: ont, criadoEm: ont }] };
+    KV['fichas_tv'] = { fichas: [] };
+    KV['reparoeletro_logistica'] = { fichas: [{ id: 'LRM1', nome: 'Excluído',
+      telefone: '5531955552222', phase: 'remarcar', equipamento: 'Micro' }] };
+    KV['tv_logistica'] = { fichas: [] };
+    KV['reparoeletro_pipe'] = { cards: [] };
+    KV['tv_pipe'] = { cards: [] };
+
+    await pr(req({ action: 'excluir', ...K }, { id: 'RM1' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 120));
+    check('exclusão registra o telefone',
+      Object.keys((KV['prospeccao_excluidos'] || {}).tels || {}).length > 0);
+
+    await lg(req({ action: 'devolver-remarcar', ...K },
+      { id: 'LRM1', motivo: 'teste', quem: 'harness' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 200));
+    const voltou = ((KV['fichas_adm'] || {}).fichas || [])
+      .filter(f => String(f.status || '') === 'entrar_contato');
+    check('remarcar não devolve quem foi excluído da fila',
+      voltou.length === 0, voltou.map(f => f.nome).join(', '));
+  }
+
   console.log('▶ Cenário SD — sync limita-se ao dia corrente');
   {
     const fsS = require('fs');
