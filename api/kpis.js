@@ -401,6 +401,69 @@ module.exports = async function handler(req, res) {
   }
 
 
+  // ── 🔎 cacar-orcamentos: onde estão os orçamentos do dia, em toda parte ──
+  // Quando o painel mostra um número e a operação conta outro, é preciso olhar
+  // TODAS as bases, não só a que o painel lê. O orçamento pode estar sendo
+  // gravado em lugar que a contagem não visita.
+  if ((req.query || {}).action === 'cacar-orcamentos') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000 - 1;
+    const noDia = d => { if (!d) return false;
+      const t = new Date(d).getTime(); return t >= ini && t <= fim; };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const d8c = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    const BASES = ['reparoeletro_pipe', 'tv_pipe', 'reparoeletro_frenteloja',
+      'fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
+      'reparoeletro_almoxarifado', 'reparoeletro_board', 'reparoeletro_arquivo'];
+    const achados = {}, telsVistos = {};
+    for (const chave of BASES) {
+      const db = await dbGet(chave);
+      if (!db) continue;
+      const lista = [];
+      for (const L of ['cards', 'fichas', 'itens']) {
+        for (const x of (((db || {})[L]) || [])) {
+          const valor = Number(x.valor || x.valorOrcamento || x.preco || 0);
+          if (!(valor > 0)) continue;
+          // qualquer data que indique quando o orçamento foi feito
+          const datas = [x.orcamentoEm, x.orcamentoCadastradoEm, x.diagnosticoEm,
+            x.movedAt, x.criadoEm, x.statusAt].filter(Boolean);
+          const doDia = datas.find(noDia);
+          if (!doDia) continue;
+          const tel = d8c(x.telefone);
+          lista.push({ nome: x.nomeContato || x.nome || x.cliente || '?', tel,
+            valor, quando: doDia,
+            campo: x.orcamentoEm ? 'orcamentoEm'
+              : x.orcamentoCadastradoEm ? 'orcamentoCadastradoEm'
+              : x.diagnosticoEm ? 'diagnosticoEm'
+              : x.movedAt ? 'movedAt' : 'criadoEm',
+            fase: x.phaseId || x.phase || x.status || '?' });
+          if (tel) (telsVistos[tel] = telsVistos[tel] || []).push(chave);
+        }
+      }
+      if (lista.length) {
+        achados[chave] = { quantos: lista.length,
+          L: lista.sort((a, b) => String(a.quando).localeCompare(String(b.quando)))
+            .map(x => hh(x.quando) + ' | ' + String(x.nome).slice(0, 20).padEnd(20) +
+              ' ' + x.tel.slice(-4) + ' | R$ ' + x.valor.toFixed(2).padStart(8) +
+              ' | ' + x.campo + ' | ' + x.fase) };
+      }
+    }
+    const clientesUnicos = Object.keys(telsVistos).length;
+    return res.status(200).json({ ok: true, dia,
+      clientesDistintosComValor: clientesUnicos,
+      POR_BASE: Object.fromEntries(Object.entries(achados)
+        .map(([k, v]) => [k, v.quantos])),
+      EM_MAIS_DE_UMA_BASE: Object.entries(telsVistos)
+        .filter(([, bs]) => new Set(bs).size > 1)
+        .map(([t, bs]) => t.slice(-4) + ' → ' + [...new Set(bs)].join(' + ')),
+      DETALHE: achados,
+      comoLer: 'compare o total de cada base com o que a operação contou: a base ' +
+        'que tiver o número certo é a fonte que a contagem deveria estar lendo' });
+  }
+
   // ── 🔍 orcamentos-perdidos: quem tem valor mas não é contado ──
   // A contagem exige data própria do orçamento — carimbo ou histórico. Card
   // antigo pode ter valor e nenhuma das duas coisas, e some da conta sem que
