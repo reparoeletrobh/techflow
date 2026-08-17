@@ -231,6 +231,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
     <div class="tab-bar">
       <button class="tab-btn active" onclick="setTab('cadastro')">Cadastro</button>
       <button class="tab-btn" onclick="setTab('painel')">Painel</button>
+      <button class="tab-btn" onclick="abrirLogBot()" style="color:#10d982;">📋 Log do Bot</button>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <div class="fl-stat-pill orc">   <strong id="fs-orc">—</strong>&nbsp;orc.</div>
@@ -481,6 +482,92 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 <div class="toasts" id="toasts"></div>
 
 <script>
+// ── 📋 log do robô: o que ele fez com as fichas do balcão ──
+// Mostra quais orçamentos foram comunicados, quais fichas prontas estão sendo
+// lembradas, e principalmente as que travaram — orçamento sem aviso e conserto
+// pronto fora da régua, que são as que param sem ninguém notar.
+var _logDias = 30;
+async function abrirLogBot(){
+  var ov = document.getElementById('ov-logbot');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-logbot';
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:99999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+                : 'border-radius:16px;padding:20px 22px;')
+    + 'max-width:820px;width:100%;max-height:92vh;overflow-y:auto;color:#e8eaed;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">'
+      + '<div style="font-size:15px;font-weight:900;">📋 Log do Bot — Frente de Loja</div>'
+      + '<div style="display:flex;gap:5px;margin-left:auto;">'
+        + [7,30,90].map(function(d){
+            return '<button onclick="logBotPeriodo(' + d + ')" style="background:'
+              + (_logDias===d?'rgba(16,217,130,.16)':'rgba(255,255,255,.03)') + ';border:1px solid '
+              + (_logDias===d?'#10d982':'#1e2430') + ';border-radius:7px;padding:5px 11px;'
+              + 'font-size:11px;font-weight:700;color:' + (_logDias===d?'#10d982':'#8b93a3')
+              + ';cursor:pointer;">' + d + 'd</button>';
+          }).join('')
+        + '<button onclick="document.getElementById(\'ov-logbot\').remove()" '
+          + 'style="background:#374151;border:none;border-radius:7px;padding:5px 13px;'
+          + 'color:#fff;font-weight:800;cursor:pointer;font-size:11px;">Fechar</button>'
+      + '</div></div>'
+    + '<div id="lb-corpo"><div style="color:#5a6270;padding:24px;text-align:center;">⏳</div></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  carregarLogBot();
+}
+function logBotPeriodo(d){ _logDias = d; abrirLogBot(); }
+
+async function carregarLogBot(){
+  var cx = document.getElementById('lb-corpo');
+  if(!cx) return;
+  var r = null;
+  try { r = await fetch('/api/frenteloja?action=log-bot&dias=' + _logDias
+    + '&k=tfk-re2026-Bx7mQp9zKw4Y').then(function(x){ return x.json(); }); } catch(e){}
+  if(!r || r.ok === undefined){ cx.innerHTML = '<div style="color:#f87171;">não consegui carregar</div>'; return; }
+  var s = r.RESUMO || {};
+  var kpi = function(n,l,cor){
+    return '<div style="background:rgba(255,255,255,.03);border:1px solid #1e2430;'
+      + 'border-radius:11px;padding:12px 14px;flex:1;min-width:96px;">'
+      + '<div style="font-family:ui-monospace,monospace;font-size:21px;font-weight:700;'
+      + 'color:'+cor+';line-height:1;">'+n+'</div>'
+      + '<div style="font-size:9.5px;color:#5a6270;font-weight:750;letter-spacing:.05em;'
+      + 'text-transform:uppercase;margin-top:5px;">'+l+'</div></div>';
+  };
+  var bloco = function(titulo, arr, cor){
+    if(!arr || !arr.length) return '';
+    return '<div style="margin-top:14px;">'
+      + '<div style="font-size:12px;font-weight:800;color:'+cor+';">'+titulo+' ('+arr.length+')</div>'
+      + '<div style="background:#0b0e13;border:1px solid #1e2430;border-radius:9px;'
+      + 'padding:10px 12px;margin-top:6px;font-family:ui-monospace,monospace;font-size:10.5px;'
+      + 'color:#8b93a3;line-height:1.9;max-height:250px;overflow-y:auto;white-space:pre;">'
+      + arr.map(function(x){ return String(x).replace(/</g,'&lt;'); }).join('\n') + '</div></div>';
+  };
+  cx.innerHTML =
+    (r.ALERTA ? '<div style="background:' + (r.ok?'rgba(52,211,153,.09)':'rgba(248,113,113,.09)')
+      + ';border:1px solid ' + (r.ok?'rgba(52,211,153,.3)':'rgba(248,113,113,.35)')
+      + ';border-radius:10px;padding:11px 13px;font-size:12px;color:'
+      + (r.ok?'#34d399':'#f87171') + ';margin-bottom:12px;line-height:1.6;">'
+      + String(r.ALERTA).replace(/</g,'&lt;') + '</div>' : '')
+    + '<div style="display:flex;gap:9px;flex-wrap:wrap;">'
+      + kpi(s.emOrcamentoCadastrado||0, 'em orçamento', '#60a5fa')
+      + kpi(s.orcamentosAvisadosPeloBot||0, 'avisados', '#34d399')
+      + kpi(s.orcamentosSemAviso||0, 'sem aviso', '#fbbf24')
+      + kpi(s.aguardandoRetirada||0, 'p/ retirar', '#a78bfa')
+      + kpi(s.foraDaRegua||0, 'fora da régua', '#f87171')
+      + kpi(s.maisAntigaNaLoja||'—', 'mais antiga', '#f0f2f5')
+    + '</div>'
+    + bloco('🚨 Travadas em Orçamento Cadastrado — o bot nunca avisou',
+        r.TRAVADAS_EM_ORCAMENTO, '#f87171')
+    + bloco('🚨 Prontas fora da régua — ninguém vai chamar o cliente',
+        r.TRAVADAS_EM_CONSERTO_REALIZADO, '#f87171')
+    + bloco('📨 Orçamentos', r.ORCAMENTOS, '#60a5fa')
+    + bloco('📦 Aguardando retirada', r.RETIRADAS, '#a78bfa');
+}
+
 // ══ DADOS DA LOJA ══════════════════════════════════════════════
 var LOJA_INFO = {
   nome: 'REPARO ELETRO - CONSERTO DE ELETRODOMÉSTICOS LTDA',
@@ -746,6 +833,21 @@ function buildCard(f){
     (f.telefone?'<div class="fl-card-tel">📱 '+f.telefone+
       ' <button onclick="event.stopPropagation();navigator.clipboard.writeText(\''+f.telefone.replace(/\D/g,'')+'\').then(function(){var b=event.target;b.textContent=\'✅\';setTimeout(function(){b.textContent=\'📋\'},1500)})" style="background:none;border:none;cursor:pointer;font-size:11px;opacity:.7">📋</button></div>':'')+
     '<div class="fl-card-equip">'+f.equipamento+(f.modelo?' · '+f.modelo:'')+'</div>'+
+    // 🏪 quando o equipamento entrou na loja e há quantos dias está aqui: a
+    // coluna diz a etapa, mas não o tempo que o aparelho ocupa espaço
+    (function(){
+      var e = f.entradaEm || f.criadoEm;
+      if(!e) return '';
+      var dt = new Date(e);
+      if(isNaN(dt.getTime())) return '';
+      var dias = Math.floor((Date.now() - dt.getTime()) / 86400000);
+      var cor = dias >= 7 ? '#f87171' : dias >= 3 ? '#fbbf24' : '#5a6270';
+      return '<div style="font-size:10px;color:' + cor + ';margin-top:3px;'
+        + 'font-family:ui-monospace,monospace;">🏪 '
+        + dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'})
+        + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})
+        + ' · há ' + dias + 'd na loja</div>';
+    })()+
     (f.descricao?'<div class="fl-card-desc">'+f.descricao.slice(0,60)+'...</div>':'')+
     // 💰 valor do orçamento vindo da Análise Loja (já com os 10% de desconto)
     (f.valorOrcamento
