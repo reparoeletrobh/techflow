@@ -43,6 +43,25 @@ async function lerEvts() {
   } catch (e) { return []; }
 }
 
+
+/**
+ * Anota um acontecimento da pesquisa no diário.
+ * Sem isso só se enxerga o estado atual de cada cliente — quem já foi avaliado,
+ * quem não — e se perde a leitura do conjunto: quantos elogiaram, quantos
+ * reclamaram, se a proporção está mudando de uma semana para outra.
+ */
+async function anotar(evento) {
+  try {
+    const k = 'satisfacao_diario';
+    const d = (await dbGet(k)) || { eventos: [] };
+    d.eventos = (d.eventos || []).concat([{ em: new Date().toISOString(), ...evento }]);
+    // guarda 120 dias: o suficiente para comparar meses
+    const corte = Date.now() - 120 * 86400000;
+    d.eventos = d.eventos.filter(e => new Date(e.em || 0).getTime() >= corte).slice(-4000);
+    await dbSet(k, d);
+  } catch (e) {}
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -54,6 +73,68 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
   }
   const action = String((req.query || {}).action || '').trim();
+
+  // ── 📊 diario — o que a pesquisa produziu, dia a dia ──
+  // O controle guarda o estado de cada cliente; este diário guarda a leitura do
+  // conjunto: quantos foram perguntados, quantos elogiaram, quantos apontaram
+  // algo e quantos viraram conflito — que é o que mostra se a satisfação está
+  // subindo ou caindo de uma semana para outra.
+  if (action === 'diario') {
+    const d = (await dbGet('satisfacao_diario')) || { eventos: [] };
+    const evs = d.eventos || [];
+    const dias = Math.max(1, Math.min(120, parseInt(req.query.dias || '30', 10)));
+    const desde = Date.now() - dias * 86400000;
+    const noPeriodo = evs.filter(e => new Date(e.em || 0).getTime() >= desde);
+    const hh = x => x ? new Date(new Date(x).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const diaDe = x => new Date(new Date(x).getTime() - 3 * 3600000).toISOString().slice(0, 10);
+
+    const conta = t => noPeriodo.filter(e => e.tipo === t).length;
+    const perguntas = conta('pergunta');
+    const elogios = conta('elogio');
+    const ressalvas = conta('ressalva');
+    const reclamacoes = conta('reclamacao');
+    const responderam = elogios + ressalvas + reclamacoes;
+
+    // por dia, para ver a evolução
+    const porDia = {};
+    for (const e of noPeriodo) {
+      const k = diaDe(e.em);
+      porDia[k] = porDia[k] || { pergunta: 0, elogio: 0, ressalva: 0, reclamacao: 0 };
+      if (porDia[k][e.tipo] !== undefined) porDia[k][e.tipo]++;
+    }
+
+    const lista = t => noPeriodo.filter(e => e.tipo === t)
+      .sort((a, b) => String(b.em).localeCompare(String(a.em)))
+      .map(e => hh(e.em) + ' | ' + String(e.nome || '?').slice(0, 22).padEnd(22) +
+        ' ' + String(e.tel || '').slice(-4) +
+        (e.equipamento ? ' | ' + String(e.equipamento).slice(0, 24) : '') +
+        (e.resposta ? ' | "' + String(e.resposta).replace(/\n/g, ' ').slice(0, 70) + '"' : '') +
+        (e.baixadoNoGmb ? ' | ✅ baixado no GMB' : '') +
+        (e.conflitoAberto ? ' | 🚨 conflito aberto' : ''));
+
+    return res.status(200).json({ ok: true,
+      periodoDias: dias,
+      RESUMO: {
+        perguntados: perguntas,
+        responderam,
+        taxaDeResposta: perguntas ? Math.round(responderam / perguntas * 100) + '%' : '—',
+        elogios, ressalvas, reclamacoes,
+        // 🎯 dos que responderam, quantos estavam plenamente satisfeitos
+        satisfacao: responderam ? Math.round(elogios / responderam * 100) + '%' : '—',
+        avaliacoesPedidas: elogios,
+        semResposta: Math.max(0, perguntas - responderam),
+      },
+      POR_DIA: Object.entries(porDia).sort().reverse().map(([dia, v]) =>
+        dia + ' | perguntou ' + String(v.pergunta).padStart(3) +
+        ' | elogio ' + String(v.elogio).padStart(3) +
+        ' | ressalva ' + String(v.ressalva).padStart(3) +
+        ' | reclamação ' + String(v.reclamacao).padStart(3)),
+      ELOGIOS: lista('elogio'),
+      RESSALVAS: lista('ressalva'),
+      RECLAMACOES: lista('reclamacao'),
+      PERGUNTADOS: lista('pergunta').slice(0, 60) });
+  }
 
   // ── 📒 REGISTRAR-ERP: livro de quem entrou no sistema de gestão ──
   // O histórico do cartão não serve como data de entrada: todo domingo à
@@ -245,6 +326,9 @@ export default async function handler(req, res) {
             });
             clientes[x.d].gmbBaixado = true;
           } catch (e) { clientes[x.d].gmbBaixado = false; }
+          await anotar({ tipo: 'elogio', tel: x.d, nome: cli.nome, sis: cli.sis,
+            equipamento: cli.equipamento, resposta: String(x.r.texto).slice(0, 200),
+            avaliacaoPedida: true, baixadoNoGmb: clientes[x.d].gmbBaixado === true });
           feitos.push(x.linha);
         } else {
           erros.push(x.linha + ' — ' + ((r && r.error && r.error.message) || 'falha'));
@@ -283,6 +367,9 @@ export default async function handler(req, res) {
           clientes[x.d].reclamou = true;
           clientes[x.d].conflitoId = r.id || r.conflito && r.conflito.id || null;
           clientes[x.d].respostaCliente = String(x.r.texto).slice(0, 300);
+          await anotar({ tipo: 'reclamacao', tel: x.d, nome: cli.nome, sis: cli.sis,
+            equipamento: cli.equipamento, resposta: String(x.r.texto).slice(0, 300),
+            conflitoAberto: true });
           conflitosAbertos.push(x.linha);
         } else {
           erros.push(x.linha + ' — não consegui abrir o conflito: ' +
@@ -298,6 +385,9 @@ export default async function handler(req, res) {
       for (const [d, c] of Object.entries(clientes)) {
         if (d.slice(-4) === fin[1] && c.aguardandoResposta) {
           c.aguardandoResposta = false; c.teveRessalva = true;
+          await anotar({ tipo: 'ressalva', tel: d, nome: c.nome, sis: c.sis,
+            equipamento: c.equipamento,
+            resposta: String(linha.split('→ ')[1] || '').replace(/^"|"$/g, '').slice(0, 200) });
         }
       }
     }
@@ -453,6 +543,8 @@ export default async function handler(req, res) {
 
             via: janelaAberta ? 'mensagem' : 'modelo',
             aguardandoResposta: true, avaliacaoPedida: false };
+          await anotar({ tipo: 'pergunta', tel: d, nome: c.nome, sis: c.sis,
+            equipamento: c.equipamento, via: janelaAberta ? 'mensagem' : 'modelo' });
           feitos.push(c.sis + ' | ' + String(c.nome).slice(0, 22) + ' ' + d.slice(-4));
         } else {
           erros.push(String(c.nome).slice(0, 20) + ': ' +

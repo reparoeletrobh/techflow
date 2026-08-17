@@ -820,6 +820,88 @@ agendarLimpeza();
 <div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Clientes +48h em Aguardando Aprovacao</span><button onclick="loadSemResposta()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-sem" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
 <div class="page" id="page-ultima-chamada"><div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Espelho Ultima Chamada do Pipefy</span><button onclick="loadUltimaChamada()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-ult" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
 <script>
+// ── 📊 diário da pesquisa de satisfação ──
+// A aba mostra quem falta abordar; este painel mostra o que já aconteceu —
+// quantos elogiaram, quantos apontaram algo e quantos viraram conflito.
+var _diaSat = 30;
+async function abrirDiarioSatisfacao(){
+  var ov = document.getElementById('ov-diario-sat');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ov-diario-sat';
+  var estreito = window.innerWidth < 900;
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;'
+    + (estreito ? 'align-items:flex-end;padding:0;' : 'align-items:center;padding:18px;')
+    + 'justify-content:center;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;'
+    + (estreito ? 'border-radius:16px 16px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));'
+                : 'border-radius:16px;padding:20px 22px;')
+    + 'max-width:760px;width:100%;max-height:92vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">'
+      + '<div style="font-size:15px;font-weight:900;">📊 Pesquisa de satisfação</div>'
+      + '<div style="display:flex;gap:5px;margin-left:auto;">'
+        + [7,30,90].map(function(d){
+            return '<button onclick="periodoDiarioSat(' + d + ')" style="background:'
+              + (_diaSat===d?'rgba(16,217,130,.16)':'rgba(255,255,255,.03)') + ';border:1px solid '
+              + (_diaSat===d?'#10d982':'#1e2430') + ';border-radius:7px;padding:5px 11px;'
+              + 'font-size:11px;font-weight:700;color:' + (_diaSat===d?'#10d982':'#8b93a3')
+              + ';cursor:pointer;">' + d + ' dias</button>';
+          }).join('')
+        + '<button onclick="document.getElementById(\'ov-diario-sat\').remove()" '
+          + 'style="background:#374151;border:none;border-radius:7px;padding:5px 13px;'
+          + 'color:#fff;font-weight:800;cursor:pointer;font-size:11px;">Fechar</button>'
+      + '</div></div>'
+    + '<div id="ds-corpo"><div style="color:#5a6270;padding:24px;text-align:center;">⏳</div></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  carregarDiarioSat();
+}
+function periodoDiarioSat(d){ _diaSat = d; abrirDiarioSatisfacao(); }
+
+async function carregarDiarioSat(){
+  var cx = document.getElementById('ds-corpo');
+  if(!cx) return;
+  var r = null;
+  try { r = await fetch('/api/satisfacao?action=diario&dias=' + _diaSat
+    + '&k=tfk-re2026-Bx7mQp9zKw4Y').then(function(x){ return x.json(); }); } catch(e){}
+  if(!r || !r.ok){ cx.innerHTML = '<div style="color:#f87171;">não consegui carregar</div>'; return; }
+  var s = r.RESUMO || {};
+  var kpi = function(n,l,cor){
+    return '<div style="background:rgba(255,255,255,.03);border:1px solid #1e2430;'
+      + 'border-radius:11px;padding:12px 14px;flex:1;min-width:92px;">'
+      + '<div style="font-family:ui-monospace,monospace;font-size:22px;font-weight:700;'
+      + 'color:'+cor+';line-height:1;">'+n+'</div>'
+      + '<div style="font-size:9.5px;color:#5a6270;font-weight:750;letter-spacing:.05em;'
+      + 'text-transform:uppercase;margin-top:5px;">'+l+'</div></div>';
+  };
+  var bloco = function(titulo, arr, cor){
+    if(!arr || !arr.length) return '';
+    return '<div style="margin-top:14px;">'
+      + '<div style="font-size:12px;font-weight:800;color:'+cor+';">'+titulo+' ('+arr.length+')</div>'
+      + '<div style="background:#0b0e13;border:1px solid #1e2430;border-radius:9px;'
+      + 'padding:10px 12px;margin-top:6px;font-family:ui-monospace,monospace;font-size:10.5px;'
+      + 'color:#8b93a3;line-height:1.9;max-height:230px;overflow-y:auto;white-space:pre-wrap;">'
+      + arr.map(function(x){ return String(x).replace(/</g,'&lt;'); }).join('\n') + '</div></div>';
+  };
+  cx.innerHTML =
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;">'
+      + kpi(s.perguntados||0, 'perguntados', '#60a5fa')
+      + kpi(s.elogios||0, 'elogios', '#34d399')
+      + kpi(s.ressalvas||0, 'ressalvas', '#fbbf24')
+      + kpi(s.reclamacoes||0, 'reclamações', '#f87171')
+      + kpi(s.satisfacao||'—', 'satisfação', '#10d982')
+      + kpi(s.taxaDeResposta||'—', 'responderam', '#a78bfa')
+    + '</div>'
+    + '<div style="font-size:11px;color:#5a6270;margin-top:8px;line-height:1.6;">'
+      + (s.avaliacoesPedidas||0) + ' pedido(s) de avaliação enviados · '
+      + (s.semResposta||0) + ' ainda sem resposta</div>'
+    + bloco('📅 Por dia', r.POR_DIA, '#f0f2f5')
+    + bloco('✅ Elogios — receberam o pedido de avaliação', r.ELOGIOS, '#34d399')
+    + bloco('⚠️ Ressalvas — não receberam o pedido', r.RESSALVAS, '#fbbf24')
+    + bloco('🚨 Reclamações — viraram conflito', r.RECLAMACOES, '#f87171')
+    + bloco('📨 Perguntados', r.PERGUNTADOS, '#8b93a3');
+}
+
 var MSG_PARTES=["*ATENCAO* comunicado importante da Reparo Eletro.","Estamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.","Por este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao."];
 var MSG_UC=MSG_PARTES.join("\n");
 function srCard(c){var tel=(c.tel||'').replace(/[^0-9]/g,'');if(tel.slice(0,2)==='55'&&tel.length>=12)tel=tel.slice(2);if(tel.length===10)tel=tel.slice(0,2)+'9'+tel.slice(2);var waLink=tel?'https://wa.me/55'+tel+'?text='+encodeURIComponent(MSG_UC):null;var id=c.pipefyId;var w=document.createElement('div');w.className='sr-card';var n=document.createElement('div');n.className='sr-nome';n.textContent=c.nome||c.title||'';w.appendChild(n);if(c.desc){var d=document.createElement('div');d.className='sr-desc';d.textContent=c.desc.substring(0,80)+'...';w.appendChild(d);}var a=document.createElement('div');a.className='sr-age';a.textContent=c.age+' dia(s) em Aguardando Aprovacao';w.appendChild(a);var b=document.createElement('div');b.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';if(waLink){var bc=document.createElement('button');bc.className='sr-btn';bc.textContent='Copiar e Enviar';bc.onclick=(function(i,lk){return function(){navigator.clipboard.writeText(lk).catch(function(){var ta=document.createElement('textarea');ta.value=lk;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});alertarCliente(i);};})(id,waLink);b.appendChild(bc);}var bm=document.createElement('button');bm.className='sr-btn';bm.id='btn-al-'+id;bm.style.cssText='background:transparent;border:1px solid var(--border);color:var(--muted);';bm.textContent='Mover p/ Ultima Chamada';bm.onclick=(function(i){return function(){alertarCliente(i);};})(id);b.appendChild(bm);w.appendChild(b);return w;}
@@ -1206,6 +1288,9 @@ function resetTabela() {
 <div class="page" id="page-gmb">
   <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);">
     <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Fichas em ERP — solicitar avaliação no Google</span>
+      <button onclick="abrirDiarioSatisfacao()" style="background:rgba(16,217,130,.14);
+        border:1px solid rgba(16,217,130,.4);border-radius:7px;padding:6px 12px;
+        color:#10d982;font-size:11px;font-weight:800;cursor:pointer;">📊 Pesquisa de satisfação</button>
     <div style="display:flex;gap:8px;">
       <input id="busca-gmb" placeholder="🔍 Buscar nome..." oninput="filtrarGMB()"
         style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;width:200px;">
