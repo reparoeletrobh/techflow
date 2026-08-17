@@ -959,6 +959,41 @@ function check(nome, cond, extra) {
   // Toda a proteção contra o retorno depende do telefone estar registrado, e
   // esse caminho — o que a tela realmente usa — não o registrava: a ficha
   // sumia e voltava horas depois, trazida por outra rotina.
+  // ── 🛵 o espelho da corrida só grava quando o equipamento sai da loja ──
+  // A corrida é criada à mão no aplicativo com os mesmos endereços da rota; o
+  // encontro é feito pelos telefones dos destinos, e o motorista só é gravado
+  // no momento da coleta, que é quando ele de fato leva os equipamentos.
+  console.log('▶ Cenário LW — espelho da corrida na rota do almoxarifado');
+  {
+    const w = carregarHandler('api/lalamove-webhook.js');
+    KV['reparoeletro_almox_rotas'] = { rotas: [
+      { id: 'RT-A', status: 'separacao', criadaEm: new Date().toISOString(), itens: [
+        { cardId: 'x1', cliente: 'Um', tel: '5531911112222' },
+        { cardId: 'x2', cliente: 'Dois', tel: '5531933334444' }] },
+      { id: 'RT-B', status: 'separacao', criadaEm: new Date().toISOString(), itens: [
+        { cardId: 'x3', cliente: 'Tres', tel: '5531955556666' }] },
+    ] };
+    KV['lalamove_vinculos'] = { pedidos: {} };
+    KV['lalamove_webhook_log'] = { eventos: [] };
+    const mot = { driverId: 'D1', name: 'Entregador', phone: '+553199990000', plateNumber: 'XYZ9A88' };
+    const stops = [{ phone: '+5531911112222' }, { phone: '+5531933334444' }];
+
+    await w({ method: 'POST', query: {}, headers: {}, body: { data: {
+      order: { orderId: 'O-1', status: 'ASSIGNING_DRIVER', stops }, driver: mot } } }, res());
+    await new Promise(s => setTimeout(s, 120));
+    check('antes da coleta a rota não recebe motorista',
+      !((KV['reparoeletro_almox_rotas'].rotas[0] || {}).motorista));
+
+    await w({ method: 'POST', query: {}, headers: {}, body: { data: {
+      order: { orderId: 'O-1', status: 'PICKED_UP', stops }, driver: mot } } }, res());
+    await new Promise(s => setTimeout(s, 150));
+    const rtA = KV['reparoeletro_almox_rotas'].rotas[0] || {};
+    const rtB = KV['reparoeletro_almox_rotas'].rotas[1] || {};
+    check('ao sair da loja o motorista é gravado na rota certa',
+      rtA.motorista === 'Entregador' && rtA.placa === 'XYZ9A88', JSON.stringify(rtA.motorista));
+    check('a outra rota não é afetada', !rtB.motorista);
+  }
+
   console.log('▶ Cenário EX3 — exclusão pela tela registra o telefone');
   {
     const fi = carregarHandler('api/fichas.js');
