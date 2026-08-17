@@ -241,8 +241,15 @@ export default async function handler(req, res) {
     const aplicar = String(req.query.aplicar || '') === '1';
     const d8s = t => String(t || '').replace(/\D/g, '').slice(-8);
     // o dia anterior, em horário de Brasília
-    const ontem = String(req.query.dia ||
-      new Date(Date.now() - 3 * 3600000 - 86400000).toISOString().slice(0, 10));
+    // 🗓️ no domingo ninguém entra em ERP, então perguntar sobre "ontem" na
+    // segunda não acharia nada — e os entregues no sábado ficariam sem pesquisa.
+    // Recua até o último dia útil quando o anterior é domingo.
+    let ontem = String(req.query.dia || '');
+    if (!ontem) {
+      const d = new Date(Date.now() - 3 * 3600000 - 86400000);
+      if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() - 1);   // domingo → sábado
+      ontem = d.toISOString().slice(0, 10);
+    }
     const iniS = new Date(ontem + 'T00:00:00-03:00').getTime();
     const fimS = iniS + 86400000 - 1;
     const naData = d => { if (!d) return false;
@@ -255,11 +262,19 @@ export default async function handler(req, res) {
     ]);
     const controle = ctrlS || { clientes: {} };
     const candidatos = [];
+    // 📅 quando o card ENTROU no ERP: vem do histórico, que registra cada
+    // passagem de fase. A última movimentação não serve — ela muda a cada
+    // alteração posterior e faria o card parecer ter entrado hoje.
+    const entrouNoErp = (c) => {
+      const hs = (c.history || [])
+        .filter(x => String(x.phase || x.phaseId || '') === 'erp')
+        .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+      return hs.length ? hs[0] : null;
+    };
     for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
       for (const c of (((db || {}).cards) || [])) {
         if (String(c.phaseId || c.phase || '') !== 'erp') continue;
-        // quando entrou no ERP: carimbo, ou a última movimentação
-        const q = c.erpEm || c.movedAt || null;
+        const q = entrouNoErp(c);
         if (!naData(q)) continue;
         candidatos.push({ sis, nome: c.nomeContato || c.nome || '', telefone: c.telefone,
           equipamento: c.equipamento || c.descricao || '', quando: q });
@@ -267,7 +282,7 @@ export default async function handler(req, res) {
     }
     for (const f of (((flS || {}).fichas) || [])) {
       if (String(f.phase || '') !== 'erp') continue;
-      const q = f.erpEm || f.movedAt || null;
+      const q = entrouNoErp(f);
       if (!naData(q)) continue;
       candidatos.push({ sis: 'LOJA', nome: f.nomeContato || f.nome || '',
         telefone: f.telefone, equipamento: f.equipamento || '', quando: q });
