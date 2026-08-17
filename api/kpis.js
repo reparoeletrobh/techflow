@@ -415,15 +415,19 @@ module.exports = async function handler(req, res) {
       .toISOString().slice(5, 16).replace('T', ' ') : '—';
     const d8c = t => String(t || '').replace(/\D/g, '').slice(-8);
 
-    const BASES = ['reparoeletro_pipe', 'tv_pipe', 'reparoeletro_frenteloja',
-      'fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
-      'reparoeletro_almoxarifado', 'reparoeletro_board', 'reparoeletro_arquivo'];
+    // 📚 inclui a base onde a logística grava o orçamento gerado, que a
+    // contagem do painel nunca visitou
+    const BASES = ['reparoeletro_orcamentos', 'reparoeletro_pipe', 'tv_pipe',
+      'reparoeletro_frenteloja', 'fichas_adm', 'fichas_tv',
+      'reparoeletro_logistica', 'tv_logistica',
+      'reparoeletro_almoxarifado', 'tv_almoxarifado',
+      'reparoeletro_board', 'reparoeletro_arquivo'];
     const achados = {}, telsVistos = {};
     for (const chave of BASES) {
       const db = await dbGet(chave);
       if (!db) continue;
       const lista = [];
-      for (const L of ['cards', 'fichas', 'itens']) {
+      for (const L of ['cards', 'fichas', 'itens', 'orcamentos', 'lista']) {
         for (const x of (((db || {})[L]) || [])) {
           const valor = Number(x.valor || x.valorOrcamento || x.preco || 0);
           if (!(valor > 0)) continue;
