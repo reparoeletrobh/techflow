@@ -251,21 +251,28 @@ export default async function handler(req,res){
       const base = nome.padEnd(22) + ' ' + tel.slice(-4) + ' | ' + eq.padEnd(26);
       const quando = f.orcamentoEm || f.movedAt || f.criadoEm;
       const dt = idade(quando);
+      // 🏪 quando o equipamento chegou na loja: é a referência que a equipe usa
+      // para saber há quanto tempo aquilo está lá, independentemente da coluna
+      const entrada = f.entradaEm || f.criadoEm || null;
+      const diasNaLoja = idade(entrada);
+      const selo = 'entrou ' + hh(entrada) +
+        (diasNaLoja != null ? ' (há ' + diasNaLoja + 'd na loja)' : '');
 
       // ── 1) orçamento cadastrado: o robô avisou o cliente? ──
       if (fase === 'orcamento_cadastrado') {
         if (new Date(quando || 0).getTime() >= desde) {
           if (f.orcEnviadoWpp) {
-            orcamentos.push('✅ ' + base + ' | avisado ' + hh(f.orcEnviadoWppEm || quando) +
+            orcamentos.push('✅ ' + base + ' | ' + selo +
+              ' | avisado ' + hh(f.orcEnviadoWppEm || quando) +
               (respondeu[tel] && respondeu[tel] > (f.orcEnviadoWppEm || quando)
                 ? ' | cliente respondeu' : ' | sem resposta'));
           } else {
-            orcamentos.push('⏳ ' + base + ' | NÃO avisado · há ' + dt + 'd');
+            orcamentos.push('⏳ ' + base + ' | ' + selo + ' | NÃO avisado · há ' + dt + 'd');
           }
         }
         // 🚨 travado: está aqui há dias e o robô nunca falou com ele
         if (!f.orcEnviadoWpp && dt != null && dt >= 2) {
-          travadosOrc.push(base + ' | há ' + dt + ' dia(s) sem aviso de orçamento' +
+          travadosOrc.push(base + ' | ' + selo + ' | há ' + dt + ' dia(s) sem aviso' +
             (Number(f.valorOrcamento || f.valor || 0) > 0
               ? ' | R$ ' + Number(f.valorOrcamento || f.valor).toFixed(2)
               : ' | ⚠️ sem valor lançado'));
@@ -277,12 +284,13 @@ export default async function handler(req,res){
         if (fase !== 'erp' && fase !== 'encerrado' && fase !== 'reprovado') {
           const prontoHa = idade(f.prontoEm || f.movedAt);
           if (f.reguaRetirada === true) {
-            retiradas.push('✅ ' + base + ' | pronto há ' + prontoHa + 'd' +
+            retiradas.push('✅ ' + base + ' | ' + selo + ' | pronto há ' + prontoHa + 'd' +
               (falouCom[tel] ? ' | último lembrete ' + hh(falouCom[tel]) : ' | ainda não lembrado') +
               (respondeu[tel] && falouCom[tel] && respondeu[tel] > falouCom[tel]
                 ? ' | respondeu' : ''));
           } else {
-            travadosConserto.push(base + ' | pronto há ' + (prontoHa != null ? prontoHa : '?') +
+            travadosConserto.push(base + ' | ' + selo +
+              ' | pronto há ' + (prontoHa != null ? prontoHa : '?') +
               ' dia(s) | fora da régua de retirada — ninguém vai chamar');
           }
         }
@@ -296,6 +304,14 @@ export default async function handler(req,res){
     };
     travadosOrc.sort(ordenaPorIdade);
     travadosConserto.sort(ordenaPorIdade);
+    // 🕐 o que está na loja há mais tempo aparece primeiro: é o que mais pesa
+    const porTempoNaLoja = (a, b) => {
+      const na = parseInt((String(a).match(/há (\d+)d na loja/) || [])[1] || 0, 10);
+      const nb = parseInt((String(b).match(/há (\d+)d na loja/) || [])[1] || 0, 10);
+      return nb - na;
+    };
+    orcamentos.sort(porTempoNaLoja);
+    retiradas.sort(porTempoNaLoja);
 
     const avisados = orcamentos.filter(x => x.startsWith('✅')).length;
     const naRegua = retiradas.length;
@@ -308,6 +324,12 @@ export default async function handler(req,res){
         aguardandoRetirada: naRegua + travadosConserto.length,
         naReguaDeRetirada: naRegua,
         foraDaRegua: travadosConserto.length,
+        // 📅 quanto tempo em média os equipamentos estão parados na loja
+        maisAntigaNaLoja: (() => {
+          const todos = orcamentos.concat(retiradas)
+            .map(x => parseInt((String(x).match(/há (\d+)d na loja/) || [])[1] || 0, 10));
+          return todos.length ? Math.max(...todos) + ' dia(s)' : '—';
+        })(),
       },
       ALERTA: (travadosOrc.length || travadosConserto.length)
         ? '🚨 ' + travadosOrc.length + ' ficha(s) com orçamento sem aviso e ' +
