@@ -237,6 +237,37 @@ export default async function handler(req, res) {
       comRessalvaParaAEquipe: comRessalva });
   }
 
+  // ── 🔬 onde-esta-erp: mostra a estrutura real dos registros em ERP ──
+  // Antes de decidir a data de entrada é preciso ver como cada base guarda
+  // isso. Supor o formato levou a contar trinta clientes num dia e nenhum
+  // no outro — esta consulta mostra os campos como eles são.
+  if (action === 'onde-esta-erp') {
+    const [ppA, ppT, flS] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('reparoeletro_frenteloja'),
+    ]);
+    const amostra = (lista, rotulo, campoFase) => {
+      const emErp = (lista || []).filter(x =>
+        String(x[campoFase] || x.phase || x.phaseId || '') === 'erp');
+      return { onde: rotulo, totalEmErp: emErp.length,
+        exemplos: emErp.slice(0, 4).map(x => ({
+          nome: String(x.nomeContato || x.nome || '?').slice(0, 24),
+          movedAt: x.movedAt || null,
+          criadoEm: x.criadoEm || null,
+          camposComData: Object.keys(x).filter(k =>
+            /Em$|At$|data|_ts/i.test(k) && x[k]).slice(0, 10),
+          historico: (x.history || []).slice(-4).map(hh =>
+            String(hh.phase || hh.phaseId || '?') + '@' +
+            String(hh.ts || hh.timestamp || '?').slice(0, 16)),
+          totalNoHistorico: (x.history || []).length,
+        })) };
+    };
+    return res.status(200).json({ ok: true,
+      PIPE_ADM: amostra(((ppA || {}).cards) || [], 'reparoeletro_pipe', 'phaseId'),
+      PIPE_TV: amostra(((ppT || {}).cards) || [], 'tv_pipe', 'phaseId'),
+      FRENTE_LOJA: amostra(((flS || {}).fichas) || [], 'reparoeletro_frenteloja', 'phase'),
+      comoLer: 'veja em camposComData e historico onde a entrada no ERP fica registrada' });
+  }
+
   if (action === 'pesquisa-satisfacao') {
     const aplicar = String(req.query.aplicar || '') === '1';
     const d8s = t => String(t || '').replace(/\D/g, '').slice(-8);
@@ -388,5 +419,5 @@ export default async function handler(req, res) {
 
 
   return res.status(404).json({ ok: false, error: 'ação não encontrada',
-    disponiveis: ['pesquisa-satisfacao', 'respostas-satisfacao'] });
+    disponiveis: ['pesquisa-satisfacao', 'respostas-satisfacao', 'onde-esta-erp'] });
 }
