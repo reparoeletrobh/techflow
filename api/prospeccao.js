@@ -528,7 +528,24 @@ export default async function handler(req,res){
         }
       }
     }
-    if(!fx) return res.status(404).json({ok:false,error:'ficha não encontrada'});
+    // 🔒 mesmo sem achar a ficha, o telefone informado precisa entrar na lista
+    // de excluídos: sem esse registro nada impede o retorno pela régua ou pela
+    // remarcação, e a ficha reaparece horas depois como se nunca tivesse saído
+    if(!fx){
+      const telInformado=String((req.body||{}).telefone||'').replace(/\D/g,'');
+      if(telInformado.length>=8){
+        try{
+          const excB=(await dbGet('prospeccao_excluidos'))||{tels:{}};
+          if(!excB.tels)excB.tels={};
+          excB.tels[telInformado.slice(-8)]=new Date().toISOString();
+          await dbSet('prospeccao_excluidos',excB);
+        }catch(_){}
+        return res.status(200).json({ok:true,
+          observacao:'a ficha não foi encontrada, mas o telefone entrou na lista de '+
+            'excluídos e não voltará para a fila'});
+      }
+      return res.status(404).json({ok:false,error:'ficha não encontrada'});
+    }
     // grava o tombstone ANTES de remover (se o sync atropelar, a trava já existe)
     if(fx&&fx.telefone){
       try{
@@ -537,6 +554,11 @@ export default async function handler(req,res){
         const dA=String(fx.telefone).replace(/\D/g,'').slice(-8);
         if(dA.length>=8)excA.tels[dA]=new Date().toISOString();
         await dbSet('prospeccao_excluidos',excA);
+        // confirma: sem esse registro a proteção contra o retorno não existe
+        const confE=await dbGet('prospeccao_excluidos');
+        if(dA.length>=8&&!(((confE||{}).tels)||{})[dA]){
+          await dbSet('prospeccao_excluidos',excA);   // uma segunda tentativa
+        }
       }catch(_){}
     }
     const dbF=(await dbGet(KEY))||db;   // relê: o sync pode ter gravado no meio

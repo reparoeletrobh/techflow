@@ -2281,6 +2281,23 @@ export default async function handler(req, res) {
     const key = sistema === 'tv' ? KEY_TV : KEY_ADM;
     const db  = (await dbGet(key)) || { fichas:[] };
     const alvo = (db.fichas || []).find(x => x.id === id);
+    // 🔒 REGISTRO DO TELEFONE: é esta lista que impede o retorno pela régua e
+    // pela remarcação. A exclusão gravava apenas a linha da planilha, então a
+    // ficha sumia da tela e reaparecia horas depois, trazida por outra rotina.
+    if (alvo && alvo.telefone) {
+      try {
+        const excF = (await dbGet('prospeccao_excluidos')) || { tels: {} };
+        if (!excF.tels) excF.tels = {};
+        const dF = String(alvo.telefone).replace(/\D/g, '').slice(-8);
+        if (dF.length >= 8) {
+          excF.tels[dF] = new Date().toISOString();
+          await dbSet('prospeccao_excluidos', excF);
+          // confirma que persistiu: sem o registro, não há proteção
+          const conf = await dbGet('prospeccao_excluidos');
+          if (!(((conf || {}).tels) || {})[dF]) await dbSet('prospeccao_excluidos', excF);
+        }
+      } catch (e) {}
+    }
     // TOMBSTONE DA LINHA: sem isto a rede de resgate reimportava a linha no ciclo seguinte
     if (alvo && alvo.sheetRow != null) {
       try {

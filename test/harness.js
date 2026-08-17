@@ -955,6 +955,26 @@ function check(nome, cond, extra) {
   // A devolução do Remarcar cria ficha NOVA, com identificador novo, então a
   // proteção por id não a alcançava: o cliente excluído reaparecia na primeira
   // remarcação, e a equipe voltava a ligar para quem já havia decidido não ligar.
+  // ── 🗑️ o botão da tela usa fichas?action=excluir, não o da prospecção ──
+  // Toda a proteção contra o retorno depende do telefone estar registrado, e
+  // esse caminho — o que a tela realmente usa — não o registrava: a ficha
+  // sumia e voltava horas depois, trazida por outra rotina.
+  console.log('▶ Cenário EX3 — exclusão pela tela registra o telefone');
+  {
+    const fi = carregarHandler('api/fichas.js');
+    KV['prospeccao_excluidos'] = { tels: {} };
+    KV['fichas_adm'] = { fichas: [{ id: 'EXT1', nome: 'Pela tela',
+      telefone: '5531955553333', status: 'entrar_contato', sheetRow: 42,
+      criadoEm: new Date().toISOString() }] };
+    KV['fichas_tv'] = { fichas: [] };
+    await fi(req({ action: 'excluir', ...K },
+      { id: 'EXT1', sistema: 'adm', motivo: 'teste' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 150));
+    const tels = Object.keys((KV['prospeccao_excluidos'] || {}).tels || {});
+    check('exclusão pela tela grava o telefone na lista',
+      tels.some(t => t.endsWith('3333')), 'gravados: ' + tels.join(', '));
+  }
+
   console.log('▶ Cenário RM — remarcar respeita a exclusão da fila');
   {
     const pr = carregarHandler('api/prospeccao.js');
