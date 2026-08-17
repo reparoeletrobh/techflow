@@ -1327,8 +1327,10 @@ function check(nome, cond, extra) {
   const nomes = lista.map(i => i.nome);
   check('ordem: Entrar em Contato é o 1º', nomes[0] === 'Entrar Contato', nomes);
   check('ordem: conflito de REPROVAÇÃO é o 2º', nomes[1] === 'Reprovou Orc', nomes);
-  check('ordem: Cliente Loja VERMELHO é o 3º', nomes[2] === 'Loja Vermelho', nomes);
-  check('ordem: Retornar é o 4º', nomes[3] === 'Retornar Um', nomes);
+  // 🔀 Retornar passou à frente de Cliente Loja: retorno é compromisso marcado
+  // com o cliente, enquanto cliente de loja que não veio pode esperar
+  check('ordem: Retornar é o 3º', nomes[2] === 'Retornar Um', nomes);
+  check('ordem: Cliente Loja VERMELHO é o 4º', nomes[3] === 'Loja Vermelho', nomes);
   check('ordem: Lead é o último', nomes[4] === 'Lead Frio', nomes);
   check('conflito de ANÁLISE DE COMPRA fica FORA (resolve por mensagem)', !nomes.includes('Analise Compra'), nomes);
   check('conflito de PROMESSA fica FORA da fila de ligação', !nomes.includes('Promessa'), nomes);
