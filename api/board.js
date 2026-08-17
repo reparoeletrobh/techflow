@@ -2329,6 +2329,79 @@ module.exports = async function handler(req, res) {
       L: alvo.map(x => x.nome + ' ' + x.tel.slice(-4)) });
   }
 
+  // ── 🏪 vendas-balcao: o que foi vendido no balcão, por dia ──
+  // O balcão registra a venda quando o atendimento é aprovado na loja. Não
+  // havia como consultar o movimento de um dia específico sem abrir a tela.
+  if (action === 'vendas-balcao') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const de = req.query.de ? new Date(req.query.de + 'T00:00:00-03:00').getTime() : null;
+    const ate = req.query.ate ? new Date(req.query.ate + 'T23:59:59-03:00').getTime() : null;
+    const iniV = de || new Date(dia + 'T00:00:00-03:00').getTime();
+    const fimV = ate || (iniV + 86400000 - 1);
+    const dentroV = d => { if (!d) return false;
+      const t = new Date(d).getTime(); return t >= iniV && t <= fimV; };
+    const hhV = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const d8v = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    const bal = await dbGet('reparoeletro_balcao');
+    const itens = Array.isArray(bal) ? bal : (((bal || {}).itens) || []);
+    const fl = await dbGet('reparoeletro_frenteloja');
+    const fichasFL = ((fl || {}).fichas) || [];
+
+    const vendas = [];
+    const jaVi = new Set();
+    for (const b of itens) {
+      // a entrada no balcão é o momento da venda
+      const quando = b.entradaEm || b.criadoEm || b.pagoEm || null;
+      if (!dentroV(quando)) continue;
+      const tel = d8v(b.telefone);
+      const ficha = fichasFL.find(f => d8v(f.telefone) === tel && tel.length >= 8);
+      const chaveV = tel + '|' + String(b.id || b.pipefyId || '');
+      if (jaVi.has(chaveV)) continue;
+      jaVi.add(chaveV);
+      vendas.push({
+        quando,
+        cliente: b.nomeContato || b.nome || (ficha && (ficha.nomeContato || ficha.nome)) || '—',
+        telefone: String(b.telefone || '').slice(-4),
+        equipamento: String(b.equipamento || b.descricao ||
+          (ficha && (ficha.equipamento || ficha.descricao)) || '').slice(0, 34),
+        valor: Number(b.valor || b.valorOrcamento ||
+          (ficha && (ficha.valorOrcamento || ficha.valor)) || 0),
+        pago: !!(b.pagoEm || b.pagamentoConfirmado || b.temComprovante),
+        forma: b.formaPagamento || (ficha && ficha.formaPagamento) || null,
+        atendente: b.criadoPor || b.movedBy || (ficha && ficha.criadoPor) || null,
+      });
+    }
+
+    vendas.sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+    const total = vendas.reduce((s, v) => s + v.valor, 0);
+    const pagas = vendas.filter(v => v.pago);
+    const porAtendente = {};
+    for (const v of vendas) {
+      const k = v.atendente || '(não registrado)';
+      porAtendente[k] = porAtendente[k] || { qtd: 0, valor: 0 };
+      porAtendente[k].qtd++; porAtendente[k].valor += v.valor;
+    }
+    return res.status(200).json({ ok: true,
+      dia: req.query.de ? (req.query.de + ' a ' + (req.query.ate || 'hoje')) : dia,
+      vendas: vendas.length,
+      valorTotal: +total.toFixed(2),
+      ticketMedio: vendas.length ? +(total / vendas.length).toFixed(2) : 0,
+      pagasNoDia: pagas.length,
+      valorPago: +pagas.reduce((s, v) => s + v.valor, 0).toFixed(2),
+      semValor: vendas.filter(v => !v.valor).length,
+      POR_ATENDENTE: Object.entries(porAtendente)
+        .sort((a, b) => b[1].valor - a[1].valor)
+        .map(([n, v]) => n + ': ' + v.qtd + ' venda(s) · R$ ' + v.valor.toFixed(2)),
+      LISTA: vendas.map(v => hhV(v.quando) + ' | ' +
+        String(v.cliente).slice(0, 24).padEnd(24) + ' ' + v.telefone +
+        ' | ' + String(v.equipamento).padEnd(30) +
+        ' | R$ ' + String(v.valor.toFixed(2)).padStart(9) +
+        (v.pago ? ' | pago' + (v.forma ? ' ' + v.forma : '') : ' | a receber')) });
+  }
+
+
   if (action === 'balcao-load') {
       const balcao = (await dbGet('reparoeletro_balcao')) || [];
       return res.status(200).json({ ok: true, cards: balcao });
