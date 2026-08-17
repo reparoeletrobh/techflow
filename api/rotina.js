@@ -49,6 +49,19 @@ module.exports = async function handler(req, res) {
     // o andamento da produção e não servia como critério.
     const AVISOS_CONFLITO_LIGADOS = true;
 
+    if (AVISOS_CONFLITO_LIGADOS) {
+      feitos.push(await chamar('avisos de conflito ao cliente',
+        'conflitos?action=avisar-clientes&aplicar=1'));
+    }
+  }
+
+  // ── 🕐 de hora em hora: rede de segurança ──
+  else if (action === 'de-hora-em-hora') {
+    // 🕐 hora e dia de Brasília, usados pelas rotinas com horário próprio.
+    // Declarados no início do bloco: usá-los antes derruba a rotina inteira.
+    const agoraBR2 = new Date(Date.now() - 3 * 3600000);
+    const horaBR = agoraBR2.getUTCHours(), diaSem = agoraBR2.getUTCDay();
+
     // 📄 orçamento pronto e cliente sem saber: o disparo só acontecia quando
     // alguém rodava à mão, e os casos iam se acumulando dia após dia. Roda em
     // horário comercial; a própria ação recusa fora dele.
@@ -65,18 +78,6 @@ module.exports = async function handler(req, res) {
       feitos.push(await chamar('régua de recuperação',
         'wa-bot?action=recuperacao-7d&aplicar=1'));
     }
-    if (AVISOS_CONFLITO_LIGADOS) {
-      feitos.push(await chamar('avisos de conflito ao cliente',
-        'conflitos?action=avisar-clientes&aplicar=1'));
-    }
-  }
-
-  // ── 🕐 de hora em hora: rede de segurança ──
-  else if (action === 'de-hora-em-hora') {
-    // 🕐 hora e dia de Brasília, usados pelas rotinas com horário próprio.
-    // Declarados no início do bloco: usá-los antes derruba a rotina inteira.
-    const agoraBR2 = new Date(Date.now() - 3 * 3600000);
-    const horaBR = agoraBR2.getUTCHours(), diaSem = agoraBR2.getUTCDay();
 
     feitos.push(await chamar('trazer fichas da planilha',
       'fichas?action=sync-completo&dias=3&aplicar=1'));
