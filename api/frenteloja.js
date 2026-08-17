@@ -211,6 +211,114 @@ export default async function handler(req,res){
   if(req.method==='OPTIONS')return res.status(200).end();
   const action=req.query.action;
 
+  // ── 📋 log-bot: o que o robô fez com as fichas do balcão ──
+  // Duas coisas dependem dele aqui: avisar o orçamento e lembrar da retirada.
+  // Quando uma delas não acontece, a ficha para de andar sem ninguém perceber —
+  // ela não está errada, só está esperando algo que nunca vai chegar.
+  if (action === 'log-bot') {
+    const dias = Math.max(1, Math.min(90, parseInt(req.query.dias || '30', 10)));
+    const desde = Date.now() - dias * 86400000;
+    const FL = (await dbGet(FL_KEY)) || { fichas: [] };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const idade = d => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+    const d8L = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    // quem o robô conversou de fato: última mensagem nossa e resposta do cliente
+    const falouCom = {}, respondeu = {};
+    try {
+      const U2 = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+      const T2 = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+      const r = await fetch(U2 + '/lrange/wa_evt_list/-8000/-1',
+        { headers: { Authorization: 'Bearer ' + T2 } }).then(x => x.json());
+      for (const s of (r.result || [])) {
+        try {
+          const e = JSON.parse(s);
+          const d = d8L(e.tel); if (!d) continue;
+          const q = String(e.ts || '');
+          if (e.dir === 'out') { if (!falouCom[d] || q > falouCom[d]) falouCom[d] = q; }
+          else { if (!respondeu[d] || q > respondeu[d]) respondeu[d] = q; }
+        } catch (x) {}
+      }
+    } catch (e) {}
+
+    const orcamentos = [], retiradas = [], travadosOrc = [], travadosConserto = [];
+    for (const f of (FL.fichas || [])) {
+      const fase = String(f.phase || '');
+      const tel = d8L(f.telefone);
+      const nome = String(f.nomeContato || f.nome || '?').slice(0, 22);
+      const eq = String(f.equipamento || '').slice(0, 26);
+      const base = nome.padEnd(22) + ' ' + tel.slice(-4) + ' | ' + eq.padEnd(26);
+      const quando = f.orcamentoEm || f.movedAt || f.criadoEm;
+      const dt = idade(quando);
+
+      // ── 1) orçamento cadastrado: o robô avisou o cliente? ──
+      if (fase === 'orcamento_cadastrado') {
+        if (new Date(quando || 0).getTime() >= desde) {
+          if (f.orcEnviadoWpp) {
+            orcamentos.push('✅ ' + base + ' | avisado ' + hh(f.orcEnviadoWppEm || quando) +
+              (respondeu[tel] && respondeu[tel] > (f.orcEnviadoWppEm || quando)
+                ? ' | cliente respondeu' : ' | sem resposta'));
+          } else {
+            orcamentos.push('⏳ ' + base + ' | NÃO avisado · há ' + dt + 'd');
+          }
+        }
+        // 🚨 travado: está aqui há dias e o robô nunca falou com ele
+        if (!f.orcEnviadoWpp && dt != null && dt >= 2) {
+          travadosOrc.push(base + ' | há ' + dt + ' dia(s) sem aviso de orçamento' +
+            (Number(f.valorOrcamento || f.valor || 0) > 0
+              ? ' | R$ ' + Number(f.valorOrcamento || f.valor).toFixed(2)
+              : ' | ⚠️ sem valor lançado'));
+        }
+      }
+
+      // ── 2) conserto realizado: o robô chamou para retirar? ──
+      if (fase === 'conserto_realizado' || f.viaControleQualidade === true) {
+        if (fase !== 'erp' && fase !== 'encerrado' && fase !== 'reprovado') {
+          const prontoHa = idade(f.prontoEm || f.movedAt);
+          if (f.reguaRetirada === true) {
+            retiradas.push('✅ ' + base + ' | pronto há ' + prontoHa + 'd' +
+              (falouCom[tel] ? ' | último lembrete ' + hh(falouCom[tel]) : ' | ainda não lembrado') +
+              (respondeu[tel] && falouCom[tel] && respondeu[tel] > falouCom[tel]
+                ? ' | respondeu' : ''));
+          } else {
+            travadosConserto.push(base + ' | pronto há ' + (prontoHa != null ? prontoHa : '?') +
+              ' dia(s) | fora da régua de retirada — ninguém vai chamar');
+          }
+        }
+      }
+    }
+
+    const ordenaPorIdade = (a, b) => {
+      const na = parseInt((String(a).match(/há (\d+)/) || [])[1] || 0, 10);
+      const nb = parseInt((String(b).match(/há (\d+)/) || [])[1] || 0, 10);
+      return nb - na;
+    };
+    travadosOrc.sort(ordenaPorIdade);
+    travadosConserto.sort(ordenaPorIdade);
+
+    const avisados = orcamentos.filter(x => x.startsWith('✅')).length;
+    const naRegua = retiradas.length;
+    return res.status(200).json({ ok: travadosOrc.length === 0 && travadosConserto.length === 0,
+      periodoDias: dias,
+      RESUMO: {
+        emOrcamentoCadastrado: orcamentos.length,
+        orcamentosAvisadosPeloBot: avisados,
+        orcamentosSemAviso: orcamentos.length - avisados,
+        aguardandoRetirada: naRegua + travadosConserto.length,
+        naReguaDeRetirada: naRegua,
+        foraDaRegua: travadosConserto.length,
+      },
+      ALERTA: (travadosOrc.length || travadosConserto.length)
+        ? '🚨 ' + travadosOrc.length + ' ficha(s) com orçamento sem aviso e ' +
+          travadosConserto.length + ' pronta(s) sem ninguém chamar o cliente'
+        : '✅ todas as fichas estão sendo trabalhadas pelo robô',
+      TRAVADAS_EM_ORCAMENTO: travadosOrc,
+      TRAVADAS_EM_CONSERTO_REALIZADO: travadosConserto,
+      ORCAMENTOS: orcamentos,
+      RETIRADAS: retiradas });
+  }
+
   if(req.method==='GET'&&action==='load'){
     const db=await dbGet(FL_KEY)||defaultDB();
     const todayStart=brtStartOfDay();
