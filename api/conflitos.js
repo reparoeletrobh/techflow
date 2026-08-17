@@ -363,8 +363,11 @@ module.exports = async function handler(req,res){
       if(!c.avisoAberturaEm && ['aberto','andamento'].includes(String(c.status||''))){
         pendentes.abertura.push(c);
       }
-      // 2) conflito resolvido e cliente ainda não avisado do desfecho
-      if(!c.avisoResolucaoEm && String(c.status||'')==='resolvido' && c.solucao){
+      // 2) 📍 chegar em RELATAR CLIENTE é o marco do desfecho: é quando a
+      // equipe dá o caso por encerrado e pronto para comunicar. O campo de
+      // solução guarda o andamento da produção — "em teste", "na pintura" —
+      // e usá-lo como critério avisava gente com serviço em andamento.
+      if(!c.avisoResolucaoEm && String(c.status||'')==='relatar'){
         pendentes.resolucao.push(c);
       }
     }
@@ -480,7 +483,10 @@ module.exports = async function handler(req,res){
         if(r.ok){
           if(tipo==='abertura'){ c.avisoAberturaEm=new Date().toISOString(); c.avisoAberturaVia=r.via; }
           else { c.avisoResolucaoEm=new Date().toISOString(); c.avisoResolucaoVia=r.via;
-                 if(r.texto) c.textoEnviadoAoCliente=String(r.texto).slice(0,600); }
+                 if(r.texto) c.textoEnviadoAoCliente=String(r.texto).slice(0,600);
+                 // 📌 cliente avisado do desfecho: o caso sai de Relatar Cliente
+                 c.status='resolvido'; c.clienteRelatado=true;
+                 c.relatadoEm=c.avisoResolucaoEm; c.relatadoPor='aviso automático'; }
           mudou=true;
           feitos.push(tipo+' | '+String(c.cliente||'?').slice(0,20)+' | '+r.via);
         } else {
