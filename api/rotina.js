@@ -43,10 +43,12 @@ module.exports = async function handler(req, res) {
     // 📺 TV condenada: avisa quem foi para retirada e recolhe a escolha do cliente
     feitos.push(await chamar('avisar TV condenada', 'wa-bot?action=tv-condenada-avisar&aplicar=1'));
     feitos.push(await chamar('escolhas da TV condenada', 'wa-bot?action=tv-condenada-respostas'));
-    // 📣 avisos de conflito ao cliente: os modelos chamado_aberto e
-    // chamado_resolvido estão aprovados, então quem está fora da janela de
-    // conversa também recebe
-    const AVISOS_CONFLITO_LIGADOS = true;
+    // 📣 avisos de conflito DESLIGADOS. Os modelos estão aprovados, mas o campo
+    // de solução guarda o andamento da produção — "em teste", "na pintura",
+    // "aguardando peça" — e não o desfecho. Avisar que "foi resolvido" com base
+    // nisso alcançaria clientes cujo serviço ainda está em andamento.
+    // Só religar quando houver um marco explícito de conclusão.
+    const AVISOS_CONFLITO_LIGADOS = false;
     if (AVISOS_CONFLITO_LIGADOS) {
       feitos.push(await chamar('avisos de conflito ao cliente',
         'conflitos?action=avisar-clientes&aplicar=1'));
