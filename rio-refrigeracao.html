@@ -368,10 +368,10 @@ function gtag_report_conversion(url) {
   var callback = function () {
     if (typeof(url) != 'undefined') { window.location = url; }
   };
-  // ⏳ o rótulo de conversão da conta nova ainda não foi criado. Enviar o
-  // rótulo antigo registraria a conversão na conta errada, então por ora só
-  // a navegação acontece — assim que o rótulo chegar, basta repor o send_to.
-  callback();
+  gtag('event', 'conversion', {
+    'send_to': 'AW-16587199538/3kyXCOPt3uIcELKosuU9',
+    'event_callback': callback
+  });
   return false;
 }
 </script>
