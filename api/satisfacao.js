@@ -505,31 +505,36 @@ export default async function handler(req, res) {
     // 🗓️ no domingo ninguém entra em ERP, então perguntar sobre "ontem" na
     // segunda não acharia nada — e os entregues no sábado ficariam sem pesquisa.
     // Recua até o último dia útil quando o anterior é domingo.
-    let ontem = String(req.query.dia || '');
-    if (!ontem) {
-      const d = new Date(Date.now() - 3 * 3600000 - 86400000);
-      if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() - 1);   // domingo → sábado
-      ontem = d.toISOString().slice(0, 10);
-    }
-    const iniS = new Date(ontem + 'T00:00:00-03:00').getTime();
-    const fimS = iniS + 86400000 - 1;
-    const naData = d => { if (!d) return false;
-      const t = new Date(d).getTime(); return t >= iniS && t <= fimS; };
+    // a data deixou de ser critério: o que define a fila é estar parado no
+    // painel, e não a data em que o cartão entrou no sistema de gestão
+    const ontem = String(req.query.dia || '');
 
-    // 🎯 quem entrou no ERP no dia consultado, segundo o LIVRO DE ENTRADAS —
-    // escrito ao longo do dia, quando a entrada acontece. O histórico do cartão
-    // não serve: a limpeza semanal move tudo em massa e apaga a distinção
-    // entre quem recebeu ontem e quem recebeu na semana passada.
-    const livroE = (await dbGet('erp_entradas')) || { registros: {} };
+
+    // 🎯 A FONTE É A ABA GOOGLE MEU NEGÓCIO: quem está parado lá é exatamente
+    // quem recebeu o serviço e ainda não foi abordado. O livro de entradas
+    // registra quando cada um entrou no sistema de gestão, mas a primeira
+    // gravação recolheu de uma vez tudo que já estava lá, misturando quem
+    // recebeu ontem com quem recebeu semanas atrás.
+    const pend = (await dbGet('gmb_pendentes')) || { fichas: [], ids: [] };
+    const enviadosGmb = (await dbGet('gmb_enviados')) || { fichas: [] };
+    const jaContatado = new Set((enviadosGmb.fichas || [])
+      .map(f => d8s(f.tel || f.telefone)).filter(t => t.length >= 8));
     const ctrlS = await dbGet('wa_pesquisa_satisfacao');
     const controle = ctrlS || { clientes: {} };
     const candidatos = [];
-    for (const r of Object.values(livroE.registros || {})) {
-      if (String(r.dia || '') !== ontem) continue;
-      candidatos.push({ sis: r.sis || 'ADM', nome: r.nome || '', cardId: r.cardId || '',
-        telefone: r.telefone, equipamento: r.equipamento || '', quando: r.em });
+    for (const f of (pend.fichas || [])) {
+      const tel = d8s(f.tel || f.telefone);
+      if (tel.length < 8) continue;
+      // quem a equipe já abordou à mão não precisa da pesquisa automática
+      if (jaContatado.has(tel)) continue;
+      candidatos.push({ sis: f.sis || 'ADM', nome: f.nome || f.nomeContato || '',
+        cardId: String(f.id || ''),
+        telefone: f.tel || f.telefone,
+        equipamento: f.desc || f.equipamento || '',
+        quando: f.entrouEm || f.criadoEm || null });
     }
     const semHistorico = [];
+
 
     // um por cliente, e nunca duas vezes
     const fila = [], jaPerguntado = [];
@@ -544,13 +549,9 @@ export default async function handler(req, res) {
 
     if (!aplicar) {
       return res.status(200).json({ ok: true, modo: 'prévia',
-        diaConsultado: ontem, entraramNoErp: candidatos.length,
-        // 🔍 de onde veio a data de cada um, para conferir contra a realidade
-        COMO_FOI_DATADO: candidatos.map(c => c.sis + ' | ' +
-          String(c.nome).slice(0, 22).padEnd(22) + ' | entrou no ERP em ' +
-          String(c.quando).slice(0, 16).replace('T', ' ')),
-        SEM_HISTORICO_DE_ERP: (semHistorico || []).length,
-        LISTA_SEM_HISTORICO: (semHistorico || []).slice(0, 40),
+        fonte: 'aba Google Meu Negócio — quem está parado lá aguardando abordagem',
+        noPainel: candidatos.length,
+        jaAbordadosPelaEquipe: 'não entram: quem já consta como contatado à mão',
         vaoReceber: fila.length, jaPerguntado,
         L: fila.map(c => c.sis + ' | ' + String(c.nome).slice(0, 22).padEnd(22) +
           ' ' + String(c.telefone || '').slice(-4) + ' | ' +
