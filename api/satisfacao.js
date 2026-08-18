@@ -74,6 +74,74 @@ export default async function handler(req, res) {
   }
   const action = String((req.query || {}).action || '').trim();
 
+  // ── 🔀 conferir-gmb: por que alguém do GMB não recebeu a pesquisa ──
+  // As duas listas nascem de lugares diferentes: o painel do Google lê apenas
+  // o quadro da linha branca, enquanto a pesquisa lê o livro de entradas, que
+  // registra as três origens. Comparar as duas mostra quem ficou de fora e por quê.
+  if (action === 'conferir-gmb') {
+    const d8g = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = x => x ? new Date(new Date(x).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [pend, env, livro, ctrl] = await Promise.all([
+      dbGet('gmb_pendentes'), dbGet('gmb_enviados'),
+      dbGet('erp_entradas'), dbGet('wa_pesquisa_satisfacao'),
+    ]);
+    const fichasPend = ((pend || {}).fichas) || [];
+    const idsPend = new Set(((pend || {}).ids || []).map(String));
+    const enviados = new Set((((env || {}).fichas) || []).map(f => d8g(f.tel || f.telefone)));
+    const clientes = ((ctrl || {}).clientes) || {};
+    const registros = Object.values(((livro || {}).registros) || {});
+    const noLivro = {};
+    for (const r of registros) { const d = d8g(r.telefone); if (d) noLivro[d] = r; }
+
+    const semPesquisa = [], comPesquisa = [], semTelefone = [];
+    for (const f of fichasPend) {
+      const d = d8g(f.tel || f.telefone);
+      const nome = String(f.nome || f.nomeContato || '?').slice(0, 22);
+      if (!d || d.length < 8) { semTelefone.push(nome + ' — sem telefone utilizável'); continue; }
+      const c = clientes[d];
+      if (c) {
+        comPesquisa.push(nome + ' ' + d.slice(-4) + ' | perguntado ' + hh(c.em) +
+          (c.avaliacaoPedida ? ' | ✅ elogiou e recebeu o link'
+            : c.reclamou ? ' | 🚨 reclamou — virou conflito'
+            : c.teveRessalva ? ' | ⚠️ fez ressalva'
+            : ' | aguardando resposta'));
+      } else {
+        const reg = noLivro[d];
+        semPesquisa.push(nome + ' ' + d.slice(-4) +
+          (reg ? ' | entrou no ERP em ' + reg.dia + ' — pesquisa ainda não alcançou'
+               : ' | 🚨 NÃO está no livro de entradas: o ERP dele não foi registrado') +
+          (enviados.has(d) ? ' | já foi contatado à mão' : ''));
+      }
+    }
+    // e o contrário: quem a pesquisa alcançou mas o painel não lista
+    const foraDoPainel = [];
+    for (const [d, c] of Object.entries(clientes)) {
+      const estaNoPainel = fichasPend.some(f => d8g(f.tel || f.telefone) === d);
+      if (!estaNoPainel && !enviados.has(d)) {
+        foraDoPainel.push(String(c.nome || '?').slice(0, 22) + ' ' + d.slice(-4) +
+          ' | ' + (c.sis || '?') + ' | perguntado ' + hh(c.em));
+      }
+    }
+    return res.status(200).json({ ok: semPesquisa.length === 0,
+      noPainelGmb: fichasPend.length,
+      RESUMO: {
+        comPesquisaEnviada: comPesquisa.length,
+        semPesquisa: semPesquisa.length,
+        semTelefone: semTelefone.length,
+        pesquisadosForaDoPainel: foraDoPainel.length,
+      },
+      VEREDITO: semPesquisa.length
+        ? '🚨 ' + semPesquisa.length + ' no painel do Google sem pesquisa enviada'
+        : '✅ todos os do painel já foram pesquisados',
+      SEM_PESQUISA: semPesquisa,
+      SEM_TELEFONE: semTelefone,
+      COM_PESQUISA: comPesquisa,
+      PESQUISADOS_FORA_DO_PAINEL: foraDoPainel,
+      observacao: 'o painel do Google lê apenas o quadro da linha branca; a pesquisa ' +
+        'lê o livro de entradas, que inclui televisão e balcão — por isso as listas diferem' });
+  }
+
   // ── 📊 diario — o que a pesquisa produziu, dia a dia ──
   // O controle guarda o estado de cada cliente; este diário guarda a leitura do
   // conjunto: quantos foram perguntados, quantos elogiaram, quantos apontaram
