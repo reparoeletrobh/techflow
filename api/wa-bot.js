@@ -536,6 +536,91 @@ export default async function handler(req, res) {
   // ── 📨 DISPARAR-ORCAMENTOS-PENDENTES: quem tem orçamento e nunca foi avisado ──
   // Confere na hora do envio que o card AINDA está em aguardando aprovação: se
   // saiu para aprovado, descarte ou outra fase, o disparo não faz mais sentido.
+  // ── 🔬 auditoria-orcamentos: a vida de cada orçamento do dia ──
+  // Quando o painel conta um número e o disparo enxerga outro, é preciso ver
+  // card a card: quando o valor foi lançado, em que fase ele está agora, se o
+  // aviso saiu, e há quanto tempo está parado esperando.
+  if (action === 'auditoria-orcamentos') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const iniA = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fimA = iniA + 86400000 - 1;
+    const d8a = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const horas = d => d ? +((Date.now() - new Date(d).getTime()) / 3600000).toFixed(1) : null;
+
+    const [ppA, ppT, ctrl] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const clientes = ((ctrl || {}).clientes) || {};
+    // quem recebeu template de orçamento, pelo registro de conversa
+    const recebeuTemplate = {};
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'out') continue;
+        const t = d8a(e.tel); if (!t) continue;
+        const txt = String(e.texto || '') + ' ' + String(e.template || '');
+        if (/orcamento_pronto|orçamento (está |ficou )?pronto/i.test(txt)) {
+          if (!recebeuTemplate[t] || e.ts > recebeuTemplate[t]) recebeuTemplate[t] = e.ts;
+        }
+      }
+    } catch (e) {}
+
+    const linhas = [];
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        // quando o valor foi lançado: é o momento do diagnóstico
+        let orcEm = c.orcamentoEm || null;
+        let viaHistorico = false;
+        if (!orcEm) {
+          const hs = (c.history || [])
+            .filter(x => ['aguardando_aprovacao', 'orcamento_cadastrado']
+              .includes(String(x.phase || x.phaseId || '')))
+            .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+          if (hs.length) { orcEm = hs[0]; viaHistorico = true; }
+        }
+        if (!orcEm) continue;
+        const t = new Date(orcEm).getTime();
+        if (!(t >= iniA && t <= fimA)) continue;
+
+        const tel = d8a(c.telefone);
+        const fase = String(c.phaseId || c.phase || '?');
+        const reg = clientes[tel];
+        const avisado = !!(reg && reg.tentativas > 0) || !!recebeuTemplate[tel];
+        // por que não foi disparado?
+        const motivo = avisado ? 'já avisado'
+          : fase !== 'aguardando_aprovacao'
+            ? 'saiu de aguardando aprovação — está em ' + fase
+          : !(Number(c.valor || 0) > 0) ? 'sem valor'
+          : 'ELEGÍVEL AGORA';
+        linhas.push({ sis, nome: c.nomeContato || c.nome || '?', tel,
+          valor: Number(c.valor || 0), orcEm, viaHistorico, fase, avisado, motivo,
+          horasParado: horas(orcEm),
+          avisadoEm: recebeuTemplate[tel] || (reg && reg.ultimo) || null });
+      }
+    }
+    linhas.sort((a, b) => String(a.orcEm).localeCompare(String(b.orcEm)));
+
+    const agrupa = {};
+    for (const l of linhas) agrupa[l.motivo] = (agrupa[l.motivo] || 0) + 1;
+    const naoAvisados = linhas.filter(l => !l.avisado);
+    return res.status(200).json({ ok: true, dia,
+      agoraBRT: new Date(Date.now() - 3 * 3600000).toISOString().slice(11, 16),
+      orcamentosDoDia: linhas.length,
+      avisados: linhas.filter(l => l.avisado).length,
+      naoAvisados: naoAvisados.length,
+      POR_MOTIVO: agrupa,
+      NAO_AVISADOS: naoAvisados.map(l => hh(l.orcEm) + ' | ' + l.sis + ' | ' +
+        String(l.nome).slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
+        ' | R$ ' + String(l.valor.toFixed(2)).padStart(8) +
+        ' | parado há ' + l.horasParado + 'h' +
+        ' | fase ' + l.fase + ' | ' + l.motivo),
+      AVISADOS: linhas.filter(l => l.avisado).map(l => hh(l.orcEm) + ' | ' +
+        String(l.nome).slice(0, 20) + ' ' + l.tel.slice(-4) +
+        ' | orçado ' + hh(l.orcEm) + ' → avisado ' + hh(l.avisadoEm)),
+      SEM_CARIMBO_PROPRIO: linhas.filter(l => l.viaHistorico).length });
+  }
+
   if (action === 'disparar-orcamentos-pendentes') {
     const aplicar = String(req.query.aplicar || '') === '1';
     const d8d = t => String(t || '').replace(/\D/g, '').slice(-8);
