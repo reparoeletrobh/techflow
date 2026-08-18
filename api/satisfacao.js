@@ -381,10 +381,10 @@ export default async function handler(req, res) {
           clientes[x.d].avaliacaoPedidaEm = new Date().toISOString();
           clientes[x.d].aguardandoResposta = false;
           clientes[x.d].respostaCliente = String(x.r.texto).slice(0, 300);
-          // ⭐ o pedido saiu: a ficha correspondente sai da fila do Google Meu
-          // Negócio pelo mesmo caminho do botão Copiar e Enviar. Sem isso a
-          // pessoa apareceria lá como pendente e receberia o pedido de novo.
+          // ⭐ a ficha já saiu do painel quando a pergunta foi feita; esta é uma
+          // segunda tentativa para o caso de aquela ter falhado
           try {
+            if (clientes[x.d] && clientes[x.d].gmbBaixado) throw new Error('já baixado');
             await fetch('https://reparoeletroadm.com/api/orcamento?action=gmb-marcar-enviado&k=' +
               ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -612,9 +612,26 @@ export default async function handler(req, res) {
 
             via: janelaAberta ? 'mensagem' : 'modelo',
             aguardandoResposta: true, avaliacaoPedida: false };
+          // ⭐ a pergunta saiu: a ficha sai da aba do Google Meu Negócio pelo
+          // mesmo caminho do botão de copiar e enviar. O cliente já foi
+          // abordado — deixá-lo lá faria a equipe abordar de novo.
+          let baixou = false;
+          try {
+            const rb = await fetch('https://reparoeletroadm.com/api/orcamento' +
+              '?action=gmb-marcar-enviado&k=' +
+              ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: c.cardId || d, nome: c.nome || '?', tel: tel,
+                desc: (c.equipamento || '') + ' · pesquisa de satisfação enviada' }),
+            }).then(x => x.json());
+            baixou = !!(rb && rb.ok);
+          } catch (e) {}
+          controle.clientes[d].gmbBaixado = baixou;
           await anotar({ tipo: 'pergunta', tel: d, nome: c.nome, sis: c.sis,
-            equipamento: c.equipamento, via: janelaAberta ? 'mensagem' : 'modelo' });
-          feitos.push(c.sis + ' | ' + String(c.nome).slice(0, 22) + ' ' + d.slice(-4));
+            equipamento: c.equipamento, via: janelaAberta ? 'mensagem' : 'modelo',
+            baixadoNoGmb: baixou });
+          feitos.push(c.sis + ' | ' + String(c.nome).slice(0, 22) + ' ' + d.slice(-4) +
+            (baixou ? ' | ✅ saiu do GMB' : ' | ⚠️ não consegui baixar no GMB'));
         } else {
           erros.push(String(c.nome).slice(0, 20) + ': ' +
             ((r && r.error && r.error.message) || 'falha no envio'));
