@@ -6034,11 +6034,11 @@ export default async function handler(req, res) {
     // 🚀 marco do número novo: não avisar equipamento que ficou pronto ANTES da virada
     const _cfgM = (await dbGet('wa_bot_config')) || {};
     const _marcoC = _cfgM.marcoNumeroNovo ? new Date(_cfgM.marcoNumeroNovo).getTime() : 0;
-    // mesma guarda de horário (ver orcamentos-pendentes)
+    // mesma guarda de horário (ver orcamentos-pendentes): até o fechamento da loja
     {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
       const d = b.getUTCDay(), hh = b.getUTCHours() + b.getUTCMinutes() / 60;
-      const dentro = (d >= 1 && d <= 5) ? (hh >= 7 && hh < 16) : (d === 6 ? (hh >= 7 && hh < 11) : false);
+      const dentro = (d >= 1 && d <= 5) ? (hh >= 7 && hh < 18) : (d === 6 ? (hh >= 7 && hh < 13) : false);
       // ?forcar=1 ignora a janela — usado em teste e quando o dono precisa disparar na mão
       if (!dentro && String(req.query.forcar || '') !== '1') {
         return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });
@@ -6134,12 +6134,14 @@ export default async function handler(req, res) {
   // ── ORCAMENTOS-PENDENTES (cron 3min + manual): orçamento registrado → envia ao cliente ──
   // TRAVA DE TESTE: só age em telefones de wa_bot_config.execTels
   if (action === 'orcamentos-pendentes') {
-    // 💰 fora da janela comercial (com 1h de folga nas pontas) não há o que enviar —
-    // rodava 480x/dia, sendo ~2/3 em horário sem movimento.
+    // 💰 fora da janela comercial não há o que enviar. A janela vai até as 18h,
+    // que é quando a loja fecha: cortar às 16h deixava sem aviso todo cliente
+    // diagnosticado nas duas últimas horas de expediente — justamente o fim de
+    // tarde, quando muito orçamento é fechado.
     {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
       const d = b.getUTCDay(), hh = b.getUTCHours() + b.getUTCMinutes() / 60;
-      const dentro = (d >= 1 && d <= 5) ? (hh >= 7 && hh < 16) : (d === 6 ? (hh >= 7 && hh < 11) : false);
+      const dentro = (d >= 1 && d <= 5) ? (hh >= 7 && hh < 18) : (d === 6 ? (hh >= 7 && hh < 13) : false);
       // ?forcar=1 ignora a janela — usado em teste e quando o dono precisa disparar na mão
       if (!dentro && String(req.query.forcar || '') !== '1') {
         return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });

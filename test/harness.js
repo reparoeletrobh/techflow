@@ -992,6 +992,21 @@ function check(nome, cond, extra) {
   // ── 📄 todo caminho que lança valor precisa carimbar a data do orçamento ──
   // O botão de diagnóstico existe em quatro lugares e só um gravava a data;
   // como a contagem exige data própria, vinte e sete orçamentos viravam seis.
+  // ── ⏰ o aviso automático precisa cobrir o expediente inteiro ──
+  // A guarda cortava às 16h por economia de execuções, deixando sem aviso todo
+  // cliente diagnosticado nas duas últimas horas — justamente o fim de tarde,
+  // quando muito orçamento é fechado.
+  console.log('▶ Cenário HR — janela de envio cobre até o fechamento da loja');
+  {
+    const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
+    check('nenhuma guarda de envio corta às 16h',
+      !/hh >= 7 && hh < 16/.test(cw));
+    check('a guarda de dia útil vai até as 18h',
+      (cw.match(/hh >= 7 && hh < 18/g) || []).length >= 2);
+    check('sábado vai até as 13h',
+      (cw.match(/hh >= 7 && hh < 13/g) || []).length >= 2);
+  }
+
   console.log('▶ Cenário OR — diagnóstico carimba a data do orçamento');
   {
     const fsO = require('fs');
