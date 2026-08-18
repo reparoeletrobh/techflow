@@ -312,6 +312,7 @@ export default async function handler(req, res) {
         sistema, sheetRow: x.linha,
         status: 'criada', origemPlanilha: true,
         veioDeLead: true,
+        protegidaDaLimpeza: true,   // decisão manual não é desfeita por rotina
         importadaManualmente: new Date().toISOString(),
         criadoEm: new Date().toISOString(),
         registradoEm: new Date().toISOString(),
@@ -949,6 +950,11 @@ export default async function handler(req, res) {
     for (const [chave, db, sis] of [[KEY_ADM, fa, 'ADM'], [KEY_TV, ft, 'TV']]) {
       for (const f of (((db || {}).fichas) || [])) {
         if (String(f.status || '') !== 'criada') continue;
+        // 🛡️ ficha importada à mão é decisão da equipe, tomada sabendo que o
+        // cliente já existia no sistema. Classificá-la como duplicata ou como
+        // conversa em andamento a apagava na passagem seguinte, e a importação
+        // parecia não ter funcionado.
+        if (f.importadaManualmente || f.veioDeLead === true) continue;
         const t = d8l(f.telefone);
         const c = conversa[t];
         const info = { chave, sis, id: f.id, nome: f.nome || '?', tel: t,
