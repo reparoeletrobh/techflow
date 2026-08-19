@@ -309,6 +309,9 @@ export default async function handler(req,res){
 
     const DUAS=2*3600000, agora=Date.now();
     const R={entraram:[],aguardando2h:[],semHorario:[],jaExistia:[],excluido:[]};
+    // 🔍 amostra crua: se a classificação vier vazia, é o formato que mudou
+    const amostra=linhas.slice(-6).map(r=>({colunas:r.length,
+      conteudo:(r||[]).map(x=>String(x||'').slice(0,26))}));
     for(const row of linhas){
       const tel=String(row[0]||'').replace(/\D/g,'').trim();
       const nome=String(row[1]||'').trim();
@@ -329,6 +332,8 @@ export default async function handler(req,res){
     }
     return res.status(200).json({ok:R.semHorario.length===0&&R.jaExistia.length===0,
       linhasNaPlanilha:linhas.length,
+      AMOSTRA_DAS_ULTIMAS_LINHAS:amostra,
+      colunaUsadaComoHorario:'índice 5 (a sexta)',
       periodo:desde?('a partir de '+desde):'planilha inteira',
       RESUMO:{entraramNoSistema:R.entraram.length,
         sumiram:R.jaExistia.length,
