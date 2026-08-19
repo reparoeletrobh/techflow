@@ -540,6 +540,116 @@ export default async function handler(req, res) {
   // Quando o painel conta um número e o disparo enxerga outro, é preciso ver
   // card a card: quando o valor foi lançado, em que fase ele está agora, se o
   // aviso saiu, e há quanto tempo está parado esperando.
+  // ── 📋 mapa-negociacao: cada ficha, sua etapa e seu estágio ──
+  // O painel resume por grupo; aqui é linha a linha, com as três dimensões que
+  // a operação usa para decidir o que fazer com cada cliente: onde ele está no
+  // atendimento, em que fase da venda, e quantos toques da régua já recebeu.
+  if (action === 'mapa-negociacao') {
+    const d8m = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [ppA, ppT, ctrl] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const clientes = ((ctrl || {}).clientes) || {};
+
+    // conversas de cada cliente, para saber em que ponto o bot parou
+    const conv = {};
+    try {
+      for (const e of (await lerEvts())) {
+        const d = d8m(e.tel); if (!d) continue;
+        (conv[d] = conv[d] || []).push(e);
+      }
+    } catch (e) {}
+
+    // 🏷️ as 5 fases: reconhecidas pelo que JÁ foi dito ao cliente
+    const MARCAS = [
+      { n: 5, re: /compramos (o |seu )?(seu |o )?equipament|damos um valor pelo|compra do (seu )?equipament/i },
+      { n: 4, re: /troca|trade|dar (o |a )?(seu|sua) .* como entrada|abatimento na compra/i },
+      { n: 3, re: /retirar (na|em) (nossa )?loja|trazer (na|até a) loja|balc[ãa]o.*15 ?min/i },
+      { n: 2, re: /desconto.*pix|à vista.*desconto|pix.*desconto/i },
+      { n: 1, re: /or[çc]amento (est[áa] |ficou )?pronto|valor do (seu )?conserto|ficou em R\$/i },
+    ];
+    const NOME_FASE = { 1: 'F1 orçamento', 2: 'F2 desconto Pix', 3: 'F3 retirar na loja',
+      4: 'F4 troca', 5: 'F5 compra do equipamento' };
+
+    const linhas = [];
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+        const d = d8m(c.telefone);
+        const msgs = (conv[d] || []).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+        const nossas = msgs.filter(e => e.dir === 'out');
+        const delas = msgs.filter(e => e.dir === 'in');
+        // a fase mais avançada JÁ oferecida ao cliente
+        let faseV = 0;
+        for (const mk of MARCAS) {
+          if (nossas.some(e => mk.re.test(String(e.texto || '')))) { faseV = mk.n; break; }
+        }
+        const rec = clientes[d] || {};
+        const ultNossa = nossas.length ? nossas[nossas.length - 1] : null;
+        const ultDele = delas.length ? delas[delas.length - 1] : null;
+        // 💬 em que ponto do atendimento o cliente está
+        const etapa = !nossas.length ? '🚨 o bot nunca falou com ele'
+          : !delas.length ? 'recebeu e nunca respondeu'
+          : (ultDele && ultNossa && new Date(ultDele.ts) > new Date(ultNossa.ts))
+            ? '⏳ RESPONDEU e aguarda nosso retorno'
+          : 'nós falamos por último';
+        const diasParado = ultNossa
+          ? Math.floor((Date.now() - new Date(ultNossa.ts).getTime()) / 86400000) : null;
+        linhas.push({ sis, nome: String(c.nomeContato || c.nome || '?').slice(0, 22),
+          tel: d, valor: Number(c.valor || 0),
+          equipamento: String(c.equipamento || c.descricao || '').slice(0, 24),
+          etapa, faseVenda: faseV ? NOME_FASE[faseV] : 'nenhuma fase oferecida',
+          faseNum: faseV,
+          disparo: Number(rec.tentativas || 0) + '/7',
+          disparoNum: Number(rec.tentativas || 0),
+          respostas: delas.length,
+          ultimoNosso: hh(ultNossa && ultNossa.ts),
+          ultimoDele: hh(ultDele && ultDele.ts),
+          diasParado, encerrado: !!rec.encerrado });
+      }
+    }
+    // quem respondeu e espera vem primeiro; depois os mais parados
+    linhas.sort((a, b) => {
+      const pa = a.etapa.startsWith('⏳') ? 0 : a.etapa.startsWith('🚨') ? 1 : 2;
+      const pb = b.etapa.startsWith('⏳') ? 0 : b.etapa.startsWith('🚨') ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return (b.diasParado || 0) - (a.diasParado || 0);
+    });
+
+    const cont = (campo) => {
+      const o = {};
+      for (const l of linhas) o[l[campo]] = (o[l[campo]] || 0) + 1;
+      return o;
+    };
+    const col = (x, n) => String(x == null ? '—' : x).padStart(n);
+    return res.status(200).json({ ok: true,
+      fichas: linhas.length,
+      adm: linhas.filter(l => l.sis === 'ADM').length,
+      tv: linhas.filter(l => l.sis === 'TV').length,
+      valorEmJogo: +linhas.reduce((s, l) => s + l.valor, 0).toFixed(2),
+      POR_ETAPA: cont('etapa'),
+      POR_FASE: cont('faseVenda'),
+      POR_DISPARO: cont('disparo'),
+      AGUARDAM_NOSSO_RETORNO: linhas.filter(l => l.etapa.startsWith('⏳'))
+        .map(l => l.sis + ' | ' + l.nome.padEnd(22) + ' ' + l.tel.slice(-4) +
+          ' | R$ ' + col(l.valor.toFixed(2), 8) + ' | ' + l.faseVenda +
+          ' | respondeu ' + l.ultimoDele),
+      SEM_CONTATO_DO_BOT: linhas.filter(l => l.etapa.startsWith('🚨'))
+        .map(l => l.sis + ' | ' + l.nome.padEnd(22) + ' ' + l.tel.slice(-4) +
+          ' | R$ ' + col(l.valor.toFixed(2), 8) + ' | ' + l.equipamento),
+      LISTA: linhas.map(l =>
+        l.sis.padEnd(3) + ' | ' + l.nome.padEnd(22) + ' ' + l.tel.slice(-4) +
+        ' | R$ ' + col(l.valor.toFixed(2), 8) +
+        ' | ' + String(l.faseVenda).padEnd(26) +
+        ' | disparo ' + l.disparo +
+        ' | ' + String(l.etapa).padEnd(34) +
+        ' | ' + col(l.respostas, 2) + ' resp' +
+        ' | parado ' + col(l.diasParado, 2) + 'd'),
+      DETALHE: linhas });
+  }
+
   if (action === 'auditoria-orcamentos') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
     const iniA = new Date(dia + 'T00:00:00-03:00').getTime();
