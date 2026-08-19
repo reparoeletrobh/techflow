@@ -3300,6 +3300,72 @@ module.exports = async function handler(req, res) {
         'ao anúncio que o trouxe; faturado conta o valor dos que entraram em ERP no período' });
   }
 
+  // ── 📉 comparar-dias: entrega e resultado, dia a dia, por categoria ──
+  // Quando a operação sente queda, é preciso ver a série: em que dia caiu,
+  // em qual categoria, e se caiu a entrega (impressões) ou a conversão.
+  if (action === 'comparar-dias') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKD = String(req.query.token || '').trim() || TOKEN;
+    const dias = Math.max(2, Math.min(30, parseInt(req.query.dias || '7', 10)));
+    const ate = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const desde = new Date(Date.now() - 3 * 3600000 - (dias - 1) * 86400000)
+      .toISOString().slice(0, 10);
+    const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}` +
+      `&time_increment=1&fields=ad_name,spend,impressions,actions&limit=200` +
+      `&access_token=${TKD}`, 20);
+
+    const porDia = {};
+    for (const i of ((ins || {}).data || [])) {
+      const d = String(i.date_start || '').slice(0, 10);
+      const cat = categoriaDe(i.ad_name || '', 'anuncio');
+      porDia[d] = porDia[d] || {};
+      porDia[d][cat] = porDia[d][cat] || { gasto: 0, impressoes: 0, conversas: 0 };
+      porDia[d][cat].gasto += Number(i.spend || 0);
+      porDia[d][cat].impressoes += Number(i.impressions || 0);
+      for (const a of (i.actions || [])) {
+        if (/messaging_conversation_started|onsite_conversion.messaging/.test(a.action_type)) {
+          porDia[d][cat].conversas += Number(a.value || 0);
+        }
+      }
+    }
+
+    const cats = [...new Set(Object.values(porDia)
+      .flatMap(d => Object.keys(d)))].sort();
+    const diasOrd = Object.keys(porDia).sort();
+    const col = (x, n) => String(x).padStart(n);
+    const linhas = diasOrd.map(d => {
+      const t = Object.values(porDia[d]).reduce((s, x) => ({
+        gasto: s.gasto + x.gasto, impressoes: s.impressoes + x.impressoes,
+        conversas: s.conversas + x.conversas }), { gasto: 0, impressoes: 0, conversas: 0 });
+      return d + ' | R$ ' + col(t.gasto.toFixed(2), 8) +
+        ' | ' + col(t.impressoes.toLocaleString('pt-BR'), 9) + ' impr' +
+        ' | ' + col(t.conversas, 4) + ' conversas' +
+        ' | R$ ' + col(t.conversas ? (t.gasto / t.conversas).toFixed(2) : '—', 6) + '/conversa';
+    });
+    // e por categoria, para ver qual delas caiu
+    const porCat = {};
+    for (const c of cats) {
+      porCat[c] = diasOrd.map(d => {
+        const x = (porDia[d] || {})[c] || { gasto: 0, impressoes: 0, conversas: 0 };
+        return d.slice(5) + ': ' + x.conversas + ' conv · ' +
+          Math.round(x.impressoes / 1000) + 'k impr · R$ ' + x.gasto.toFixed(0);
+      });
+    }
+    const ontem = diasOrd[diasOrd.length - 2], hoje = diasOrd[diasOrd.length - 1];
+    const somaDe = d => Object.values(porDia[d] || {})
+      .reduce((s, x) => s + x.conversas, 0);
+    return res.status(200).json({ ok: true, periodo: desde + ' a ' + ate,
+      POR_DIA: linhas,
+      POR_CATEGORIA: porCat,
+      VARIACAO: ontem && hoje
+        ? 'ontem ' + somaDe(ontem) + ' conversas · hoje ' + somaDe(hoje) +
+          ' (o dia de hoje ainda está correndo)'
+        : null,
+      comoLer: 'queda de impressões é problema de entrega; impressões estáveis com ' +
+        'menos conversas é problema de criativo ou de público' });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
