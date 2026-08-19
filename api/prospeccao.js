@@ -283,10 +283,17 @@ export default async function handler(req,res){
     }
     if(!linhas.length) return res.status(200).json({ok:false,error:'planilha sem linhas'});
 
+    // 📅 MESMO leitor da importação: a planilha usa ano de dois dígitos
+    // ('19/08/26') e exigir quatro fazia toda linha parecer ilegível
     const parseBR=(s)=>{
-      const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})/);
-      if(!m) return null;
-      return new Date(Date.UTC(+m[3],+m[2]-1,+m[1],+m[4]+3,+m[5]));
+      const str=String(s||'').trim();
+      let m=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+      if(m){ let ano=parseInt(m[3],10); if(ano<100) ano+=2000;
+        return new Date(Date.UTC(ano,parseInt(m[2],10)-1,parseInt(m[1],10),
+          parseInt(m[4],10)+3,parseInt(m[5],10))); }
+      m=str.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{1,2}):(\d{2})/);
+      if(m) return new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4]+3,+m[5]));
+      return null;
     };
     const d8a=t=>String(t||'').replace(/\D/g,'').slice(-8);
     const desde=String(req.query.desde||'');
