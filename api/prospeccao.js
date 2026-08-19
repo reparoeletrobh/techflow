@@ -333,8 +333,19 @@ export default async function handler(req,res){
         ' | '+String(equip).slice(0,20).padEnd(20)+' | '+String(hora).slice(0,16);
       if(!dt){ R.semHorario.push(linha+' | 🚨 horário ilegível — NUNCA será importado'); continue; }
       if((agora-dt.getTime())<DUAS){ R.aguardando2h.push(linha+' | aguarda completar 2h'); continue; }
-      if(excluidos.has(d)){ R.excluido.push(linha+' | foi excluído da fila à mão'); continue; }
-      if(noSistema[d]){ R.entraram.push(linha+' | '+[...new Set(noSistema[d])].join(' · ')); continue; }
+      // 🔍 ESTAR no sistema vem primeiro: um lead pode ter entrado e depois ter
+      // sido excluído da fila de ligação, e isso não é um lead perdido.
+      // Perguntar pela exclusão antes escondia quem de fato entrou.
+      if(noSistema[d]){
+        R.entraram.push(linha+' | '+[...new Set(noSistema[d])].join(' · ')+
+          (excluidos.has(d)?' | (também consta como excluído da fila)':''));
+        continue;
+      }
+      if(excluidos.has(d)){
+        R.excluido.push(linha+' | consta na lista de excluídos e NÃO está no sistema — '+
+          'não voltará pela planilha');
+        continue;
+      }
       R.jaExistia.push(linha+' | 🚨 NÃO está em lugar nenhum do sistema');
     }
     return res.status(200).json({ok:R.semHorario.length===0&&R.jaExistia.length===0,
