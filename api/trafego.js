@@ -3149,6 +3149,157 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'agora rode subir-agora da categoria para recriar com o vídeo certo' });
   }
 
+  // ── 📊 funil-ciclo: da ficha ao pagamento, por categoria ──
+  // O relatório do Copiloto media custo por conversa, mas conversa não é
+  // negócio: o que importa é quanto custa cada etapa até o dinheiro entrar.
+  // Aqui o gasto de cada categoria é confrontado com quantas fichas chegaram,
+  // quantas foram orçadas, aprovadas e pagas — e com o que faturaram.
+  if (action === 'funil-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKF = String(req.query.token || '').trim() || TOKEN;
+    // janela do ciclo: sábado 13h → agora (ou o intervalo informado)
+    const aBR = new Date(Date.now() - 3 * 3600000);
+    let voltar = (aBR.getUTCDay() - 6 + 7) % 7;
+    if (aBR.getUTCDay() === 6 && aBR.getUTCHours() < 13) voltar = 7;
+    const iniC = new Date(aBR.getTime() - voltar * 86400000);
+    iniC.setUTCHours(13, 0, 0, 0);
+    const desde = String(req.query.desde || '') ||
+      new Date(iniC.getTime() + 3 * 3600000).toISOString().slice(0, 10);
+    const ate = String(req.query.ate || '') ||
+      new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const iniMs = new Date(desde + 'T00:00:00-03:00').getTime();
+    const fimMs = new Date(ate + 'T23:59:59-03:00').getTime();
+    const dentroF = d => { if (!d) return false;
+      const t = new Date(d).getTime(); return t >= iniMs && t <= fimMs; };
+
+    // ── 1) o que foi investido em cada categoria ──
+    const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}` +
+      `&fields=ad_id,ad_name,spend&limit=100&access_token=${TKF}`, 12);
+    const gasto = {};
+    for (const i of ((ins || {}).data || [])) {
+      const cat = categoriaDe(i.ad_name || '', 'anuncio');
+      gasto[cat] = (gasto[cat] || 0) + Number(i.spend || 0);
+    }
+
+    // ── 2) o funil, ficha a ficha ──
+    // A categoria de cada ficha vem do EQUIPAMENTO, que é o que liga o cliente
+    // ao anúncio que o trouxe — não há marcação de campanha na ficha.
+    const [ppA, ppT, flF, fiA, fiT] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('reparoeletro_frenteloja'),
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+    ]);
+    const vazio = () => ({ fichas: 0, orcadas: 0, aprovadas: 0, erp: 0, faturado: 0 });
+    const F = {};
+    const cat0 = (eq, sis) => {
+      const c = categoriaDe(String(eq || ''), 'equipamento');
+      return c && c !== 'institucional' ? c : (sis === 'TV' ? 'tv' : 'microondas');
+    };
+    const marca = (c, campo, valor) => {
+      F[c] = F[c] || vazio();
+      if (campo === 'faturado') F[c].faturado += valor;
+      else F[c][campo]++;
+    };
+
+    // fichas que CHEGARAM no período
+    for (const [db, sis] of [[fiA, 'ADM'], [fiT, 'TV']]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        if (!dentroF(f.criadoEm)) continue;
+        marca(cat0(f.equipamento, sis), 'fichas');
+      }
+    }
+    // e as do balcão, que também são fichas de entrada
+    for (const f of (((flF || {}).fichas) || [])) {
+      if (!dentroF(f.criadoEm)) continue;
+      marca(cat0(f.equipamento, 'ADM'), 'fichas');
+    }
+
+    // orçadas · aprovadas · pagas — pelos carimbos do cartão
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        const cc = cat0(c.equipamento || c.descricao, sis);
+        const hist = c.history || [];
+        const quando = fase => {
+          const hs = hist.filter(x => String(x.phase || x.phaseId || '') === fase)
+            .map(x => String(x.ts || x.timestamp || '')).filter(Boolean).sort();
+          return hs.length ? hs[0] : null;
+        };
+        // orçamento: carimbo próprio ou primeira passagem por aguardando aprovação
+        const orcEm = c.orcamentoEm || quando('aguardando_aprovacao');
+        if (dentroF(orcEm)) marca(cc, 'orcadas');
+        const aprEm = quando('aprovados') || quando('aprovado');
+        if (dentroF(aprEm)) marca(cc, 'aprovadas');
+        const erpEm = quando('erp');
+        if (dentroF(erpEm)) {
+          marca(cc, 'erp');
+          marca(cc, 'faturado', Number(c.valor || 0));
+        }
+      }
+    }
+    // o balcão fatura sem passar pelo pipe: entra pela própria ficha
+    for (const f of (((flF || {}).fichas) || [])) {
+      const cc = cat0(f.equipamento, 'ADM');
+      if (dentroF(f.orcamentoEm)) marca(cc, 'orcadas');
+      if (String(f.phase || '') === 'erp' && dentroF(f.movedAt)) {
+        marca(cc, 'erp');
+        marca(cc, 'faturado', Number(f.valorOrcamento || f.valor || 0));
+      }
+    }
+
+    // ── 3) o custo de cada etapa ──
+    const cats = [...new Set([...Object.keys(gasto), ...Object.keys(F)])].sort();
+    const por = (v, n) => n > 0 ? +(v / n).toFixed(2) : null;
+    const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + '%' : '—';
+    const linhas = cats.map(c => {
+      const g = +(gasto[c] || 0).toFixed(2);
+      const f = F[c] || vazio();
+      return { categoria: c, investido: g,
+        fichas: f.fichas, custoPorFicha: por(g, f.fichas),
+        orcadas: f.orcadas, custoPorOrcamento: por(g, f.orcadas),
+        aprovadas: f.aprovadas, custoPorAprovacao: por(g, f.aprovadas),
+        erp: f.erp, custoPorErp: por(g, f.erp),
+        faturado: +f.faturado.toFixed(2),
+        roas: g > 0 ? +(f.faturado / g).toFixed(2) : null,
+        conversaoFichaOrcamento: pct(f.orcadas, f.fichas),
+        conversaoOrcamentoAprovacao: pct(f.aprovadas, f.orcadas),
+        conversaoAprovacaoErp: pct(f.erp, f.aprovadas) };
+    });
+
+    const T = linhas.reduce((s, l) => ({
+      investido: s.investido + l.investido, fichas: s.fichas + l.fichas,
+      orcadas: s.orcadas + l.orcadas, aprovadas: s.aprovadas + l.aprovadas,
+      erp: s.erp + l.erp, faturado: s.faturado + l.faturado,
+    }), { investido: 0, fichas: 0, orcadas: 0, aprovadas: 0, erp: 0, faturado: 0 });
+
+    const col = (x, n) => String(x == null ? '—' : x).padStart(n);
+    return res.status(200).json({ ok: true,
+      periodo: desde + ' a ' + ate,
+      TOTAL: { investido: +T.investido.toFixed(2), fichas: T.fichas,
+        custoPorFicha: por(T.investido, T.fichas),
+        orcadas: T.orcadas, custoPorOrcamento: por(T.investido, T.orcadas),
+        aprovadas: T.aprovadas, custoPorAprovacao: por(T.investido, T.aprovadas),
+        erp: T.erp, custoPorErp: por(T.investido, T.erp),
+        faturado: +T.faturado.toFixed(2),
+        roas: T.investido > 0 ? +(T.faturado / T.investido).toFixed(2) : null },
+      TABELA: [
+        'categoria     | investido | fichas  R$/ficha | orçad  R$/orç | aprov  R$/aprov | ERP   R$/ERP | faturado |  ROAS',
+      ].concat(linhas.map(l =>
+        String(l.categoria).slice(0, 13).padEnd(13) + ' | ' +
+        col(l.investido.toFixed(2), 9) + ' | ' +
+        col(l.fichas, 6) + ' ' + col(l.custoPorFicha, 8) + ' | ' +
+        col(l.orcadas, 5) + ' ' + col(l.custoPorOrcamento, 6) + ' | ' +
+        col(l.aprovadas, 5) + ' ' + col(l.custoPorAprovacao, 8) + ' | ' +
+        col(l.erp, 4) + ' ' + col(l.custoPorErp, 6) + ' | ' +
+        col(l.faturado.toFixed(2), 8) + ' | ' + col(l.roas, 5))),
+      CONVERSOES: linhas.map(l => String(l.categoria).slice(0, 13).padEnd(13) +
+        ' | ficha→orçamento ' + String(l.conversaoFichaOrcamento).padStart(4) +
+        ' | orçamento→aprovação ' + String(l.conversaoOrcamentoAprovacao).padStart(4) +
+        ' | aprovação→ERP ' + String(l.conversaoAprovacaoErp).padStart(4)),
+      DETALHE: linhas,
+      comoLer: 'a categoria da ficha vem do equipamento, que é o que liga o cliente ' +
+        'ao anúncio que o trouxe; faturado conta o valor dos que entraram em ERP no período' });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o
