@@ -5939,6 +5939,19 @@ export default async function handler(req, res) {
           usouFallbackAdm = okA;
         }
         if (okA) {
+          // 💬 REGISTRA a abordagem no histórico de conversa. Sem isto a primeira
+          // mensagem que o cliente recebe não existe no registro: a ficha parece
+          // nunca ter sido abordada e a consulta do atendimento vem vazia.
+          try {
+            await rpushEvt({ ts: new Date().toISOString(), tel: to,
+              nome: f.nome || null, dir: 'out',
+              texto: 'Olá, ' + String(f.nome || 'tudo bem').split(' ')[0] +
+                '! Recebemos o seu cadastro sobre ' +
+                String(f.equipamentoCompleto || f.equipamento || 'equipamento') + '.',
+              tipo: 'template', via: 'abordagem-fichas',
+              template: usouFallbackAdm ? 'cadastro_recebido' :
+                (f._sis === 'tv' ? 'cadastro_recebido_tv' : 'cadastro_recebido') });
+          } catch (e) {}
           try {
             f.status = 'contato_feito';
             f.contatoFeitoEm = new Date().toISOString();

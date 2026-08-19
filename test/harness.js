@@ -1009,6 +1009,21 @@ function check(nome, cond, extra) {
   // ── 🔢 conversa se conta uma vez só ──
   // A plataforma devolve várias métricas para a mesma conversa; somar todas
   // multiplica o número por três ou quatro e faz o custo parecer irreal.
+  // ── 💬 toda mensagem enviada ao cliente entra no histórico ──
+  // A régua e a abordagem enviavam sem registrar: a mensagem chegava, o
+  // controle marcava a tentativa, mas o histórico ficava vazio — a ficha
+  // parecia nunca abordada e a consulta do atendimento não mostrava nada.
+  console.log('▶ Cenário RG — envio ao cliente é registrado no histórico');
+  {
+    const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
+    for (const [acao, marca] of [
+      ['régua de recuperação', "recuperação ' + x.tentativa + '/7"],
+      ['abordagem de fichas', "via: 'abordagem-fichas'"],
+    ]) {
+      check(acao + ' registra o envio no histórico', cw.includes(marca));
+    }
+  }
+
   console.log('▶ Cenário CV — conversa não é contada em duplicidade');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
