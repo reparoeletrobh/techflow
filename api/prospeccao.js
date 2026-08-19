@@ -266,6 +266,88 @@ export default async function handler(req,res){
       dica:aplicar?null:'para aplicar: &aplicar=1'});
   }
 
+  // ── 🔬 auditoria-leads: por que um lead da planilha não virou ficha ──
+  // A importação recusa em silêncio em três situações — horário ilegível,
+  // menos de duas horas na aba, telefone já conhecido — e nenhuma delas
+  // aparece na tela. Um lead que não entra não é abordado por ninguém.
+  if(action==='auditoria-leads'){
+    const SHEET=(process.env.SHEET_LEADS_ID||process.env.GOOGLE_SHEET_ID||'').trim();
+    const CHAVE=(process.env.GOOGLE_API_KEY||'').trim();
+    const aba=String(req.query.aba||'Criadas');
+    let linhas=[];
+    try{
+      const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET+
+        '/values/'+encodeURIComponent(aba)+'?key='+CHAVE).then(x=>x.json());
+      linhas=(r.values||[]).slice(1);
+    }catch(e){
+      return res.status(200).json({ok:false,error:'não consegui ler a planilha: '+e.message});
+    }
+    if(!linhas.length) return res.status(200).json({ok:false,
+      error:'planilha vazia ou sem acesso', dica:'confira SHEET_LEADS_ID e GOOGLE_API_KEY'});
+
+    const parseBR=(s)=>{
+      const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})/);
+      if(!m) return null;
+      return new Date(Date.UTC(+m[3],+m[2]-1,+m[1],+m[4]+3,+m[5]));
+    };
+    const d8a=t=>String(t||'').replace(/\D/g,'').slice(-8);
+    const desde=String(req.query.desde||'');
+    const iniA=desde?new Date(desde+'T00:00:00-03:00').getTime():0;
+
+    // tudo que o sistema conhece, para saber se o lead entrou de alguma forma
+    const [pA,pT,fA,fT,exc]=await Promise.all([
+      dbGet('prospeccao_adm'),dbGet('prospeccao_tv'),
+      dbGet('fichas_adm'),dbGet('fichas_tv'),dbGet('prospeccao_excluidos'),
+    ]);
+    const noSistema={};
+    for(const [db,onde] of [[pA,'prospecção ADM'],[pT,'prospecção TV'],
+                            [fA,'fichas ADM'],[fT,'fichas TV']]){
+      for(const f of (((db||{}).fichas)||[])){
+        const d=d8a(f.telefone); if(!d) continue;
+        (noSistema[d]=noSistema[d]||[]).push(onde+'/'+String(f.status||'?'));
+      }
+    }
+    const excluidos=new Set(Object.keys(((exc||{}).tels)||{}));
+
+    const DUAS=2*3600000, agora=Date.now();
+    const R={entraram:[],aguardando2h:[],semHorario:[],jaExistia:[],excluido:[]};
+    for(const row of linhas){
+      const tel=String(row[0]||'').replace(/\D/g,'').trim();
+      const nome=String(row[1]||'').trim();
+      const equip=String(row[2]||'').trim();
+      const hora=String(row[5]||'').trim();
+      if(!tel&&!nome) continue;
+      const dt=parseBR(hora);
+      if(desde&&dt&&dt.getTime()<iniA) continue;
+      if(desde&&!dt) continue;
+      const d=d8a(tel);
+      const linha=String(nome||'?').slice(0,22).padEnd(22)+' '+d.slice(-4)+
+        ' | '+String(equip).slice(0,20).padEnd(20)+' | '+String(hora).slice(0,16);
+      if(!dt){ R.semHorario.push(linha+' | 🚨 horário ilegível — NUNCA será importado'); continue; }
+      if((agora-dt.getTime())<DUAS){ R.aguardando2h.push(linha+' | aguarda completar 2h'); continue; }
+      if(excluidos.has(d)){ R.excluido.push(linha+' | foi excluído da fila à mão'); continue; }
+      if(noSistema[d]){ R.entraram.push(linha+' | '+[...new Set(noSistema[d])].join(' · ')); continue; }
+      R.jaExistia.push(linha+' | 🚨 NÃO está em lugar nenhum do sistema');
+    }
+    return res.status(200).json({ok:R.semHorario.length===0&&R.jaExistia.length===0,
+      linhasNaPlanilha:linhas.length,
+      periodo:desde?('a partir de '+desde):'planilha inteira',
+      RESUMO:{entraramNoSistema:R.entraram.length,
+        sumiram:R.jaExistia.length,
+        horarioIlegivel:R.semHorario.length,
+        aguardando2h:R.aguardando2h.length,
+        excluidosAMao:R.excluido.length},
+      VEREDITO:(R.jaExistia.length||R.semHorario.length)
+        ?'🚨 '+R.jaExistia.length+' sumiram e '+R.semHorario.length+
+         ' têm horário ilegível e nunca serão importados'
+        :'✅ todos os leads da planilha estão no sistema ou aguardando',
+      SUMIRAM:R.jaExistia.slice(0,80),
+      HORARIO_ILEGIVEL:R.semHorario.slice(0,40),
+      AGUARDANDO_2H:R.aguardando2h.slice(0,30),
+      EXCLUIDOS_A_MAO:R.excluido.slice(0,30),
+      ENTRARAM:R.entraram.slice(0,40)});
+  }
+
   if(action==='badge'){
     // Badge apenas LÊ o Redis; sync fica com a página /prospeccao (2h).
     // Self-fetch removido: dobrava as invocations no Vercel.
