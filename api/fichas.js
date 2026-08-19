@@ -2248,7 +2248,10 @@ export default async function handler(req, res) {
     // usado quando a ficha vem de Entrar em Contato — sem isso o KPI ficava zerado
     try {
       const origemCol = String(stAnt || ficha.status || '');
-      if (origemCol === 'lead') {
+      // 🏅 conta também quem passou por Retornar ou Cliente Loja antes: a ficha
+      // guarda a marca de ter nascido em Lead, e a conversão pertence à
+      // prospecção independentemente de quantas colunas percorreu
+      if (origemCol === 'lead' || ficha.veioDaColunaLead) {
         const diaC = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
         const kC = 'prosp_convertidos_' + diaC;
         const regC = (await dbGet(kC)) || { total: 0, itens: [] };

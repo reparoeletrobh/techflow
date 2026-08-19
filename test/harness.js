@@ -1013,6 +1013,27 @@ function check(nome, cond, extra) {
   // A régua e a abordagem enviavam sem registrar: a mensagem chegava, o
   // controle marcava a tentativa, mas o histórico ficava vazio — a ficha
   // parecia nunca abordada e a consulta do atendimento não mostrava nada.
+  // ── 🏅 lead que passa por Retornar continua sendo conversão de lead ──
+  // A contagem olhava só a coluna imediatamente anterior, então o caminho
+  // lead → retornar → logística não pontuava e a prospecção parecia render
+  // menos do que rende.
+  console.log('▶ Cenário LC — conversão de lead pelo caminho indireto');
+  {
+    const pr = carregarHandler('api/prospeccao.js');
+    const diaC = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    KV['prospeccao_adm'] = { fichas: [{ id: 'LC1', nome: 'Veio de Lead',
+      telefone: '5531955558888', status: 'lead', equipamento: 'Micro',
+      criadoEm: new Date().toISOString() }] };
+    KV['prosp_convertidos_' + diaC] = { total: 0, itens: [] };
+    // lead → retornar
+    await pr(req({ action: 'mover', ...K },
+      { id: 'LC1', status: 'retornar', dataRetorno: '2026-08-25' }, 'POST'), res());
+    await new Promise(s => setTimeout(s, 120));
+    const f = (KV['prospeccao_adm'].fichas || [])[0] || {};
+    check('a ficha guarda que nasceu em Lead', !!f.veioDaColunaLead);
+    check('e está em Retornar', f.status === 'retornar');
+  }
+
   console.log('▶ Cenário RG — envio ao cliente é registrado no histórico');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');

@@ -424,6 +424,10 @@ export default async function handler(req,res){
     const f=db.fichas.find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
     const stAnt=f.status;
+    // 🏅 a origem LEAD acompanha a ficha: o cliente que veio da coluna Lead e
+    // passou por Retornar antes de virar logística continua sendo uma conversão
+    // de lead — perder isso no caminho subestimava o resultado da prospecção
+    if(stAnt==='lead'&&!f.veioDaColunaLead) f.veioDaColunaLead=new Date().toISOString();
     f.status=status;f.movidoEm=new Date().toISOString();
     if(status==='retornar'){
       f.dataRetorno=dataRetorno||null;
@@ -569,7 +573,9 @@ export default async function handler(req,res){
     try {
       // ⚠️ ficha.status já virou 'logistica' algumas linhas acima — quem guarda a
       // coluna de ORIGEM é stAntLog. Conferir ficha.status aqui nunca dava 'lead'.
-      if (String(stAntLog || '') === 'lead') {
+      // conta tanto quem veio direto de Lead quanto quem passou por Retornar
+      // ou Cliente Loja no meio do caminho, desde que tenha nascido em Lead
+      if (String(stAntLog || '') === 'lead' || ficha.veioDaColunaLead) {
         const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
         const kC = 'prosp_convertidos_' + dia;
         const reg = (await dbGet(kC)) || { total: 0, itens: [] };
@@ -578,7 +584,10 @@ export default async function handler(req,res){
           reg.itens.push({ id: ficha.id, nome: ficha.nome,
             telefone: String(ficha.telefone || '').slice(-4),
             equipamento: ficha.equipamento || '', sistema,
-            tipoColeta, em: new Date().toISOString() });
+            tipoColeta, em: new Date().toISOString(),
+            caminho: String(stAntLog || '') === 'lead'
+              ? 'lead → logística'
+              : 'lead → ' + String(stAntLog || '?') + ' → logística' });
           await dbSet(kC, reg);
         }
         ficha.leadConvertidoEm = new Date().toISOString();
