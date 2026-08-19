@@ -1155,6 +1155,9 @@ module.exports = async function handler(req, res) {
     const ids = String(req.query.ids || '').split(',').filter(Boolean);
     const apenasUm = String(req.query.apenasUm || '') === '1';
     if (!(verba > 0)) return res.status(400).json({ ok: false, error: 'verba inválida' });
+    // 📋 vídeos cujo nome o dicionário não reconheceu: o texto veio de reserva,
+    // e vale saber quais para enriquecer o dicionário
+    const semDicionario = [];
 
     // 📅 término: sábado 11h BRT — SEMPRE no futuro. Rodando num sábado depois das 11h
     // o cálculo antigo apontava para hoje, e as campanhas nasciam já encerradas.
@@ -1310,10 +1313,38 @@ module.exports = async function handler(req, res) {
             // ✍️ TEXTO: o criativo nascia SEM título e SEM corpo (os 3 de TV de 05/08).
             // Gera a partir do nome do vídeo, que descreve o defeito, e mantém o
             // botão e o destino herdados do modelo.
+            // 🛡️ o criativo NUNCA pode nascer mudo. Antes, quando o dicionário não
+            // cobria o nome do vídeo, título e corpo ficavam indefinidos e o anúncio
+            // ia ao ar como vídeo sem chamada — foi o que zerou as duas melhores
+            // campanhas de TV do ciclo. Agora há três camadas de resguardo.
             const txt = textoPorDefeito(String(v.title || ''), cat);
-            if (txt) {
-              novoOss.video_data.title = txt.titulo;
-              novoOss.video_data.message = txt.corpo;
+            const doModelo = oss.video_data || {};
+            const GENERICO = {
+              tv: { titulo: 'Consertamos sua TV',
+                corpo: 'Conserto de TV rápido em BH, com peças originais e garantia. ' +
+                  'Coletamos na sua casa e devolvemos funcionando. Chama no WhatsApp!' },
+              microondas: { titulo: 'Seu micro-ondas parou?',
+                corpo: 'Não esquenta, não liga ou faz barulho? Consertamos com peças ' +
+                  'originais e garantia. Coletamos na sua casa. Chama no WhatsApp!' },
+              purificador: { titulo: 'Purificador com problema?',
+                corpo: 'Não gela, vaza ou parou de sair água? Consertamos rápido, ' +
+                  'com garantia e coleta na sua casa. Fala com a gente!' },
+              adega: { titulo: 'Sua adega parou de gelar?',
+                corpo: 'Adega ou cervejeira com defeito? Consertamos com peças ' +
+                  'originais e garantia. Chama no WhatsApp!' },
+              institucional: { titulo: 'Conserto de eletrodomésticos em BH',
+                corpo: 'Micro-ondas, purificador, adega e TV. Peças originais, ' +
+                  'garantia e coleta na sua casa. Chama no WhatsApp!' },
+            };
+            const reserva = GENERICO[cat] || GENERICO.institucional;
+            // 1º o dicionário do defeito · 2º o texto do próprio modelo · 3º o genérico
+            novoOss.video_data.title =
+              (txt && txt.titulo) || doModelo.title || reserva.titulo;
+            novoOss.video_data.message =
+              (txt && txt.corpo) || doModelo.message || reserva.corpo;
+            if (!txt) {
+              semDicionario.push(String(v.title || '?') +
+                (doModelo.title ? ' (usou o texto do modelo)' : ' (usou o texto padrão)'));
             }
           } else if (oss.link_data) {
             novoOss.link_data = oss.link_data;
@@ -1384,6 +1415,30 @@ module.exports = async function handler(req, res) {
       } catch (e) {}
     }
     return res.status(200).json({ ok: erros.length === 0, criados: feitos.length, feitos, erros,
+      SEM_TEXTO_NO_DICIONARIO: semDicionario,
+      // 🔍 conferência imediata: anúncio sem chamada é vídeo mudo e não converte
+      MUDOS: await (async () => {
+        const mudos = [];
+        for (const f of feitos) {
+          if (!f.campanha) continue;
+          try {
+            const ra = await fetch(`${GRAPH}/${f.campanha}/ads` +
+              `?fields=creative{title,body,object_story_spec}&limit=5&access_token=${TK}`)
+              .then(x => x.json());
+            for (const a of (((ra || {}).data) || [])) {
+              const cr = a.creative || {};
+              const vd = ((cr.object_story_spec || {}).video_data) || {};
+              const t = cr.title || vd.title || '';
+              const c2 = cr.body || vd.message || '';
+              if (!String(t).trim() || !String(c2).trim()) {
+                mudos.push(f.video + (!String(t).trim() ? ' · sem título' : '') +
+                  (!String(c2).trim() ? ' · sem corpo' : ''));
+              }
+            }
+          } catch (e) {}
+        }
+        return mudos;
+      })(),
       APROVACAO_PENDENTE: pendencias || 'nenhuma',
       terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
       aviso: erros.length ? 'veja os erros — o vídeo não foi trocado no criativo, apenas a campanha foi clonada' : undefined,

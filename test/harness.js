@@ -999,6 +999,24 @@ function check(nome, cond, extra) {
   // ── 📋 os fatos declarados precisam bater com o código ──
   // FATOS.md é consultado antes de afirmar qualquer regra; se ele divergir do
   // sistema, passa a ser fonte de erro em vez de correção.
+  // ── ✍️ nenhum criativo pode nascer sem título e sem corpo ──
+  // Quando o dicionário não cobria o nome do vídeo, os dois campos ficavam
+  // indefinidos e o anúncio ia ao ar mudo — foi o que zerou as duas melhores
+  // campanhas de TV no meio do ciclo.
+  console.log('▶ Cenário TX — criativo novo sempre nasce com texto');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    check('o texto não depende mais de condicional que possa não entrar',
+      !/if \(txt\) \{\s*novoOss\.video_data\.title/.test(ct));
+    check('há reserva por categoria quando o dicionário não cobre',
+      /const GENERICO = \{/.test(ct) && /reserva\.titulo/.test(ct));
+    check('o título tem três camadas de resguardo',
+      /txt && txt\.titulo\) \|\| doModelo\.title \|\| reserva\.titulo/.test(ct));
+    check('o corpo tem três camadas de resguardo',
+      /txt && txt\.corpo\) \|\| doModelo\.message \|\| reserva\.corpo/.test(ct));
+    check('o retorno aponta os que sairiam mudos', /MUDOS:/.test(ct));
+  }
+
   console.log('▶ Cenário FT2 — FATOS.md confere com o sistema');
   {
     const fsF = require('fs');

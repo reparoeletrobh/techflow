@@ -80,6 +80,23 @@ estar em `prospeccao_excluidos`.
 
 ---
 
+## CRIAÇÃO DE CAMPANHA
+
+**Nenhum criativo pode nascer sem título e sem corpo.** Anúncio mudo é vídeo
+sem chamada e praticamente não converte — foi o que zerou "Tela lavada 508" e
+"Led queimado 508", as duas melhores de TV, no meio do ciclo de 15/08.
+
+O texto vem em três camadas, nesta ordem:
+1. dicionário do defeito, pelo nome do arquivo do vídeo
+2. texto do próprio modelo que está sendo duplicado
+3. texto genérico da categoria
+
+O retorno do `subir-agora` traz `SEM_TEXTO_NO_DICIONARIO` — vídeos cujo nome não
+foi reconhecido, que valem entrar no dicionário — e `MUDOS`, conferência feita
+na própria Meta logo após a criação. **`MUDOS` tem de vir vazio.**
+
+---
+
 ## REGRAS DE NEGÓCIO QUE JÁ CUSTARAM ERRO
 
 **Verba de campanha pausada não é liberada.** Não construir redistribuição
