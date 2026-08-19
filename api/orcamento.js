@@ -379,12 +379,23 @@ module.exports = async function handler(req, res) {
     const { id, nome, tel, desc } = req.body || {};
     const GMB_ENV_KEY  = 'gmb_enviados';
     const GMB_PEND_KEY = 'gmb_pendentes';
-    // Remover do pool pendente
+    // 📞 remove também pelo TELEFONE: quem chama de fora nem sempre tem o
+    // identificador do cartão, e a remoção só por identificador falhava em
+    // silêncio — a resposta vinha positiva e a ficha continuava na lista
+    const d8G = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const telAlvo = d8G(tel);
+    let removidos = 0;
     try {
       const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [], fichas: [] };
-      db_pend.ids    = (db_pend.ids    || []).filter(i => String(i)   !== String(id));
-      db_pend.fichas = (db_pend.fichas || []).filter(f => String(f.id) !== String(id));
+      const antes = (db_pend.fichas || []).length;
+      const casa = f => String(f.id) === String(id) ||
+        (telAlvo.length >= 8 && d8G(f.tel || f.telefone) === telAlvo);
+      const idsFora = new Set((db_pend.fichas || []).filter(casa).map(f => String(f.id)));
+      db_pend.fichas = (db_pend.fichas || []).filter(f => !casa(f));
+      db_pend.ids = (db_pend.ids || [])
+        .filter(i => String(i) !== String(id) && !idsFora.has(String(i)));
       await dbSet(GMB_PEND_KEY, db_pend);
+      removidos = antes - db_pend.fichas.length;
     } catch(ep) { console.warn('[gmb] remover pendente:', ep.message); }
     const db_g = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
     // Evitar duplicatas
@@ -396,7 +407,7 @@ module.exports = async function handler(req, res) {
       db_g.fichas = db_g.fichas.slice(0, 5000); // limite alto p/ não derrubar dedup (bug corrigido em 30/06)
       await dbSet(GMB_ENV_KEY, db_g);
     }
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, removidosDoPainel: removidos });
   }
 
   // ── GET gmb-diagnostico — estado atual + o que há nos backups ────────────

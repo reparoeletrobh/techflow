@@ -83,9 +83,10 @@ module.exports = async function handler(req, res) {
     feitos.push(await chamar('registrar entradas no ERP',
       'satisfacao?action=registrar-erp'));
 
-    // ⭐ pesquisa de satisfação de quem recebeu o serviço ontem: sai às 8h,
-    // antes do expediente encher, e a resposta abre a janela para o dia
-    if (horaBR === 8 && diaSem >= 1 && diaSem <= 6) {
+    // ⭐ pesquisa de satisfação: roda ao longo do dia, não só às 8h. O cliente
+    // entra no painel quando o serviço é entregue, a qualquer hora, e esperar
+    // a manhã seguinte deixava a fila acumular e a equipe abordava antes.
+    if (horaBR >= 8 && horaBR < 19 && diaSem >= 1 && diaSem <= 6) {
       feitos.push(await chamar('pesquisa de satisfação',
         'satisfacao?action=pesquisa-satisfacao&aplicar=1'));
     }
