@@ -3323,10 +3323,16 @@ module.exports = async function handler(req, res) {
       porDia[d][cat] = porDia[d][cat] || { gasto: 0, impressoes: 0, conversas: 0 };
       porDia[d][cat].gasto += Number(i.spend || 0);
       porDia[d][cat].impressoes += Number(i.impressions || 0);
-      for (const a of (i.actions || [])) {
-        if (/messaging_conversation_started|onsite_conversion.messaging/.test(a.action_type)) {
-          porDia[d][cat].conversas += Number(a.value || 0);
-        }
+      // ⚠️ a plataforma devolve várias métricas para a MESMA conversa —
+      // conversa iniciada, primeira resposta, conexão total. Somar todas
+      // multiplicava o número por três ou quatro. A regra do copiloto é
+      // pegar a PRIMEIRA que existir, na ordem de preferência.
+      const CONV_D = ['onsite_conversion.messaging_conversation_started_7d',
+        'onsite_conversion.messaging_first_reply',
+        'onsite_conversion.total_messaging_connection', 'lead'];
+      for (const tipo of CONV_D) {
+        const a = (i.actions || []).find(x => x.action_type === tipo);
+        if (a) { porDia[d][cat].conversas += Number(a.value || 0); break; }
       }
     }
 

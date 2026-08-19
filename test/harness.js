@@ -1006,6 +1006,19 @@ function check(nome, cond, extra) {
   // ── 🏷️ conflito do bot precisa nascer com o motivo no campo que a tela lê ──
   // A régua gravava em 'motivo' e a tela lê 'motivoConflito': o texto existia no
   // banco e o card aparecia vazio, deixando a equipe sem saber o que houve.
+  // ── 🔢 conversa se conta uma vez só ──
+  // A plataforma devolve várias métricas para a mesma conversa; somar todas
+  // multiplica o número por três ou quatro e faz o custo parecer irreal.
+  console.log('▶ Cenário CV — conversa não é contada em duplicidade');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    check('não há soma indiscriminada de ações de mensagem',
+      !/conversas \+= Number\(a\.value[\s\S]{0,40}\}\s*\}/.test(
+        ct.replace(/break;[\s\S]{0,20}\}/g, 'BREAK}')));
+    check('a contagem usa a lista fechada e para na primeira',
+      (ct.match(/messaging_conversation_started_7d/g) || []).length >= 2);
+  }
+
   console.log('▶ Cenário MC — conflito do bot grava o motivo no campo certo');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
