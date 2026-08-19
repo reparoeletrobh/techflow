@@ -411,6 +411,44 @@ module.exports = async function handler(req, res) {
   }
 
   // ── GET gmb-diagnostico — estado atual + o que há nos backups ────────────
+  // ── 🧹 gmb-limpar-ja-enviados: quem já foi contatado sai do painel ──
+  // A remoção antiga comparava só o identificador do cartão e falhava em
+  // silêncio: o registro de contato era criado, a ficha continuava listada, e
+  // a equipe voltava a abordar quem já tinha sido abordado.
+  if (action === 'gmb-limpar-ja-enviados') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const d8L = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const pend = (await dbGet('gmb_pendentes')) || { ids: [], fichas: [] };
+    const env = (await dbGet('gmb_enviados')) || { fichas: [] };
+    const idsEnv = new Set((env.fichas || []).map(f => String(f.id)));
+    const telsEnv = new Set((env.fichas || [])
+      .map(f => d8L(f.tel || f.telefone)).filter(t => t.length >= 8));
+
+    const jaContatados = (pend.fichas || []).filter(f =>
+      idsEnv.has(String(f.id)) ||
+      (d8L(f.tel || f.telefone).length >= 8 && telsEnv.has(d8L(f.tel || f.telefone))));
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        noPainel: (pend.fichas || []).length,
+        jaContatadosQueVaoSair: jaContatados.length,
+        restarao: (pend.fichas || []).length - jaContatados.length,
+        L: jaContatados.slice(0, 60).map(f => String(f.nome || '?').slice(0, 24) +
+          ' ' + String(f.tel || '').slice(-4)),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    const fora = new Set(jaContatados.map(f => String(f.id)));
+    const antes = (pend.fichas || []).length;
+    pend.fichas = (pend.fichas || []).filter(f => !fora.has(String(f.id)));
+    pend.ids = (pend.ids || []).filter(i => !fora.has(String(i)));
+    await dbSet('gmb_pendentes', pend);
+    // confirma que persistiu
+    const conf = await dbGet('gmb_pendentes');
+    return res.status(200).json({ ok: true,
+      removidos: antes - (pend.fichas || []).length,
+      restaramNoPainel: (((conf || {}).fichas) || []).length });
+  }
+
   if (action === 'gmb-diagnostico') {
     const pipe = (await dbGet('reparoeletro_pipe')) || { cards: [] };
     const pend = (await dbGet('gmb_pendentes')) || { ids: [], fichas: [] };
