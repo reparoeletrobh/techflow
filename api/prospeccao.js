@@ -271,19 +271,17 @@ export default async function handler(req,res){
   // menos de duas horas na aba, telefone já conhecido — e nenhuma delas
   // aparece na tela. Um lead que não entra não é abordado por ninguém.
   if(action==='auditoria-leads'){
-    const SHEET=(process.env.SHEET_LEADS_ID||process.env.GOOGLE_SHEET_ID||'').trim();
-    const CHAVE=(process.env.GOOGLE_API_KEY||'').trim();
-    const aba=String(req.query.aba||'Criadas');
+    // 📄 mesma fonte que a importação usa: o CSV publicado da aba Criadas
     let linhas=[];
     try{
-      const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET+
-        '/values/'+encodeURIComponent(aba)+'?key='+CHAVE).then(x=>x.json());
-      linhas=(r.values||[]).slice(1);
+      const resp=await fetch(SHEET_CSV,{redirect:'follow'});
+      if(!resp.ok) return res.status(200).json({ok:false,
+        error:'não consegui ler a planilha: HTTP '+resp.status});
+      linhas=parseCSV(await resp.text()).slice(1);
     }catch(e){
       return res.status(200).json({ok:false,error:'não consegui ler a planilha: '+e.message});
     }
-    if(!linhas.length) return res.status(200).json({ok:false,
-      error:'planilha vazia ou sem acesso', dica:'confira SHEET_LEADS_ID e GOOGLE_API_KEY'});
+    if(!linhas.length) return res.status(200).json({ok:false,error:'planilha sem linhas'});
 
     const parseBR=(s)=>{
       const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})/);
