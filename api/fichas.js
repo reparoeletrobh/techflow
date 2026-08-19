@@ -142,8 +142,9 @@ export default async function handler(req, res) {
       .toISOString().slice(5, 16).replace('T', ' ') : '—';
 
     const achados = [];
-    const BANCOS = ['fichas_adm', 'fichas_tv', 'prospeccao_adm',
+    const BANCOS = ['fichas_adm', 'fichas_tv', 'prospeccao_adm', 'prospeccao_tv',
       'reparoeletro_logistica', 'tv_logistica', 'reparoeletro_pipe', 'tv_pipe',
+      'reparoeletro_frenteloja', 'reparoeletro_board',
       'reparoeletro_arquivo', 'tv_arquivo'];
     for (const chave of BANCOS) {
       const db = await dbGet(chave);
@@ -160,6 +161,25 @@ export default async function handler(req, res) {
             equipamento: String(x.equipamento || x.descricao || '').slice(0, 60) || null,
             orcamentoEm: x.orcamentoEm ? hh(x.orcamentoEm) : null,
             formaPagamento: x.formaPagamento || null,
+            // 🔧 o laudo fica na ficha da logística, onde o técnico o escreve;
+            // sem ele o rastreio dizia o valor mas não o que foi diagnosticado
+            diagnostico: (() => {
+              const d = x.diagnostico;
+              if (!d) return null;
+              if (typeof d === 'string') return d.slice(0, 500);
+              // quando é estruturado, resume o que importa
+              const eqs = (d.equips || []).map(e =>
+                [e.tipo, e.polegadas ? e.polegadas + '"' : null, e.defeito,
+                 e.servico, e.pecas].filter(Boolean).join(' · '));
+              const partes = [
+                d.defeito || null, d.servico || null, d.laudo || null,
+                d.observacao || d.obs || null,
+                eqs.length ? eqs.join(' | ') : null,
+              ].filter(Boolean);
+              return partes.length ? partes.join(' | ').slice(0, 500)
+                : JSON.stringify(d).slice(0, 400);
+            })(),
+            defeitoRelatado: String(x.defeito || x.problema || '').slice(0, 200) || null,
             historico: (x.history || []).map(e =>
               String(e.phase || e.phaseId || '?') + '@' +
               String(e.ts || e.timestamp || '').slice(0, 16).replace('T', ' ')),
@@ -187,8 +207,13 @@ export default async function handler(req, res) {
       NA_LISTA_DE_EXCLUIDOS: excluidoEm ? hh(excluidoEm) : '🚨 NÃO — a exclusão não foi gravada',
       ONDE_ESTA: achados.map(a => a.banco + ' | id ' + a.id +
         ' | ' + a.status + ' | criado ' + a.criadoEm +
+        (a.valor ? ' | R$ ' + a.valor.toFixed(2) : '') +
         (a.origem ? ' | origem ' + a.origem : '') +
         (a.excluidoDaFilaEm ? ' | excluído da fila em ' + a.excluidoDaFilaEm : '')),
+      DIAGNOSTICOS: achados.filter(a => a.diagnostico)
+        .map(a => a.banco + ' | ' + a.nome + ' | ' + a.diagnostico),
+      DEFEITO_RELATADO: achados.filter(a => a.defeitoRelatado)
+        .map(a => a.banco + ' | ' + a.nome + ' | ' + a.defeitoRelatado),
       DETALHE: achados,
       leitura: !excluidoEm
         ? 'sem registro de exclusão: ou ela não foi feita, ou falhou antes de gravar'
