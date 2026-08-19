@@ -90,6 +90,14 @@ module.exports = async function handler(req, res) {
       feitos.push(await chamar('pesquisa de satisfação',
         'satisfacao?action=pesquisa-satisfacao&aplicar=1'));
     }
+    // 🧹 quem já recebeu a pesquisa não fica no painel: a baixa pode falhar por
+    // rede ou por identificador ausente, e sem uma varredura a ficha ficaria lá
+    // esperando uma abordagem que já aconteceu
+    if (horaBR >= 8 && horaBR < 19) {
+      feitos.push(await chamar('baixar já perguntados do painel',
+        'satisfacao?action=baixar-perguntados&aplicar=1'));
+    }
+
     // ⭐ e a leitura das respostas ao longo do dia: só quem elogiou sem
     // ressalva recebe o pedido de avaliação
     if (horaBR >= 9 && horaBR < 20) {

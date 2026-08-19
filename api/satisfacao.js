@@ -74,6 +74,60 @@ export default async function handler(req, res) {
   }
   const action = String((req.query || {}).action || '').trim();
 
+  // ── 🧹 baixar-perguntados: tira do painel quem já recebeu a pesquisa ──
+  // A baixa acontece no momento do envio, mas quem foi perguntado antes disso
+  // existir — ou cuja baixa falhou — continuou listado, e a equipe acabaria
+  // abordando de novo quem o sistema já abordou.
+  if (action === 'baixar-perguntados') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const d8b = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [pend, ctrl] = await Promise.all([
+      dbGet('gmb_pendentes'), dbGet('wa_pesquisa_satisfacao'),
+    ]);
+    const clientes = ((ctrl || {}).clientes) || {};
+    const alvos = [];
+    for (const f of (((pend || {}).fichas) || [])) {
+      const tel = d8b(f.tel || f.telefone);
+      const c = clientes[tel];
+      if (!c) continue;
+      alvos.push({ id: f.id, nome: f.nome || f.nomeContato || '?', tel,
+        telCheio: f.tel || f.telefone,
+        perguntadoEm: c.em,
+        situacao: c.avaliacaoPedida ? 'elogiou e recebeu o link'
+          : c.reclamou ? 'reclamou — virou conflito'
+          : c.teveRessalva ? 'fez ressalva'
+          : 'aguardando resposta' });
+    }
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSairDoPainel: alvos.length,
+        L: alvos.map(a => String(a.nome).slice(0, 22).padEnd(22) + ' ' + a.tel.slice(-4) +
+          ' | perguntado ' + String(a.perguntadoEm).slice(5, 16).replace('T', ' ') +
+          ' | ' + a.situacao),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const a of alvos) {
+      try {
+        const r = await fetch('https://reparoeletroadm.com/api/orcamento' +
+          '?action=gmb-marcar-enviado&k=' +
+          ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: a.id, nome: a.nome, tel: a.telCheio,
+            desc: 'pesquisa de satisfação já enviada' }),
+        }).then(x => x.json());
+        if (r && r.ok) {
+          if (clientes[a.tel]) clientes[a.tel].gmbBaixado = true;
+          feitos.push(a.nome + ' ' + a.tel.slice(-4) +
+            (r.removidosDoPainel ? ' (removeu ' + r.removidosDoPainel + ')' : ''));
+        } else erros.push(a.nome + ': recusado');
+      } catch (e) { erros.push(a.nome + ': ' + e.message); }
+    }
+    if (feitos.length) await dbSet('wa_pesquisa_satisfacao', ctrl);
+    return res.status(200).json({ ok: erros.length === 0,
+      baixados: feitos.length, L: feitos, erros });
+  }
+
   // ── 🔀 conferir-gmb: por que alguém do GMB não recebeu a pesquisa ──
   // As duas listas nascem de lugares diferentes: o painel do Google lê apenas
   // o quadro da linha branca, enquanto a pesquisa lê o livro de entradas, que
