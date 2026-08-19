@@ -1039,6 +1039,11 @@ function check(nome, cond, extra) {
     const rota = (v.rewrites || []).find(r => r.source === '/tv/garantia');
     check('a rota /tv/garantia serve a fila',
       !!rota && /tv-garantia-fila/.test(rota.destination));
+    // e o botão do menu precisa levar à fila, não direto à gestão
+    const menu = fsG.readFileSync('tv-adm.html', 'utf8');
+    const item = (menu.match(/data-url="([^"]*)"[^>]*data-label="Garantia TV"/) || [])[1];
+    check('o botão Garantia do menu de TV leva à fila',
+      item === '/tv/garantia', 'aponta para ' + item);
   }
 
   console.log('▶ Cenário LC — conversão de lead pelo caminho indireto');
