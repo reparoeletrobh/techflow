@@ -153,6 +153,16 @@ export default async function handler(req, res) {
           achados.push({ banco: chave, id: x.id,
             nome: x.nome || x.nomeContato || '?',
             status: x.status || x.phase || x.phaseId || '?',
+            // 💰 o valor do orçamento fica no cartão e sobrevive à conversa:
+            // mesmo sem o histórico da mensagem, é ele que responde quanto foi
+            // combinado com o cliente
+            valor: Number(x.valor || x.valorOrcamento || 0) || null,
+            equipamento: String(x.equipamento || x.descricao || '').slice(0, 60) || null,
+            orcamentoEm: x.orcamentoEm ? hh(x.orcamentoEm) : null,
+            formaPagamento: x.formaPagamento || null,
+            historico: (x.history || []).map(e =>
+              String(e.phase || e.phaseId || '?') + '@' +
+              String(e.ts || e.timestamp || '').slice(0, 16).replace('T', ' ')),
             criadoEm: hh(x.criadoEm), movedAt: hh(x.movedAt),
             contatoFeitoEm: hh(x.contatoFeitoEm),
             excluidoDaFilaEm: x.excluidoDaFilaEm ? hh(x.excluidoDaFilaEm) : null,
