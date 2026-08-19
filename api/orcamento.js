@@ -411,6 +411,38 @@ module.exports = async function handler(req, res) {
   }
 
   // ── GET gmb-diagnostico — estado atual + o que há nos backups ────────────
+  // ── 🔓 gmb-destravar: devolve ao painel quem nunca foi contatado ──
+  // O registro de contato pode ter sido criado sem que a mensagem saísse — por
+  // erro de gravação ou clique que não completou. Nesse caso a ficha fica presa:
+  // não é abordada pela equipe, porque parece contatada, e é ignorada pela
+  // pesquisa, pelo mesmo motivo.
+  if (action === 'gmb-destravar') {
+    const alvo = String(req.query.tel || '').replace(/\D/g, '').slice(-4);
+    if (alvo.length < 4) return res.status(400).json({ ok: false,
+      error: 'informe &tel= com os 4 últimos dígitos' });
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const env = (await dbGet('gmb_enviados')) || { fichas: [] };
+    const achadas = (env.fichas || []).filter(f =>
+      String(f.tel || f.telefone || '').replace(/\D/g, '').endsWith(alvo));
+    if (!achadas.length) return res.status(200).json({ ok: false,
+      error: 'não consta como contatado — a trava é outra' });
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoVoltarAoPainel: achadas.length,
+        L: achadas.map(f => String(f.nome || '?').slice(0, 26) + ' ' +
+          String(f.tel || '').slice(-4) + ' | marcado como contatado em ' +
+          String(f.enviadoEm || '?').slice(0, 16).replace('T', ' ')),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    const antes = (env.fichas || []).length;
+    env.fichas = (env.fichas || []).filter(f =>
+      !String(f.tel || f.telefone || '').replace(/\D/g, '').endsWith(alvo));
+    await dbSet('gmb_enviados', env);
+    return res.status(200).json({ ok: true,
+      removidosDoRegistroDeContato: antes - env.fichas.length,
+      observacao: 'a ficha volta a ser elegível para a pesquisa na próxima rodada' });
+  }
+
   // ── 🧹 gmb-limpar-ja-enviados: quem já foi contatado sai do painel ──
   // A remoção antiga comparava só o identificador do cartão e falhava em
   // silêncio: o registro de contato era criado, a ficha continuava listada, e
