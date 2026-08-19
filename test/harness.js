@@ -1044,6 +1044,13 @@ function check(nome, cond, extra) {
     const item = (menu.match(/data-url="([^"]*)"[^>]*data-label="Garantia TV"/) || [])[1];
     check('o botão Garantia do menu de TV leva à fila',
       item === '/tv/garantia', 'aponta para ' + item);
+    // 📺 o formulário de cadastro aberto pela fila tem de ser o de TV:
+    // apontar para o da linha branca fazia a garantia entrar na frente errada
+    check('o cadastro da fila de TV abre o formulário de TV',
+      !/frame-cadastro'\)\.src='\/garantia/.test(tela) &&
+      /frame-cadastro'\)\.src='\/tv\//.test(tela));
+    check('a fila de TV não linka para telas da linha branca',
+      !/href="\/garantia/.test(tela) && !/href="\/adm"/.test(tela));
   }
 
   console.log('▶ Cenário LC — conversão de lead pelo caminho indireto');

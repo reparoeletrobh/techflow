@@ -212,7 +212,9 @@ async function reabrir(id){
   load();
 }
 function abrirCadastro(){
-  document.getElementById('frame-cadastro').src='/garantia-gestao';
+  // 📺 o formulário tem de ser o de TV: apontar para o da linha branca fazia
+  // toda garantia cadastrada aqui entrar na frente errada
+  document.getElementById('frame-cadastro').src='/tv/garantia-gestao';
   document.getElementById('ov-cadastro').style.display='block';
 }
 function fecharCadastro(){
