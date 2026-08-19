@@ -3311,9 +3311,12 @@ module.exports = async function handler(req, res) {
     const desde = new Date(Date.now() - 3 * 3600000 - (dias - 1) * 86400000)
       .toISOString().slice(0, 10);
     const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    // 📄 com quebra diária são dezenas de anúncios × dias: paginar de menos
+    // trunca a série e faz sumir justamente os dias mais recentes, que é
+    // quando a operação percebe a queda e vem perguntar
     const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}` +
-      `&time_increment=1&fields=ad_name,spend,impressions,actions&limit=200` +
-      `&access_token=${TKD}`, 20);
+      `&time_increment=1&fields=ad_name,spend,impressions,actions,date_start` +
+      `&limit=500&access_token=${TKD}`, 60);
 
     const porDia = {};
     for (const i of ((ins || {}).data || [])) {
@@ -3358,15 +3361,30 @@ module.exports = async function handler(req, res) {
           Math.round(x.impressoes / 1000) + 'k impr · R$ ' + x.gasto.toFixed(0);
       });
     }
+    // ⚠️ a série tem de cobrir o período pedido: faltar dia significa que a
+    // leitura foi truncada, e concluir a partir dela seria concluir errado
+    const esperados = [];
+    for (let k = 0; k < dias; k++) {
+      esperados.push(new Date(Date.now() - 3 * 3600000 - (dias - 1 - k) * 86400000)
+        .toISOString().slice(0, 10));
+    }
+    const faltando = esperados.filter(d => !diasOrd.includes(d));
     const ontem = diasOrd[diasOrd.length - 2], hoje = diasOrd[diasOrd.length - 1];
     const somaDe = d => Object.values(porDia[d] || {})
       .reduce((s, x) => s + x.conversas, 0);
-    return res.status(200).json({ ok: true, periodo: desde + ' a ' + ate,
+    return res.status(200).json({ ok: faltando.length === 0,
+      periodo: desde + ' a ' + ate,
+      DIAS_FALTANDO: faltando,
+      aviso: faltando.length
+        ? '🚨 a leitura veio incompleta: ' + faltando.join(', ') +
+          ' não retornaram. Não tire conclusão desta série.'
+        : null,
       POR_DIA: linhas,
       POR_CATEGORIA: porCat,
       VARIACAO: ontem && hoje
-        ? 'ontem ' + somaDe(ontem) + ' conversas · hoje ' + somaDe(hoje) +
-          ' (o dia de hoje ainda está correndo)'
+        ? ontem + ': ' + somaDe(ontem) + ' conversas · ' +
+          hoje + ': ' + somaDe(hoje) +
+          (hoje === ate ? ' (dia em curso)' : ' ⚠️ este não é o dia de hoje')
         : null,
       comoLer: 'queda de impressões é problema de entrega; impressões estáveis com ' +
         'menos conversas é problema de criativo ou de público' });
