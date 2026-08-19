@@ -369,6 +369,33 @@ export default async function handler(req,res){
       ENTRARAM:R.entraram.slice(0,40)});
   }
 
+  // ── 🔎 quem-excluiu: quando cada telefone entrou na lista de bloqueio ──
+  // A lista impede o lead de voltar pela planilha. Se algo a alimentou sem que
+  // a equipe pedisse, leads legítimos deixam de entrar em silêncio.
+  if(action==='quem-excluiu'){
+    const exc=(await dbGet('prospeccao_excluidos'))||{tels:{}};
+    const tels=((exc||{}).tels)||{};
+    const porDia={}, porHora={};
+    for(const [t,q] of Object.entries(tels)){
+      const d=String(q||'').slice(0,10);
+      const hr=String(q||'').slice(0,13);
+      porDia[d]=(porDia[d]||0)+1;
+      porHora[hr]=(porHora[hr]||0)+1;
+    }
+    // 🚨 muitos no mesmo minuto = gravação em massa, não ação humana
+    const emMassa=Object.entries(porHora).filter(([,n])=>n>=10)
+      .sort((a,b)=>b[1]-a[1]);
+    return res.status(200).json({ok:emMassa.length===0,
+      totalNaLista:Object.keys(tels).length,
+      POR_DIA:Object.entries(porDia).sort().reverse().slice(0,20)
+        .map(([d,n])=>d+' | '+n+' telefone(s)'),
+      GRAVACOES_EM_MASSA:emMassa.slice(0,20)
+        .map(([h,n])=>h.replace('T',' ')+'h | '+n+' telefones no mesmo horário'),
+      leitura:emMassa.length
+        ? '🚨 dezenas de telefones marcados no mesmo horário não é exclusão manual'
+        : 'as exclusões estão distribuídas, compatível com ação humana'});
+  }
+
   if(action==='badge'){
     // Badge apenas LÊ o Redis; sync fica com a página /prospeccao (2h).
     // Self-fetch removido: dobrava as invocations no Vercel.
