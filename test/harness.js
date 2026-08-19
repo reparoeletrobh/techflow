@@ -996,6 +996,29 @@ function check(nome, cond, extra) {
   // A guarda cortava às 16h por economia de execuções, deixando sem aviso todo
   // cliente diagnosticado nas duas últimas horas — justamente o fim de tarde,
   // quando muito orçamento é fechado.
+  // ── 📋 os fatos declarados precisam bater com o código ──
+  // FATOS.md é consultado antes de afirmar qualquer regra; se ele divergir do
+  // sistema, passa a ser fonte de erro em vez de correção.
+  console.log('▶ Cenário FT2 — FATOS.md confere com o sistema');
+  {
+    const fsF = require('fs');
+    const fatos = fsF.existsSync('FATOS.md') ? fsF.readFileSync('FATOS.md', 'utf8') : '';
+    check('FATOS.md existe', fatos.length > 500);
+    check('registra o ciclo de sábado a sábado',
+      /sábado 13h.*sábado 11h/s.test(fatos));
+    check('registra as verbas base', /108,75/.test(fatos) && /75,75/.test(fatos));
+    check('registra que movedAt não é data',
+      /movedAt.*NÃO é data/s.test(fatos));
+    // os quatro caminhos citados precisam mesmo carimbar
+    for (const arq of ['api/frenteloja.js', 'api/logistica.js',
+                       'api/tv-logistica.js', 'api/board.js']) {
+      if (!fatos.includes(arq.replace('api/', ''))) continue;
+      const c = fsF.readFileSync(arq, 'utf8');
+      check('FATOS diz que ' + arq + ' carimba o orçamento — e carimba',
+        /orcamentoEm\s*=\s*now/.test(c));
+    }
+  }
+
   console.log('▶ Cenário HR — janela de envio cobre até o fechamento da loja');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
