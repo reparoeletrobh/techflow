@@ -77,6 +77,11 @@ module.exports = async function handler(req, res) {
       feitos.push(await chamar('corridas em andamento', 'lalamove?action=acompanhar'));
     }
 
+    // 💾 arquiva as conversas por cliente: a janela corrente cobre poucos dias
+    // com o volume atual, e a consulta de um atendimento antigo não encontrava
+    // mais nada — o valor combinado com o cliente se perdia junto
+    feitos.push(await chamar('arquivar conversas', 'conversas?action=arquivar'));
+
     // 📒 livro de entradas no ERP: gravado ao longo do dia, é o que permite
     // saber quem recebeu ontem — o histórico do cartão perde essa informação
     // na limpeza semanal de domingo
