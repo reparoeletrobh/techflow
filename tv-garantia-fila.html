@@ -53,11 +53,11 @@ h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;}
 </style>
 </head>
 <body>
-<h1>🛡️ Garantia <span style="font-size:11px;color:var(--dim);font-weight:600;">fila de tratamento</span></h1>
+<h1>📺 Garantia TV <span style="font-size:11px;color:var(--dim);font-weight:600;">fila de tratamento</span></h1>
 <div class="topmenu">
-  <a class="ativa" href="/garantia">🔥 Fila</a>
-  <a href="/garantia-gestao">📁 Gestão de Garantias</a>
-  <a href="/adm">← Menu</a>
+  <a class="ativa" href="/tv/garantia">🔥 Fila</a>
+  <a href="/tv-garantia-v2">📁 Gestão de Garantias</a>
+  <a href="/tv">← Menu</a>
 </div>
 <button onclick="abrirCadastro()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;border-radius:12px;padding:13px;color:#fff;font-size:14px;font-weight:900;cursor:pointer;margin-bottom:14px;">➕ Cadastrar Garantia</button>
 <div id="ov-cadastro" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99;padding:16px;">
@@ -163,7 +163,7 @@ async function resolver(id,destino){
 async function escolherTecnicoQC(id){
   var tecs = [];
   try {
-    var eq = await fetch('/api/tv-qualidade?action=equipe').then(function(x){return x.json();});
+    var eq = await fetch('/api/qualidade?action=equipe').then(function(x){return x.json();});
     if(eq && eq.ok) tecs = eq.tecnicos || [];
   } catch(e){}
   if(!tecs.length) tecs = ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'];

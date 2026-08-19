@@ -1017,6 +1017,30 @@ function check(nome, cond, extra) {
   // A contagem olhava só a coluna imediatamente anterior, então o caminho
   // lead → retornar → logística não pontuava e a prospecção parecia render
   // menos do que rende.
+  // ── 🛡️ a fila de garantia de TV precisa funcionar como a de linha branca ──
+  // A tela existia mas apontava para o módulo da outra frente, e a rota levava
+  // direto para a gestão: quem clicava em Garantia no TV nunca via a fila.
+  console.log('▶ Cenário GT — fila de garantia de TV aponta para o próprio módulo');
+  {
+    const fsG = require('fs');
+    const tela = fsG.readFileSync('tv-garantia-fila.html', 'utf8');
+    check('a fila de TV não chama o módulo de linha branca',
+      !/api\/garantia\?/.test(tela));
+    // cada ação chamada precisa existir na API correspondente
+    const api = fsG.readFileSync('api/tv-garantia-v2.js', 'utf8');
+    const chamadas = [...new Set((tela.match(/api\/tv-garantia-v2\?action=([a-z-]+)/g) || [])
+      .map(x => x.split('action=')[1]))];
+    const faltando = chamadas.filter(a =>
+      !api.includes('action === "' + a + '"') && !api.includes("action === '" + a + "'"));
+    check('todas as ações chamadas existem na API de TV',
+      faltando.length === 0, faltando.join(', '));
+    // e a rota principal leva à fila, como no ADM
+    const v = JSON.parse(fsG.readFileSync('vercel.json', 'utf8'));
+    const rota = (v.rewrites || []).find(r => r.source === '/tv/garantia');
+    check('a rota /tv/garantia serve a fila',
+      !!rota && /tv-garantia-fila/.test(rota.destination));
+  }
+
   console.log('▶ Cenário LC — conversão de lead pelo caminho indireto');
   {
     const pr = carregarHandler('api/prospeccao.js');

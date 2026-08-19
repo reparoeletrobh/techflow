@@ -163,6 +163,10 @@
   ],
   "rewrites": [
     {
+      "source": "/tv/garantia-gestao",
+      "destination": "/tv-garantia-v2.html"
+    },
+    {
       "source": "/delete-data",
       "destination": "/exclusao-de-dados.html"
     },
@@ -1000,7 +1004,7 @@
     },
     {
       "source": "/tv/garantia",
-      "destination": "/tv-garantia.html"
+      "destination": "/tv-garantia-fila.html"
     },
     {
       "source": "/tecnico",
