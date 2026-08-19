@@ -232,6 +232,40 @@ export default async function handler(req,res){
   }
 
   // ── BADGE: retorna contagem de leads novos (+ faz sync) ────────────────
+  // ── 🔧 reparar-motivo: repõe o texto dos conflitos que aparecem vazios ──
+  // A régua de recuperação gravava o texto num campo com outro nome; ele existe
+  // no banco, mas a tela lê 'motivoConflito' e o card saía sem nada, deixando a
+  // equipe sem saber por que aquele cliente virou conflito.
+  if(action==='reparar-motivo'){
+    const aplicar=String(req.query.aplicar||'')==='1';
+    const reparados=[], semNada=[];
+    for(const chave of ['prospeccao_adm','prospeccao_tv']){
+      const db=(await dbGet(chave))||{fichas:[]};
+      let mexeu=0;
+      for(const f of (db.fichas||[])){
+        if(String(f.status||'')!=='conflitos_bot') continue;
+        if(String(f.motivoConflito||'').trim()) continue;     // já tem texto
+        // o texto pode estar em qualquer um destes campos, conforme quem criou
+        const achado=f.motivo||f.descricao||f.observacao||f.obs||null;
+        const linha=String(f.nome||'?').slice(0,22)+' '+
+          String(f.telefone||'').slice(-4)+
+          (f.origem?' | origem '+f.origem:'');
+        if(achado){
+          if(aplicar){ f.motivoConflito=String(achado).slice(0,300); mexeu++; }
+          reparados.push(linha+' → "'+String(achado).slice(0,70)+'"');
+        } else {
+          semNada.push(linha+' | nenhum texto guardado em campo nenhum');
+        }
+      }
+      if(aplicar&&mexeu) await dbSet(chave,db);
+    }
+    return res.status(200).json({ok:true,
+      modo:aplicar?'aplicado':'prévia',
+      reparados:reparados.length, semTextoNenhum:semNada.length,
+      L:reparados, SEM_TEXTO:semNada,
+      dica:aplicar?null:'para aplicar: &aplicar=1'});
+  }
+
   if(action==='badge'){
     // Badge apenas LÊ o Redis; sync fica com a página /prospeccao (2h).
     // Self-fetch removido: dobrava as invocations no Vercel.

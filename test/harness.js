@@ -1003,6 +1003,21 @@ function check(nome, cond, extra) {
   // Quando o dicionário não cobria o nome do vídeo, os dois campos ficavam
   // indefinidos e o anúncio ia ao ar mudo — foi o que zerou as duas melhores
   // campanhas de TV no meio do ciclo.
+  // ── 🏷️ conflito do bot precisa nascer com o motivo no campo que a tela lê ──
+  // A régua gravava em 'motivo' e a tela lê 'motivoConflito': o texto existia no
+  // banco e o card aparecia vazio, deixando a equipe sem saber o que houve.
+  console.log('▶ Cenário MC — conflito do bot grava o motivo no campo certo');
+  {
+    const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
+    const i = cw.indexOf("status: 'conflitos_bot'");
+    const trecho = i > 0 ? cw.slice(i, i + 600) : '';
+    check('a régua grava motivoConflito, não motivo',
+      /motivoConflito:/.test(trecho) && !/\bmotivo:\s*'/.test(trecho));
+    const cp = require('fs').readFileSync('api/prospeccao.js', 'utf8');
+    check('existe reparo para os conflitos já gravados errado',
+      /reparar-motivo/.test(cp));
+  }
+
   console.log('▶ Cenário TX — criativo novo sempre nasce com texto');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');

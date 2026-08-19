@@ -3501,8 +3501,11 @@ export default async function handler(req, res) {
                 nome: c.nomeContato || '?', telefone: c.telefone,
                 equipamento: c.equipamento || c.descricao || '',
                 status: 'conflitos_bot',
-                motivo: '🔁 7 tentativas de recuperação sem resposta — orçamento de R$ ' +
-                  (c.valor || '?') + ' parado em aguardando aprovação desde ' +
+                // ⚠️ o campo lido pelo sistema é motivoConflito: gravar em 'motivo'
+                // fazia o texto existir no banco e o card aparecer vazio na tela
+                motivoConflito: '🔁 7 tentativas de recuperação sem resposta — ' +
+                  'orçamento de R$ ' + (c.valor || '?') +
+                  ' parado em aguardando aprovação desde ' +
                   String(c.movedAt || c.criadoEm || '').slice(0, 10) + '. Retomar por TELEFONE.',
                 origem: 'recuperacao-7d',
                 cardId: c.id,
