@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/frenteloja?action=sync-fl&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/30 * * * *"
+      "schedule": "*/15 10-22 * * 1-6"
     },
     {
       "path": "/api/board?action=validate-loja&k=tfk-re2026-Bx7mQp9zKw4Y",
@@ -26,11 +26,11 @@
     },
     {
       "path": "/api/webhook-mp?action=sync-vendas-mp&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/15 10-23 * * *"
     },
     {
       "path": "/api/webhook-mp?action=sync-fin-mp&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/15 10-23 * * *"
     },
     {
       "path": "/api/pipe?action=arquivar-ultima-chamada&k=tfk-re2026-Bx7mQp9zKw4Y",
@@ -42,11 +42,11 @@
     },
     {
       "path": "/api/webhook-mp?action=sync-fin-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 10-23 * * *"
     },
     {
       "path": "/api/tv-webhook-mp?action=sync-fin-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 10-23 * * *"
     },
     {
       "path": "/api/tv-webhook-mp?action=reconciliar-mp&k=tfk-re2026-Bx7mQp9zKw4Y",
@@ -58,7 +58,7 @@
     },
     {
       "path": "/api/tv-pipe?action=pipe-sem-resposta&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 10-22 * * 1-6"
     },
     {
       "path": "/api/financeiro?action=arquivar-automatico&k=tfk-re2026-Bx7mQp9zKw4Y",
@@ -78,19 +78,19 @@
     },
     {
       "path": "/api/wa-bot?action=abordagem-fichas&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/5 10-21 * * 1-6"
     },
     {
       "path": "/api/wa-bot?action=orcamentos-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/3 * * * *"
+      "schedule": "*/3 10-21 * * 1-6"
     },
     {
       "path": "/api/wa-bot?action=conserto-finalizado-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/3 * * * *"
+      "schedule": "*/5 10-21 * * 1-6"
     },
     {
       "path": "/api/wa-bot?action=reativar-conversas&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/trafego?action=inteligencia&recalcular=1&k=tfk-re2026-Bx7mQp9zKw4Y",
@@ -122,7 +122,7 @@
     },
     {
       "path": "/api/fichas?action=sync&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/10 9-22 * * *"
     },
     {
       "path": "/api/trafego?action=pendentes-aprovacao&dias=2&k=tfk-re2026-Bx7mQp9zKw4Y",
@@ -146,11 +146,11 @@
     },
     {
       "path": "/api/tv-logistica?action=distribuir&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/15 10-22 * * 1-6"
     },
     {
       "path": "/api/tv-triagem?action=aplicar-em-massa&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 10-22 * * 1-6"
     },
     {
       "path": "/api/rotina?action=de-hora-em-hora&k=tfk-re2026-Bx7mQp9zKw4Y",

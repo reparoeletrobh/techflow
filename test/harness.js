@@ -1020,6 +1020,38 @@ function check(nome, cond, extra) {
   // ── 🛡️ a fila de garantia de TV precisa funcionar como a de linha branca ──
   // A tela existia mas apontava para o módulo da outra frente, e a rota levava
   // direto para a gestão: quem clicava em Garantia no TV nunca via a fila.
+  // ── 💸 as rotinas não podem rodar fora do expediente ──
+  // Executar de três em três minutos madrugada adentro custava dezenas de
+  // milhares de chamadas por mês sem nada a fazer: fora do horário comercial
+  // a ação apenas confere o relógio e sai.
+  console.log('▶ Cenário CR — rotinas de envio limitadas ao expediente');
+  {
+    const v = JSON.parse(require('fs').readFileSync('vercel.json', 'utf8'));
+    const porDia = (s) => {
+      const [m, hh, , , dw] = s.split(' ');
+      const fm = m.startsWith('*/') ? 60 / +m.slice(2) : (m === '*' ? 60 : m.split(',').length);
+      let fh;
+      if (hh.startsWith('*/')) fh = 24 / +hh.slice(2);
+      else if (hh === '*') fh = 24;
+      else if (hh.includes('-')) { const [a, b] = hh.split('-'); fh = +b - +a + 1; }
+      else fh = hh.split(',').length;
+      let dias = 7;
+      if (dw !== '*') {
+        if (dw.includes('-')) { const [a, b] = dw.split('-'); dias = +b - +a + 1; }
+        else dias = dw.split(',').length;
+      }
+      return fm * fh * (dias / 7);
+    };
+    const total = (v.crons || []).reduce((s, c) => s + porDia(c.schedule), 0);
+    check('o total diário de execuções está sob controle',
+      total < 1600, Math.round(total) + '/dia');
+    // e o envio de orçamento precisa cobrir o expediente inteiro
+    const orc = (v.crons || []).find(c => c.path.includes('orcamentos-pendentes'));
+    const faixa = orc ? orc.schedule.split(' ')[1] : '';
+    check('o envio de orçamento cobre das 7h às 18h BRT',
+      /^10-2[01]$/.test(faixa), faixa);
+  }
+
   console.log('▶ Cenário GT — fila de garantia de TV aponta para o próprio módulo');
   {
     const fsG = require('fs');
