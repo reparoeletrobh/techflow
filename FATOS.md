@@ -143,8 +143,16 @@ a pessoa trabalha não foi entregue.
 ## PROTOCOLO DE DEPLOY
 
 ```
-branch dev → node test/harness.js → 🟢 VERDE → merge main → push → sleep 66s
+trabalha no dev → node test/harness.js → 🟢 VERDE → merge main → push SÓ do main → sleep 66s
 ```
+
+**Nunca dar push no branch dev.** Cada push gera um build, e publicar as duas
+branches dobrava o custo sem nenhum ganho: o endereço de prévia do dev não é
+usado por ninguém. O dev continua existindo localmente como etapa de trabalho.
+
+**Agrupar correções antes de publicar.** Um push por ajuste isolado gerava
+dezenas de builds por dia. Quando não houver urgência, acumular o bloco de
+trabalho e publicar de uma vez.
 
 Arquivo de função na Vercel tem limite de tamanho. `wa-bot.js` passou de 470 mil
 caracteres e deixou de ser publicado — o sintoma é traiçoeiro: nenhum erro,
