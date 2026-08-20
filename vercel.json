@@ -78,15 +78,15 @@
     },
     {
       "path": "/api/wa-bot?action=abordagem-fichas&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/5 10-21 * * 1-6"
+      "schedule": "*/30 10-21 * * 1-6"
     },
     {
       "path": "/api/wa-bot?action=orcamentos-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/3 10-21 * * 1-6"
+      "schedule": "*/30 10-21 * * 1-6"
     },
     {
       "path": "/api/wa-bot?action=conserto-finalizado-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "*/5 10-21 * * 1-6"
+      "schedule": "*/30 10-21 * * 1-6"
     },
     {
       "path": "/api/wa-bot?action=reativar-conversas&k=tfk-re2026-Bx7mQp9zKw4Y",
