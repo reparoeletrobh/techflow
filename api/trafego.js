@@ -3390,6 +3390,50 @@ module.exports = async function handler(req, res) {
         'menos conversas é problema de criativo ou de público' });
   }
 
+  // ── 💰 definir-verba: altera o teto do ciclo por link ──
+  // A configuração só aceitava envio com corpo, o que exige ferramenta própria.
+  // A verba muda de uma semana para outra e quem decide precisa conseguir
+  // ajustá-la sozinho, vendo antes o que estava valendo.
+  if (action === 'definir-verba') {
+    const cfgV = (await dbGet('trafego_config')) || {};
+    const antes = Object.assign({ adm: 2500, tv: 870 }, cfgV.verba || {});
+    const novoAdm = req.query.adm != null ? parseFloat(req.query.adm) : null;
+    const novoTv = req.query.tv != null ? parseFloat(req.query.tv) : null;
+    if (novoAdm == null && novoTv == null) {
+      return res.status(200).json({ ok: true, modo: 'consulta',
+        verbaAtual: antes,
+        total: +(antes.adm + antes.tv).toFixed(2),
+        comoAlterar: 'acrescente &adm=4350 e/ou &tv=870 · e &aplicar=1 para gravar' });
+    }
+    if ((novoAdm != null && !(novoAdm >= 0)) || (novoTv != null && !(novoTv >= 0))) {
+      return res.status(400).json({ ok: false, error: 'valor inválido' });
+    }
+    const depois = Object.assign({}, antes);
+    if (novoAdm != null) depois.adm = novoAdm;
+    if (novoTv != null) depois.tv = novoTv;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        de: antes, para: depois,
+        diferenca: { adm: +(depois.adm - antes.adm).toFixed(2),
+          tv: +(depois.tv - antes.tv).toFixed(2) },
+        totalNovo: +(depois.adm + depois.tv).toFixed(2),
+        dica: 'para gravar: &aplicar=1' });
+    }
+    cfgV.verba = Object.assign({}, cfgV.verba || {}, depois);
+    cfgV.verbaAlteradaEm = new Date().toISOString();
+    await dbSet('trafego_config', cfgV);
+    // confirma que persistiu: verba errada distorce todo o planejamento do ciclo
+    const conf = await dbGet('trafego_config');
+    const gravado = ((conf || {}).verba) || {};
+    const ok = Number(gravado.adm) === depois.adm && Number(gravado.tv) === depois.tv;
+    return res.status(200).json({ ok,
+      verba: gravado,
+      total: +(Number(gravado.adm || 0) + Number(gravado.tv || 0)).toFixed(2),
+      observacao: ok
+        ? 'vale a partir do próximo ciclo montado; campanhas já criadas mantêm a verba atual'
+        : '🚨 a gravação não foi confirmada — rode de novo' });
+  }
+
   if (action === 'r2-diagnostico') {
     // ⚠️ estes são os nomes que o código realmente usa. Havia um segundo padrão
     // de nomes em outra parte do arquivo, e conferir os errados fazia o

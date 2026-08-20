@@ -108,7 +108,7 @@ para o número antigo abriu janela naquele número; a resposta sai por ele.
 **As 5 fases do funil não se pulam:** F1 orçamento → F2 desconto Pix →
 F3 retirada no balcão → F4 troca → F5 compra do equipamento.
 
-**Prazo de reforma e pintura: 10 a 20 dias.** Os 15 minutos do anúncio valem
+**Prazo de reforma e pintura: 3 a 7 dias.** Os 15 minutos do anúncio valem
 para balcão com troca de peça simples.
 
 **A descrição da ficha é o defeito de origem**, registrado antes de o
