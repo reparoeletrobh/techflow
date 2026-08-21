@@ -1110,6 +1110,25 @@ function check(nome, cond, extra) {
   // O cliente é identificado pelos 8 últimos dígitos e finais coincidem entre
   // pessoas diferentes: um conflito de adega na linha branca barrou a
   // negociação de uma TV de outro cliente, segurando R$ 1.410.
+  // ── ⭐ elogio na pesquisa não pode virar oferta de orçamento ──
+  // O cérebro responde em segundos e a leitura da pesquisa rodava de hora em
+  // hora: quem elogiava recebia uma proposta comercial no lugar do pedido de
+  // avaliação, e o momento do elogio se perdia.
+  console.log('▶ Cenário PS — pesquisa trata a resposta antes do cérebro');
+  {
+    const fsP = require('fs');
+    const wh = fsP.readFileSync('api/wa-webhook.js', 'utf8');
+    check('o webhook consulta a pesquisa antes de acionar o cérebro',
+      /satisfacao[\s\S]{0,60}tratar-resposta/.test(wh));
+    check('o cérebro só responde se a pesquisa não assumiu',
+      /!escolhaTv && !pesquisaAssumiu/.test(wh));
+    const sat = fsP.readFileSync('api/satisfacao.js', 'utf8');
+    check('a pesquisa assume apenas o elogio puro',
+      /veredito === 'elogio'[\s\S]{0,2000}assumiu: true/.test(sat));
+    check('reclamação e ressalva liberam o cérebro',
+      /assumiu: false, veredito,\s*\n\s*observacao: 'registrado/.test(sat));
+  }
+
   console.log('▶ Cenário CF — conflito não cruza entre as frentes');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');

@@ -196,6 +196,123 @@ export default async function handler(req, res) {
         'lê o livro de entradas, que inclui televisão e balcão — por isso as listas diferem' });
   }
 
+  // ── ⚡ tratar-resposta: classifica UM cliente na hora em que ele responde ──
+  // A leitura em lote roda de hora em hora, mas o cérebro do bot responde em
+  // segundos: quem elogiava recebia uma oferta de orçamento no lugar do pedido
+  // de avaliação. Esta ação é chamada pelo webhook antes do cérebro e devolve
+  // se a pesquisa assumiu a conversa.
+  if (action === 'tratar-resposta') {
+    const d8t = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const alvo = String(req.query.tel || '');
+    const d = d8t(alvo);
+    if (d.length < 8) return res.status(200).json({ ok: true, assumiu: false });
+    const ctrl = (await dbGet('wa_pesquisa_satisfacao')) || { clientes: {} };
+    const clientes = ctrl.clientes || {};
+    const c = clientes[d];
+    // não é uma resposta de pesquisa: o cérebro segue normalmente
+    if (!c || !c.aguardandoResposta || c.avaliacaoPedida) {
+      return res.status(200).json({ ok: true, assumiu: false });
+    }
+    // a última mensagem do cliente, posterior à pergunta
+    let texto = null, quando = 0;
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'in') continue;
+        if (d8t(e.tel) !== d) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (q <= new Date(c.em || 0).getTime()) continue;
+        const t = String(e.texto || '').trim();
+        if (!t || t.startsWith('🎤 [')) continue;
+        if (q > quando) { quando = q; texto = t; }
+      }
+    } catch (e) {}
+    if (!texto) return res.status(200).json({ ok: true, assumiu: false,
+      motivo: 'ainda não há resposta registrada' });
+
+    // 🧠 classifica: mesmo critério da leitura em lote
+    const CHAVE = (process.env.ANTHROPIC_API_KEY || '').trim();
+    let veredito = 'indefinido';
+    if (CHAVE) {
+      try {
+        const rr = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': CHAVE, 'anthropic-version': '2023-06-01',
+            'content-type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 12, temperature: 0,
+            system: 'Você classifica a resposta de um cliente a uma pesquisa de satisfação ' +
+              'de assistência técnica.\n\nResponda APENAS uma palavra:\n' +
+              'RECLAMACAO — se relata que algo NÃO está funcionando, voltou a apresentar ' +
+              'defeito, está insatisfeito ou cobra solução.\n' +
+              'ELOGIO — se diz que está tudo certo, funcionando, satisfeito, agradece ou ' +
+              'elogia, E NÃO acrescenta nada além disso.\n' +
+              'RESSALVA — se há observação, sugestão, dúvida, pedido, condição, ou se ' +
+              'ainda não usou o equipamento.\n' +
+              'INDEFINIDO — se é ambígua ou não responde à pergunta.\n\n' +
+              'Na dúvida entre ELOGIO e RESSALVA, responda RESSALVA.',
+            messages: [{ role: 'user', content: texto.slice(0, 600) }] }),
+        }).then(x => x.json());
+        const t = ((rr.content || []).filter(b => b.type === 'text')
+          .map(b => b.text).join('') || '').trim().toUpperCase();
+        if (t.includes('RECLAMACAO') || t.includes('RECLAMAÇÃO')) veredito = 'reclamacao';
+        else if (t.includes('ELOGIO')) veredito = 'elogio';
+        else if (t.includes('RESSALVA')) veredito = 'ressalva';
+      } catch (e) {}
+    }
+    // 🔒 sem classificação, o cérebro assume: é melhor uma resposta boa de
+    // negociação que o silêncio de uma pesquisa que não soube o que fazer
+    if (veredito === 'indefinido') {
+      return res.status(200).json({ ok: true, assumiu: false, veredito });
+    }
+
+    const cfg = (await dbGet('wa_credenciais')) || {};
+    const pid = cfg.phoneId || process.env.WA_PHONE_ID;
+    const tk = cfg.token || process.env.WA_TOKEN;
+    const tel = String(c.telefone || '').replace(/\D/g, '') || d;
+
+    if (veredito === 'elogio') {
+      const LINK = 'https://g.page/r/CUDbfbB2xOBHEBM/review';
+      const msg = 'Maravilha! A qualquer momento que precisar de algo pode me chamar aqui ' +
+        'que estaremos prontos pra te atender.\n\n' +
+        'Quero apenas te fazer um último pedido, que me ajuda demais a continuar fazendo ' +
+        'um bom trabalho. Sua avaliação no nosso Google é muito importante pro nosso ' +
+        'crescimento. Se possível nos avalie por favor:\n\n' + LINK;
+      try {
+        const r = await fetch('https://graph.facebook.com/v20.0/' + pid + '/messages', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: tel,
+            type: 'text', text: { body: msg, preview_url: true } }),
+        }).then(x => x.json());
+        if (!(r && r.messages && r.messages[0])) {
+          return res.status(200).json({ ok: false, assumiu: false,
+            erro: (r && r.error && r.error.message) || 'falha no envio' });
+        }
+      } catch (e) {
+        return res.status(200).json({ ok: false, assumiu: false, erro: e.message });
+      }
+      c.avaliacaoPedida = true;
+      c.avaliacaoPedidaEm = new Date().toISOString();
+      c.aguardandoResposta = false;
+      c.respostaCliente = texto.slice(0, 300);
+      await dbSet('wa_pesquisa_satisfacao', ctrl);
+      await anotar({ tipo: 'elogio', tel: d, nome: c.nome, sis: c.sis,
+        equipamento: c.equipamento, resposta: texto.slice(0, 200),
+        avaliacaoPedida: true, viaImediata: true });
+      return res.status(200).json({ ok: true, assumiu: true, veredito: 'elogio' });
+    }
+
+    // reclamação e ressalva: a pesquisa NÃO responde, mas registra e libera o
+    // cérebro para conduzir — quem apontou um problema precisa de conversa real
+    c.aguardandoResposta = false;
+    c.respostaCliente = texto.slice(0, 300);
+    if (veredito === 'reclamacao') c.reclamou = true; else c.teveRessalva = true;
+    await dbSet('wa_pesquisa_satisfacao', ctrl);
+    await anotar({ tipo: veredito, tel: d, nome: c.nome, sis: c.sis,
+      equipamento: c.equipamento, resposta: texto.slice(0, 300), viaImediata: true });
+    return res.status(200).json({ ok: true, assumiu: false, veredito,
+      observacao: 'registrado; o cérebro conduz a conversa' });
+  }
+
   // ── 📊 diario — o que a pesquisa produziu, dia a dia ──
   // O controle guarda o estado de cada cliente; este diário guarda a leitura do
   // conjunto: quantos foram perguntados, quantos elogiaram, quantos apontaram

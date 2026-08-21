@@ -171,10 +171,25 @@ export default async function handler(req, res) {
                         .then(x => x.json());
                       escolhaTv = !!(rE && rE.responderam);
                     } catch (e) {}
+                    // ⭐ o cliente pode estar respondendo à pesquisa de satisfação.
+                    // Quem elogia recebe o pedido de avaliação; deixar o cérebro
+                    // responder por cima fazia o elogio virar oferta de orçamento.
+                    // Reclamação e ressalva são registradas e o cérebro conduz.
+                    let pesquisaAssumiu = false;
                     if (!escolhaTv) {
+                      try {
+                        const rP = await fetch('https://reparoeletroadm.com/api/satisfacao' +
+                          '?action=tratar-resposta&tel=' + telLimpo + '&k=' + KW)
+                          .then(x => x.json());
+                        pesquisaAssumiu = !!(rP && rP.assumiu);
+                      } catch (e) {}
+                    }
+                    if (!escolhaTv && !pesquisaAssumiu) {
                       await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? telLimpo : ''}&k=${KW}`);
                     } else {
-                      console.log('[tv-condenada] escolha registrada — cérebro não responde');
+                      console.log(escolhaTv
+                        ? '[tv-condenada] escolha registrada — cérebro não responde'
+                        : '[satisfação] elogio tratado — cérebro não responde');
                     }
                   }
                 } catch (e) {
