@@ -342,7 +342,7 @@ export default async function handler(req, res) {
     } catch (e) {}
 
     const CHAVE = (process.env.ANTHROPIC_API_KEY || '').trim();
-    const elogios = [], outros = [];
+    const elogios = [], outros = [], reclamacoes = [];
     for (const [d, r] of Object.entries(respostas)) {
       let veredito = 'indefinido';
       if (CHAVE) {
@@ -371,14 +371,21 @@ export default async function handler(req, res) {
         ' | perguntado ' + hh(r.c.em) +
         ' | respondeu "' + r.texto.slice(0, 60).replace(/\n/g, ' ') + '"';
       if (veredito === 'elogio') elogios.push({ d, r, linha });
-      else outros.push(linha + ' | ' + veredito);
+      else {
+        outros.push(linha + ' | ' + veredito);
+        // 🚨 reclamação encontrada aqui nunca virou conflito, porque o cérebro
+        // respondeu por cima e a classificação não chegou a rodar
+        if (veredito === 'reclamacao') reclamacoes.push({ d, r, linha });
+      }
     }
 
     if (!aplicar) {
       return res.status(200).json({ ok: true, modo: 'prévia',
         responderamSemLink: Object.keys(respostas).length,
         elogiosQueVaoReceber: elogios.length,
+        reclamacoesQueViramConflito: reclamacoes.length,
         ELOGIOS: elogios.map(x => x.linha),
+        RECLAMACOES_ABRIRAO_CONFLITO: reclamacoes.map(x => x.linha),
         NAO_SAO_ELOGIO: outros,
         dica: 'para enviar: &aplicar=1' });
     }
@@ -418,9 +425,44 @@ export default async function handler(req, res) {
       } catch (e) { erros.push(x.linha + ' — ' + e.message); }
       await new Promise(s => setTimeout(s, 400));
     }
-    if (feitos.length) await dbSet('wa_pesquisa_satisfacao', ctrl);
+    // 🚨 e as reclamações viram conflito: o cliente relatou um problema e
+    // ninguém foi avisado, porque a classificação não chegou a rodar
+    const conflitos = [];
+    for (const x of reclamacoes) {
+      const cli = clientes[x.d] || {};
+      if (cli.reclamou) continue;                       // já registrado antes
+      try {
+        const r = await fetch('https://reparoeletroadm.com/api/conflitos?action=criar&k=' +
+          ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            titulo: 'Reclamação na pesquisa — ' + String(cli.nome || '?').slice(0, 30),
+            tipo: 'qualidade', prioridade: 'alto',
+            setor: cli.sis === 'TV' ? 'TV' : 'Assistência',
+            ficha: String(cli.nome || '?') + ' ' + x.d.slice(-4),
+            cliente: cli.nome || '?', telefone: cli.telefone || x.d,
+            equipamento: cli.equipamento || '',
+            descricao: 'Respondeu à pesquisa de satisfação: "' +
+              String(x.r.texto).slice(0, 400) + '"' +
+              (cli.equipamento ? '\n\nEquipamento: ' + cli.equipamento : ''),
+            registradoPor: 'pesquisa de satisfação',
+          }),
+        }).then(y => y.json());
+        if (r && r.ok) {
+          cli.reclamou = true;
+          cli.aguardandoResposta = false;
+          cli.respostaCliente = String(x.r.texto).slice(0, 300);
+          conflitos.push(x.linha);
+          await anotar({ tipo: 'reclamacao', tel: x.d, nome: cli.nome, sis: cli.sis,
+            equipamento: cli.equipamento, resposta: String(x.r.texto).slice(0, 300),
+            conflitoAberto: true, recuperado: true });
+        } else erros.push(x.linha + ' — conflito recusado');
+      } catch (e) { erros.push(x.linha + ' — conflito: ' + e.message); }
+    }
+    if (feitos.length || conflitos.length) await dbSet('wa_pesquisa_satisfacao', ctrl);
     return res.status(200).json({ ok: erros.length === 0,
-      enviados: feitos.length, L: feitos, erros });
+      enviados: feitos.length, L: feitos,
+      conflitosAbertos: conflitos.length, CONFLITOS: conflitos, erros });
   }
 
   // ── 📊 diario — o que a pesquisa produziu, dia a dia ──
