@@ -243,10 +243,16 @@ export default async function handler(req, res) {
               'de assistência técnica.\n\nResponda APENAS uma palavra:\n' +
               'RECLAMACAO — se relata que algo NÃO está funcionando, voltou a apresentar ' +
               'defeito, está insatisfeito ou cobra solução.\n' +
-              'ELOGIO — se diz que está tudo certo, funcionando, satisfeito, agradece ou ' +
-              'elogia, E NÃO acrescenta nada além disso.\n' +
-              'RESSALVA — se há observação, sugestão, dúvida, pedido, condição, ou se ' +
-              'ainda não usou o equipamento.\n' +
+              'ELOGIO — SOMENTE se a mensagem inteira é satisfação ou agradecimento, ' +
+              'sem NENHUM acréscimo. Exemplos que SÃO elogio: "Obrigado", "Tudo certo, ' +
+              'muito obrigado", "Ficou ótimo".\n' +
+              'RESSALVA — se há qualquer coisa além do agradecimento: observação, ' +
+              'sugestão, dúvida, pedido, condição, promessa de responder depois, ou se ' +
+              'a pessoa ainda não usou nem verificou o equipamento. Exemplos que NÃO são ' +
+              'elogio: "Liguei ontem, ainda não olhei, mando informações depois", ' +
+              '"Obrigado, mas tenho uma dúvida", "Está bom, só que...", ' +
+              '"Ainda não testei, obrigada". O agradecimento junto de qualquer outra ' +
+              'coisa é RESSALVA, não elogio.\n' +
               'INDEFINIDO — se é ambígua ou não responde à pergunta.\n\n' +
               'Na dúvida entre ELOGIO e RESSALVA, responda RESSALVA.',
             messages: [{ role: 'user', content: texto.slice(0, 600) }] }),
