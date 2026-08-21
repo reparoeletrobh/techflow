@@ -253,7 +253,9 @@ export default async function handler(req,res){
       const dt = idade(quando);
       // 🏪 quando o equipamento chegou na loja: é a referência que a equipe usa
       // para saber há quanto tempo aquilo está lá, independentemente da coluna
-      const entrada = f.entradaEm || f.criadoEm || null;
+      // o campo gravado na criação é createdAt — procurar só por criadoEm
+      // deixava o registro sem a data de entrada de toda ficha do balcão
+      const entrada = f.createdAt || f.entradaEm || f.criadoEm || null;
       const diasNaLoja = idade(entrada);
       const selo = 'entrou ' + hh(entrada) +
         (diasNaLoja != null ? ' (há ' + diasNaLoja + 'd na loja)' : '');

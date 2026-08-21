@@ -836,7 +836,13 @@ function buildCard(f){
     // 🏪 quando o equipamento entrou na loja e há quantos dias está aqui: a
     // coluna diz a etapa, mas não o tempo que o aparelho ocupa espaço
     (function(){
-      var e = f.entradaEm || f.criadoEm;
+      // 🗓️ qualquer data que indique quando o aparelho chegou: fichas antigas
+      // e as vindas de outros caminhos nem sempre têm o campo de criação, e
+      // exigir só ele deixava o card sem informação nenhuma
+      // 🗓️ o campo gravado na criação chama-se createdAt; os demais cobrem
+      // fichas antigas e as vindas por outros caminhos
+      var e = f.createdAt || f.entradaEm || f.criadoEm || f.registradoEm
+        || (f.history && f.history.length ? f.history[0].ts : null) || f.movedAt;
       if(!e) return '';
       var dt = new Date(e);
       if(isNaN(dt.getTime())) return '';
