@@ -1106,6 +1106,20 @@ function check(nome, cond, extra) {
   // O painel olhava só a janela de eventos, que cobre poucos dias: quem
   // recebeu vários toques da régua semanas atrás aparecia como abandonado,
   // e a equipe era mandada ligar para quem o sistema já vinha trabalhando.
+  // ── 🔀 conflito de uma frente não barra a outra ──
+  // O cliente é identificado pelos 8 últimos dígitos e finais coincidem entre
+  // pessoas diferentes: um conflito de adega na linha branca barrou a
+  // negociação de uma TV de outro cliente, segurando R$ 1.410.
+  console.log('▶ Cenário CF — conflito não cruza entre as frentes');
+  {
+    const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
+    check('os conflitos são lidos das duas prospecções, separados',
+      /conflitoPorFrente/.test(cw) &&
+      /\['prospeccao_adm', 'ADM'\], \['prospeccao_tv', 'TV'\]/.test(cw));
+    check('o filtro do disparo usa a frente do próprio card',
+      /conflitoPorFrente\[frenteA\]/.test(cw));
+  }
+
   console.log('▶ Cenário SC — sem contato considera o controle de disparos');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');

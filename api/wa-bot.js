@@ -785,14 +785,22 @@ export default async function handler(req, res) {
       cvv.total++;
       if (e.dir === 'in') { cvv.dele++; if (q > cvv.ultimaDele) cvv.ultimaDele = q; }
     }
-    // conflitos já abertos na prospecção
-    try {
-      const pr = await dbGet('prospeccao_adm');
-      for (const f of (((pr || {}).fichas) || [])) {
-        if (!/conflito/i.test(String(f.status || ''))) continue;
-        const t = d8d(f.telefone); if (t) conflitoAberto[t] = f.status;
-      }
-    } catch (e) {}
+    // ⚠️ conflitos abertos, SEPARADOS POR FRENTE. O cliente é identificado
+    // pelos 8 últimos dígitos, e finais coincidem com frequência entre pessoas
+    // diferentes: um conflito de adega na linha branca chegou a barrar a
+    // negociação de uma TV de outro cliente com o mesmo final.
+    const conflitoPorFrente = { ADM: {}, TV: {} };
+    for (const [chave, frente] of [['prospeccao_adm', 'ADM'], ['prospeccao_tv', 'TV']]) {
+      try {
+        const pr = await dbGet(chave);
+        for (const f of (((pr || {}).fichas) || [])) {
+          if (!/conflito/i.test(String(f.status || ''))) continue;
+          const t = d8d(f.telefone); if (t) conflitoPorFrente[frente][t] = f.status;
+        }
+      } catch (e) {}
+    }
+    // mantido para o restante do código que ainda consulta sem frente
+    Object.assign(conflitoAberto, conflitoPorFrente.ADM, conflitoPorFrente.TV);
 
     // 🎯 O CRITÉRIO É ESTE: está em aguardando aprovação e nunca recebeu o
     // disparo de orçamento. Nada além disso decide quem entra.
@@ -805,7 +813,12 @@ export default async function handler(req, res) {
       .map(x => x.slice(-4)));
     const porCliente = {}, comConversa = [], comConflito = [], excluidosManual = [];
     for (const a of alvo) {
-      if (conflitoAberto[a.d]) { comConflito.push({ ...a, status: conflitoAberto[a.d] }); continue; }
+      // 🎯 o conflito só barra na MESMA frente: o cliente da linha branca e o
+      // da televisão podem ter o mesmo final de telefone e serem pessoas
+      // diferentes, e um conflito de um não pode travar a negociação do outro
+      const frenteA = String(a.sis || '').toUpperCase() === 'TV' ? 'TV' : 'ADM';
+      const conf = (conflitoPorFrente[frenteA] || {})[a.d];
+      if (conf) { comConflito.push({ ...a, status: conf }); continue; }
       if (excluirManual.has(a.d.slice(-4))) { excluidosManual.push(a); continue; }
       // informativo: quem está conversando ENTRA, mas fica sinalizado
       const cv = conversaViva[a.d];
