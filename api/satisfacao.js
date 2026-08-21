@@ -313,6 +313,116 @@ export default async function handler(req, res) {
       observacao: 'registrado; o cérebro conduz a conversa' });
   }
 
+  // ── 🔎 elogios-perdidos: quem elogiou e não recebeu o link ──
+  // Enquanto o cérebro respondia por cima da pesquisa, o elogio virava conversa
+  // comercial e o pedido de avaliação nunca saía. Esta varredura relê as
+  // respostas de quem foi perguntado e ainda não recebeu o link.
+  if (action === 'elogios-perdidos') {
+    const aplicar = String(req.query.aplicar || '') === '1';
+    const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = x => x ? new Date(new Date(x).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const ctrl = (await dbGet('wa_pesquisa_satisfacao')) || { clientes: {} };
+    const clientes = ctrl.clientes || {};
+
+    // a resposta de cada cliente que foi perguntado e não recebeu o link
+    const respostas = {};
+    try {
+      for (const e of (await lerEvts())) {
+        if (e.dir !== 'in') continue;
+        const d = d8x(e.tel); if (!d) continue;
+        const c = clientes[d];
+        if (!c || c.avaliacaoPedida) continue;
+        const q = new Date(e.ts || 0).getTime();
+        if (q <= new Date(c.em || 0).getTime()) continue;
+        const txt = String(e.texto || '').trim();
+        if (!txt || txt.startsWith('🎤 [')) continue;
+        if (!respostas[d] || q > respostas[d].ts) respostas[d] = { ts: q, texto: txt, c };
+      }
+    } catch (e) {}
+
+    const CHAVE = (process.env.ANTHROPIC_API_KEY || '').trim();
+    const elogios = [], outros = [];
+    for (const [d, r] of Object.entries(respostas)) {
+      let veredito = 'indefinido';
+      if (CHAVE) {
+        try {
+          const rr = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'x-api-key': CHAVE, 'anthropic-version': '2023-06-01',
+              'content-type': 'application/json' },
+            body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 12, temperature: 0,
+              system: 'Classifique a resposta de um cliente a uma pesquisa de satisfação. ' +
+                'Responda APENAS uma palavra: ELOGIO se diz que está tudo certo, ' +
+                'funcionando, satisfeito, agradece ou elogia, E NADA MAIS. RESSALVA se há ' +
+                'observação, dúvida, pedido, condição, ou se ainda não usou. RECLAMACAO se ' +
+                'relata defeito ou insatisfação. INDEFINIDO se ambígua. Na dúvida entre ' +
+                'ELOGIO e RESSALVA, responda RESSALVA.',
+              messages: [{ role: 'user', content: r.texto.slice(0, 600) }] }),
+          }).then(x => x.json());
+          const t = ((rr.content || []).filter(b => b.type === 'text')
+            .map(b => b.text).join('') || '').trim().toUpperCase();
+          if (t.includes('ELOGIO')) veredito = 'elogio';
+          else if (t.includes('RECLAMACAO') || t.includes('RECLAMAÇÃO')) veredito = 'reclamacao';
+          else if (t.includes('RESSALVA')) veredito = 'ressalva';
+        } catch (e) {}
+      }
+      const linha = String(r.c.nome || '?').slice(0, 22) + ' ' + d.slice(-4) +
+        ' | perguntado ' + hh(r.c.em) +
+        ' | respondeu "' + r.texto.slice(0, 60).replace(/\n/g, ' ') + '"';
+      if (veredito === 'elogio') elogios.push({ d, r, linha });
+      else outros.push(linha + ' | ' + veredito);
+    }
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        responderamSemLink: Object.keys(respostas).length,
+        elogiosQueVaoReceber: elogios.length,
+        ELOGIOS: elogios.map(x => x.linha),
+        NAO_SAO_ELOGIO: outros,
+        dica: 'para enviar: &aplicar=1' });
+    }
+
+    const cfg = (await dbGet('wa_credenciais')) || {};
+    const pid = cfg.phoneId || process.env.WA_PHONE_ID;
+    const tk = cfg.token || process.env.WA_TOKEN;
+    const LINK = 'https://g.page/r/CUDbfbB2xOBHEBM/review';
+    const msg = 'Maravilha! A qualquer momento que precisar de algo pode me chamar aqui ' +
+      'que estaremos prontos pra te atender.\n\n' +
+      'Quero apenas te fazer um último pedido, que me ajuda demais a continuar fazendo ' +
+      'um bom trabalho. Sua avaliação no nosso Google é muito importante pro nosso ' +
+      'crescimento. Se possível nos avalie por favor:\n\n' + LINK;
+    const feitos = [], erros = [];
+    for (const x of elogios) {
+      const cli = clientes[x.d] || {};
+      const tel = String(cli.telefone || '').replace(/\D/g, '') || x.d;
+      try {
+        const r = await fetch('https://graph.facebook.com/v20.0/' + pid + '/messages', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: tel,
+            type: 'text', text: { body: msg, preview_url: true } }),
+        }).then(y => y.json());
+        if (r && r.messages && r.messages[0]) {
+          cli.avaliacaoPedida = true;
+          cli.avaliacaoPedidaEm = new Date().toISOString();
+          cli.aguardandoResposta = false;
+          cli.respostaCliente = String(x.r.texto).slice(0, 300);
+          feitos.push(x.linha);
+          await anotar({ tipo: 'elogio', tel: x.d, nome: cli.nome, sis: cli.sis,
+            equipamento: cli.equipamento, resposta: String(x.r.texto).slice(0, 200),
+            avaliacaoPedida: true, recuperado: true });
+        } else {
+          erros.push(x.linha + ' — ' + ((r && r.error && r.error.message) || 'falha'));
+        }
+      } catch (e) { erros.push(x.linha + ' — ' + e.message); }
+      await new Promise(s => setTimeout(s, 400));
+    }
+    if (feitos.length) await dbSet('wa_pesquisa_satisfacao', ctrl);
+    return res.status(200).json({ ok: erros.length === 0,
+      enviados: feitos.length, L: feitos, erros });
+  }
+
   // ── 📊 diario — o que a pesquisa produziu, dia a dia ──
   // O controle guarda o estado de cada cliente; este diário guarda a leitura do
   // conjunto: quantos foram perguntados, quantos elogiaram, quantos apontaram
