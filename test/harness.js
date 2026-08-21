@@ -1102,6 +1102,21 @@ function check(nome, cond, extra) {
     check('e está em Retornar', f.status === 'retornar');
   }
 
+  // ── 🔍 "sem contato" só quando ninguém falou mesmo ──
+  // O painel olhava só a janela de eventos, que cobre poucos dias: quem
+  // recebeu vários toques da régua semanas atrás aparecia como abandonado,
+  // e a equipe era mandada ligar para quem o sistema já vinha trabalhando.
+  console.log('▶ Cenário SC — sem contato considera o controle de disparos');
+  {
+    const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
+    check('o painel não declara abandono só pela janela de eventos',
+      !/semBot: nossas\.length === 0,/.test(cw));
+    check('o critério considera respostas e disparos registrados',
+      /semBot: nossas\.length === 0 && delas\.length === 0 &&/.test(cw));
+    check('quem tem disparo sem histórico é separado',
+      /semRegistroNaJanela/.test(cw));
+  }
+
   console.log('▶ Cenário RG — envio ao cliente é registrado no histórico');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');

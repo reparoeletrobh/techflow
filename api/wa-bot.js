@@ -1105,7 +1105,14 @@ export default async function handler(req, res) {
           tipoHoje: hojeEnviadas.map(e => e.tipo || 'texto').join(','),
           ultimoNosso: ultimaNossa ? ultimaNossa.ts : null,
           ultimoDele: ultimaDele ? ultimaDele.ts : null,
-          diasSemContato, respostas: delas.length, semBot: nossas.length === 0,
+          diasSemContato, respostas: delas.length,
+          // 🔍 "sem contato" tem de significar que NINGUÉM falou com o cliente.
+          // Olhar só a janela de eventos era enganoso: ela cobre poucos dias e
+          // conversas antigas somem, fazendo o painel acusar de abandonado quem
+          // recebeu vários toques da régua e às vezes até respondeu.
+          semBot: nossas.length === 0 && delas.length === 0 &&
+            !(Number(rec.tentativas || 0) > 0),
+          semRegistroNaJanela: nossas.length === 0 && Number(rec.tentativas || 0) > 0,
           encerrado: !!rec.encerrado });
       }
     }
@@ -1143,6 +1150,8 @@ export default async function handler(req, res) {
         receberamMensagemHoje: receberamHoje.length,
         naoRecebemHa3DiasOuMais: semContatoHa3.length,
         semNenhumContatoDoBot: semBot.length,
+        // recebeu disparo, mas a conversa já saiu da janela de eventos
+        comDisparoSemHistorico: linhas.filter(l => l.semRegistroNaJanela).length,
         sequenciaEsgotada: esgotados.length,
       },
       POR_FASE_DE_VENDA: {
@@ -1161,6 +1170,8 @@ export default async function handler(req, res) {
           ? 'cliente respondeu — a conversa segue pelo cérebro, sem régua'
           : l.recebeuHoje > 0 ? 'recebeu hoje, entra na régua a partir de amanhã'
           : l.semBot ? 'nunca recebeu mensagem do bot'
+          : l.semRegistroNaJanela
+            ? 'recebeu ' + l.disparos + ' disparo(s) — conversa fora da janela'
           : 'recebeu mensagem mas não está inscrito na sequência';
         return l.sis + ' | ' + l.nome.slice(0, 20).padEnd(20) + ' ' + l.tel.slice(-4) +
           ' | R$ ' + String(l.valor.toFixed(2)).padStart(8) + ' | ' + motivo;
