@@ -111,6 +111,13 @@ F3 retirada no balcão → F4 troca → F5 compra do equipamento.
 **Prazo de reforma e pintura: 3 a 7 dias.** Os 15 minutos do anúncio valem
 para balcão com troca de peça simples.
 
+**Forno elétrico: 1 a 7 dias**, conforme a peça estar em BH ou vir de São Paulo.
+
+**Forno com similar novo abaixo de R$ 800 não é coletado.** A mão de obra mais
+o frete inviabilizam. O bot pede a foto da etiqueta ANTES de decidir, recusa a
+coleta com franqueza e oferece a condição especial de balcão. Nunca dizer que
+"não consertamos forno" — o que não compensa é o frete.
+
 **A descrição da ficha é o defeito de origem**, registrado antes de o
 equipamento chegar à loja. Não descreve o estado atual.
 
