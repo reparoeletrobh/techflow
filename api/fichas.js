@@ -143,7 +143,13 @@ export default async function handler(req, res) {
     const diasDe = d => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
 
     // 📚 lê cada banco UMA vez e cruza com todos os alvos, em vez de reler por cliente
-    const BANCOS = [
+    // 🎯 &onde=pipe restringe a consulta ao funil e ao arquivo, que é onde a
+    // operação acompanha o serviço em si — sem as fases de captação e coleta
+    const soPipe = String(req.query.onde || '') === 'pipe';
+    const BANCOS = soPipe ? [
+      ['reparoeletro_pipe', 'pipe ADM'], ['tv_pipe', 'pipe TV'],
+      ['reparoeletro_arquivo', 'arquivo ADM'], ['tv_arquivo', 'arquivo TV'],
+    ] : [
       ['reparoeletro_pipe', 'pipe ADM'], ['tv_pipe', 'pipe TV'],
       ['reparoeletro_frenteloja', 'balcão'], ['reparoeletro_board', 'técnico'],
       ['fichas_adm', 'fichas ADM'], ['fichas_tv', 'fichas TV'],
@@ -198,6 +204,7 @@ export default async function handler(req, res) {
     const col = (x, n) => String(x == null ? '—' : x).padStart(n);
     return res.status(200).json({ ok: true,
       consultados: alvos.length, encontrados: linhas.length,
+      escopo: soPipe ? 'apenas funil e arquivo' : 'todos os bancos',
       semRegistroNenhum: semRegistro,
       POR_STATUS: porStatus,
       valorTotal: +linhas.reduce((s, l) => s + (l.valor || 0), 0).toFixed(2),
