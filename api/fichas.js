@@ -129,6 +129,87 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 📋 rastrear-lote: situação de vários clientes de uma vez ──
+  // Conferir dezenas de fichas uma a uma é inviável. Aqui a lista inteira é
+  // consultada numa passagem só, e cada cliente volta com onde está, o valor,
+  // e há quanto tempo não se move.
+  if (action === 'rastrear-lote') {
+    const brutos = String(req.query.tels || '').split(/[,;\s]+/).filter(Boolean);
+    if (!brutos.length) return res.status(400).json({ ok: false,
+      error: 'informe &tels=0204,4031,0460 (os 4 últimos dígitos, separados por vírgula)' });
+    const alvos = brutos.map(x => x.replace(/\D/g, '')).filter(x => x.length >= 4);
+    const hhL = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : null;
+    const diasDe = d => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+
+    // 📚 lê cada banco UMA vez e cruza com todos os alvos, em vez de reler por cliente
+    const BANCOS = [
+      ['reparoeletro_pipe', 'pipe ADM'], ['tv_pipe', 'pipe TV'],
+      ['reparoeletro_frenteloja', 'balcão'], ['reparoeletro_board', 'técnico'],
+      ['fichas_adm', 'fichas ADM'], ['fichas_tv', 'fichas TV'],
+      ['prospeccao_adm', 'prospecção ADM'], ['prospeccao_tv', 'prospecção TV'],
+      ['reparoeletro_logistica', 'logística ADM'], ['tv_logistica', 'logística TV'],
+      ['reparoeletro_arquivo', 'arquivo ADM'], ['tv_arquivo', 'arquivo TV'],
+    ];
+    const achados = {};
+    for (const a of alvos) achados[a] = [];
+    for (const [chave, rotulo] of BANCOS) {
+      const db = await dbGet(chave);
+      if (!db) continue;
+      for (const L of ['cards', 'fichas']) {
+        for (const x of (((db || {})[L]) || [])) {
+          const tel = String(x.telefone || '').replace(/\D/g, '');
+          if (!tel) continue;
+          for (const a of alvos) {
+            if (!tel.endsWith(a)) continue;
+            const quando = x.movedAt || x.criadoEm || x.createdAt || null;
+            achados[a].push({ onde: rotulo,
+              nome: x.nomeContato || x.nome || x.cliente || '?',
+              status: String(x.phaseId || x.phase || x.status || '?'),
+              valor: Number(x.valor || x.valorOrcamento || 0) || null,
+              equipamento: String(x.equipamento || x.descricao || '').slice(0, 26),
+              quando, dias: diasDe(quando) });
+          }
+        }
+      }
+    }
+
+    // 🎯 a situação que vale é a do registro VIVO mais recente; arquivo só
+    // quando não há mais nada, porque ali o atendimento já terminou
+    const PESO = { 'arquivo ADM': 0, 'arquivo TV': 0 };
+    const linhas = [], semRegistro = [];
+    for (const a of alvos) {
+      const lista = achados[a] || [];
+      if (!lista.length) { semRegistro.push(a); continue; }
+      const vivos = lista.filter(x => PESO[x.onde] !== 0);
+      const base = (vivos.length ? vivos : lista)
+        .sort((p, q) => String(q.quando || '').localeCompare(String(p.quando || '')))[0];
+      linhas.push({ tel: a, nome: base.nome, onde: base.onde, status: base.status,
+        valor: base.valor, equipamento: base.equipamento,
+        dias: base.dias, quando: hhL(base.quando),
+        arquivado: !vivos.length, registros: lista.length,
+        outros: lista.filter(x => x !== base)
+          .map(x => x.onde + '/' + x.status).slice(0, 4) });
+    }
+    linhas.sort((p, q) => (q.dias || 0) - (p.dias || 0));
+
+    const porStatus = {};
+    for (const l of linhas) porStatus[l.status] = (porStatus[l.status] || 0) + 1;
+    const col = (x, n) => String(x == null ? '—' : x).padStart(n);
+    return res.status(200).json({ ok: true,
+      consultados: alvos.length, encontrados: linhas.length,
+      semRegistroNenhum: semRegistro,
+      POR_STATUS: porStatus,
+      valorTotal: +linhas.reduce((s, l) => s + (l.valor || 0), 0).toFixed(2),
+      LISTA: linhas.map(l => l.tel + ' | ' +
+        String(l.nome).slice(0, 20).padEnd(20) + ' | ' +
+        String(l.status).slice(0, 22).padEnd(22) + ' | ' +
+        (l.arquivado ? 'ARQUIVO  ' : String(l.onde).padEnd(9)) + ' | ' +
+        'R$ ' + col(l.valor ? l.valor.toFixed(2) : '—', 8) + ' | ' +
+        'parado ' + col(l.dias, 3) + 'd | ' + String(l.equipamento)),
+      DETALHE: linhas });
+  }
+
   // ── 🔬 rastrear-cliente: tudo que o sistema sabe sobre um telefone ──
   // Quando alguém diz que excluiu e a ficha voltou, é preciso ver o registro
   // inteiro: em que bancos ele existe, com que identificadores, o que cada um
