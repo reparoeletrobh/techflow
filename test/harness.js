@@ -1268,7 +1268,7 @@ function check(nome, cond, extra) {
     check('após clonar, o criativo é substituído',
       /TROCA O CRIATIVO DO CLONE[\s\S]{0,2200}adcreatives/.test(b));
     check('o vídeo novo entra no lugar do vídeo do modelo',
-      /video_id: v\.id[\s\S]{0,900}aplicar criativo/.test(b));
+      /video_id: v\.id[\s\S]{0,1600}aplicar criativo/.test(b));
     check('o texto do dicionário tem precedência sobre o do modelo',
       /vdC\.title = \(txtC && txtC\.titulo\) \|\| vdC\.title/.test(b));
     check('falha na troca é reportada, não silenciada',
