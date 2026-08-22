@@ -114,7 +114,10 @@ module.exports = async function handler(req, res) {
     // vinte por vez, então uma fila de oitenta e seis levava quatro dias para
     // dar a volta — e o cliente ficava sem contato justamente no intervalo em
     // que a negociação esfria. Passa a rodar mais vezes ao longo do dia.
-    if ([10, 14, 17].includes(horaBR)) {
+    // 📅 no sábado o expediente termina às 13h, então as passagens se concentram
+    // na manhã: das 8h às 11h. Nos dias úteis seguem espalhadas pela tarde.
+    const HORAS_REGUA = diaSem === 6 ? [8, 9, 10, 11] : [10, 14, 17];
+    if (HORAS_REGUA.includes(horaBR)) {
       feitos.push(await chamar('régua de recuperação',
         'wa-bot?action=recuperacao-7d&aplicar=1'));
     }

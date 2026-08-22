@@ -723,6 +723,75 @@ export default async function handler(req, res) {
   // Uma fila grande pode ser fila cheia ou fila travada, e a diferença muda o
   // que fazer. Aqui cada card em negociação recebe o motivo pelo qual não
   // recebeu disparo hoje, com a mesma lógica que a régua usa para decidir.
+  // ── 📺 sem-valor-tv: por que estas televisões não têm orçamento ──
+  // Um cartão em negociação sem valor pode ser televisão condenada esperando a
+  // escolha do cliente, pode estar aguardando peça, ou pode ser simplesmente
+  // um diagnóstico que ninguém lançou. A conduta é diferente em cada caso.
+  if (action === 'sem-valor-tv') {
+    const d8v = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hv = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [ppT, bdT, logT, fiT] = await Promise.all([
+      dbGet('tv_pipe'), dbGet('tv_board'), dbGet('tv_logistica'), dbGet('fichas_tv'),
+    ]);
+    // 📺 onde cada televisão está fora do funil
+    const fora = {};
+    for (const [db, lista, rot] of [[bdT, 'cards', 'quadro técnico'],
+                                    [logT, 'fichas', 'logística'],
+                                    [fiT, 'fichas', 'ficha']]) {
+      for (const x of (((db || {})[lista]) || [])) {
+        const d = d8v(x.telefone); if (!d) continue;
+        (fora[d] = fora[d] || []).push({ onde: rot,
+          fase: String(x.phaseId || x.phase || x.status || '?'),
+          condenado: String(x.phaseId || '') === 'condenado',
+          avisoStatus: x.avisoCondenadoStatus || null,
+          escolha: x.escolhaCondenado || x.decisaoCliente || null,
+          diagnostico: String(x.diagnostico || '').slice(0, 60) || null,
+          quando: x.movedAt });
+      }
+    }
+    const linhas = [];
+    for (const c of (((ppT || {}).cards) || [])) {
+      if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+      if (Number(c.valor || 0) > 0) continue;
+      const d = d8v(c.telefone);
+      const ctx = fora[d] || [];
+      const cond = ctx.find(x => x.condenado);
+      let situacao, conduta;
+      if (cond) {
+        situacao = '📺 CONDENADA — sem viabilidade de reparo';
+        conduta = cond.avisoStatus
+          ? 'já avisado (' + cond.avisoStatus + ') — aguarda a escolha do cliente'
+          : '🚨 ainda NÃO foi avisado da condenação';
+      } else if (ctx.some(x => ['aguardando_peca','comprar_peca'].includes(x.fase))) {
+        situacao = 'aguardando peça';
+        conduta = 'o valor sai quando a peça for definida';
+      } else if (ctx.some(x => ['producao','analise'].includes(x.fase))) {
+        situacao = 'em análise técnica';
+        conduta = 'o técnico ainda está avaliando';
+      } else {
+        situacao = '🚨 sem diagnóstico lançado';
+        conduta = 'ninguém orçou — o cartão foi para negociação sem valor';
+      }
+      linhas.push({ nome: String(c.nomeContato || '?').slice(0, 22),
+        tel: String(c.telefone || '').replace(/\D/g, ''),
+        equipamento: String(c.equipamento || '').slice(0, 30),
+        situacao, conduta,
+        ondeEsta: ctx.map(x => x.onde + '/' + x.fase).join(' · ') || 'só no funil',
+        diagnostico: (ctx.find(x => x.diagnostico) || {}).diagnostico || null,
+        desde: hv(c.movedAt) });
+    }
+    const porSituacao = {};
+    for (const l of linhas) porSituacao[l.situacao] = (porSituacao[l.situacao] || 0) + 1;
+    return res.status(200).json({ ok: true,
+      televisoesSemValor: linhas.length,
+      POR_SITUACAO: porSituacao,
+      TABELA: linhas.map(l => String(l.nome).padEnd(22) + ' | ' +
+        String(l.tel).padStart(13) + ' | ' +
+        String(l.equipamento).slice(0, 26).padEnd(26) + ' | ' + l.situacao),
+      DETALHE: linhas });
+  }
+
   if (action === 'por-que-parado') {
     const d8p = t => String(t || '').replace(/\D/g, '').slice(-8);
     const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
