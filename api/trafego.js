@@ -3183,6 +3183,115 @@ module.exports = async function handler(req, res) {
   // ── 📐 estudo-ciclo: a distribuição de verba antes de subir ──
   // Montar o ciclo sem ver a conta antes leva a descobrir o desequilíbrio
   // depois que as campanhas já estão no ar e a verba comprometida.
+  // ── 📋 plano-ciclo: a tabela final antes de subir ──
+  // Junta os campeões que continuam, os criativos novos que estão no
+  // armazenamento e a verba de cada um, para conferir a distribuição inteira
+  // numa tela só antes de comprometer o dinheiro.
+  if (action === 'plano-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKP = String(req.query.token || '').trim() || TOKEN;
+    const cfgP = await cfgTrafego();
+    const vADM = Number(req.query.adm || ((cfgP.verba || {}).adm) || 4350);
+    const vTV = Number(req.query.tv || ((cfgP.verba || {}).tv) || 870);
+    const selo = String(req.query.selo || '15082026');
+    const minConv = Math.max(1, parseInt(req.query.minConv || '10', 10));
+
+    // 1) desempenho do ciclo que encerra
+    const ate = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const desde = new Date(Date.now() - 3 * 3600000 - 7 * 86400000)
+      .toISOString().slice(0, 10);
+    const jan = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${jan}` +
+      `&fields=ad_id,ad_name,spend,actions&limit=300&access_token=${TKP}`, 25);
+    const titulos = {};
+    try {
+      const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads` +
+        `?fields=id,creative{title,body,object_story_spec}&limit=200&access_token=${TKP}`, 20);
+      for (const a of ((ads || {}).data || [])) {
+        const cr = a.creative || {};
+        const vd = ((cr.object_story_spec || {}).video_data) || {};
+        titulos[a.id] = { t: cr.title || vd.title || '', c: cr.body || vd.message || '' };
+      }
+    } catch (e) {}
+    const CONV_P = ['onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.messaging_first_reply',
+      'onsite_conversion.total_messaging_connection', 'lead'];
+    const perf = [];
+    for (const i of ((ins || {}).data || [])) {
+      if (!String(i.ad_name || '').includes(selo)) continue;   // só o ciclo atual
+      let conv = 0;
+      for (const t of CONV_P) {
+        const a = (i.actions || []).find(x => x.action_type === t);
+        if (a) { conv = Number(a.value || 0); break; }
+      }
+      const g = Number(i.spend || 0);
+      const tt = titulos[i.ad_id] || {};
+      perf.push({ nome: String(i.ad_name).replace(' ' + selo, ''), conv, gasto: g,
+        custo: conv > 0 ? +(g / conv).toFixed(2) : null,
+        cat: categoriaDe(i.ad_name || '', 'anuncio'),
+        reforma: ehReforma(i.ad_name, tt.t, tt.c) });
+    }
+    const ord = (a, b) => (a.custo || 9999) - (b.custo || 9999);
+    const campTV = perf.filter(p => p.cat === 'tv' && !p.reforma && p.conv >= minConv).sort(ord);
+    const campADM = perf.filter(p => p.cat !== 'tv' && !p.reforma && p.conv >= minConv).sort(ord);
+    const reforma = perf.filter(p => p.reforma);
+
+    // 2) o que está no armazenamento esperando virar campanha
+    let novosTV = [], novosADM = [];
+    try {
+      const r2 = await fetch('https://reparoeletroadm.com/api/trafego?action=r2-listar&k=' +
+        ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()))
+        .then(x => x.json());
+      const arqs = (r2 && (r2.arquivos || r2.L || r2.videos)) || [];
+      for (const a of arqs) {
+        const n = String(a.nome || a.key || a || '');
+        if (!n) continue;
+        const c = categoriaDe(n, 'anuncio');
+        (c === 'tv' ? novosTV : novosADM).push({ nome: n, cat: c, reforma: ehReforma(n) });
+      }
+    } catch (e) {}
+
+    // 3) a conta: reforma sai primeiro, o resto divide igual
+    const refAtivos = reforma.length;
+    const gastoRef = refAtivos * TETO_REFORMA;
+    const admDisputam = campADM.length + novosADM.length;
+    const porADM = admDisputam ? +((vADM - gastoRef) / admDisputam).toFixed(2) : 0;
+    const tvDisputam = campTV.length + novosTV.length;
+    const porTV = tvDisputam ? +(vTV / tvDisputam).toFixed(2) : 0;
+    const fmt = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+    const linha = (n, tipo, conv, custo, verba) =>
+      String(n).slice(0, 38).padEnd(38) + ' | ' + tipo.padEnd(9) + ' | ' +
+      String(conv == null ? 'novo' : conv + ' conv').padStart(8) + ' | ' +
+      String(custo ? fmt(custo) : '—').padStart(9) + ' | ' + fmt(verba);
+
+    const TABELA_TV = campTV.map(p => linha(p.nome, 'campeão', p.conv, p.custo, porTV))
+      .concat(novosTV.map(p => linha(p.nome, 'novo R2', null, null, porTV)));
+    const TABELA_ADM = campADM.map(p => linha(p.nome, 'campeão', p.conv, p.custo, porADM))
+      .concat(novosADM.map(p => linha(p.nome, 'novo R2', null, null, porADM)))
+      .concat(reforma.map(p => linha(p.nome, '🎨 reforma', p.conv, p.custo, TETO_REFORMA)));
+
+    const somaTV = porTV * tvDisputam;
+    const somaADM = porADM * admDisputam + gastoRef;
+    return res.status(200).json({ ok: true,
+      cicloAvaliado: selo, periodo: desde + ' a ' + ate,
+      RESUMO: {
+        tv: campTV.length + ' campeões + ' + novosTV.length + ' novos = ' +
+          tvDisputam + ' campanhas × ' + fmt(porTV),
+        adm: campADM.length + ' campeões + ' + novosADM.length + ' novos = ' +
+          admDisputam + ' campanhas × ' + fmt(porADM),
+        reforma: refAtivos + ' criativo(s) × ' + fmt(TETO_REFORMA) + ' (teto fixo)',
+      },
+      CABECALHO: 'campanha'.padEnd(38) + ' | tipo      |     conv |     custo | verba',
+      TABELA_TV, TABELA_ADM,
+      CONTA: { tv: fmt(somaTV) + ' de ' + fmt(vTV),
+        adm: fmt(somaADM) + ' de ' + fmt(vADM),
+        total: fmt(somaTV + somaADM) + ' de ' + fmt(vADM + vTV),
+        sobra: fmt((vADM + vTV) - (somaTV + somaADM)) },
+      avisoR2: (novosTV.length + novosADM.length) === 0
+        ? '⚠️ nenhum vídeo novo encontrado no armazenamento — confira se o envio terminou'
+        : null });
+  }
+
   if (action === 'estudo-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const TKE = String(req.query.token || '').trim() || TOKEN;
