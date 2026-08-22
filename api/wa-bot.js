@@ -548,6 +548,137 @@ export default async function handler(req, res) {
   // O sistema tem sete momentos em que fala com o cliente, cada um com fila e
   // trava próprias. Sem uma visão única não dá para saber se algum parou de
   // funcionar — e um disparo que falha em silêncio é cliente sem resposta.
+  // ── 🔬 auditoria-mensagens: cada mensagem contra o estado real do cliente ──
+  // Uma mensagem pode sair perfeita e ainda assim estar errada, se não
+  // corresponde ao que se passa com aquele cliente. Foi o que aconteceu com o
+  // elogio que virou oferta de orçamento. Aqui cada mensagem nossa da semana é
+  // confrontada com a fase em que o cliente está.
+  if (action === 'auditoria-mensagens') {
+    const dias = Math.max(1, Math.min(14, parseInt(req.query.dias || '7', 10)));
+    const desdeMs = Date.now() - dias * 86400000;
+    const d8a = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const ha = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+
+    const [ppA, ppT, board, fl, logA, logT, fiA, fiT] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('reparoeletro_board'),
+      dbGet('reparoeletro_frenteloja'), dbGet('reparoeletro_logistica'),
+      dbGet('tv_logistica'), dbGet('fichas_adm'), dbGet('fichas_tv'),
+    ]);
+    // 🗺️ onde cada cliente está AGORA, por telefone
+    const estado = {};
+    const por = (db, lista, rot) => {
+      for (const x of (((db || {})[lista]) || [])) {
+        const d = d8a(x.telefone); if (!d) continue;
+        (estado[d] = estado[d] || []).push({
+          onde: rot, fase: String(x.phaseId || x.phase || x.status || '?'),
+          valor: Number(x.valor || x.valorOrcamento || 0) || null,
+          equipamento: String(x.equipamento || '').slice(0, 24) });
+      }
+    };
+    por(ppA, 'cards', 'pipe ADM'); por(ppT, 'cards', 'pipe TV');
+    por(board, 'cards', 'técnico'); por(fl, 'fichas', 'balcão');
+    por(logA, 'fichas', 'logística ADM'); por(logT, 'fichas', 'logística TV');
+    por(fiA, 'fichas', 'ficha ADM'); por(fiT, 'fichas', 'ficha TV');
+
+    // 🏷️ o que cada mensagem nossa afirma ao cliente
+    const TIPOS = [
+      { t: 'orçamento', re: /or[çc]amento (est[áa]|ficou|vou te enviar)|valor do (seu )?conserto|fica em \\d+ reais|conserto completo fica/i,
+        exige: c => c.some(x => ['aguardando_aprovacao','orc_registrado','ultima_chamada','analise','orcamento_cadastrado'].includes(x.fase)),
+        oQueExige: 'card em aguardando aprovação ou orçamento registrado' },
+      { t: 'conserto pronto', re: /passou pelo (nosso )?controle de qualidade|conserto (foi )?finalizado|j[áa] est[áa] pronto.*conserto/i,
+        exige: c => c.some(x => ['conserto_realizado','controle_qualidade','aguardando_ret','delivery_feito','solicitar_entrega','entrega_solicitada','erp','finalizado','pago'].includes(x.fase)),
+        oQueExige: 'fase igual ou posterior a conserto realizado' },
+      { t: 'retirada na loja', re: /aguardando voc[êe] aqui na loja|pronto pra retirada|pode vir buscar/i,
+        exige: c => c.some(x => x.onde === 'balcão' || ['aguardando_ret','conserto_realizado'].includes(x.fase)),
+        oQueExige: 'equipamento no balcão ou aguardando retirada' },
+      { t: 'coleta', re: /programar a busca|nossa rota j[áa] passa|vamos buscar|coleta e entrega/i,
+        exige: c => c.some(x => ['criada','contato_feito','entrar_contato','prospeccao','logistica','coleta_solicitada'].includes(x.fase)),
+        oQueExige: 'ficha ainda em captação ou logística' },
+      { t: 'em produção', re: /fila de produ[çc][ãa]o|entrar na fila|j[áa] est[áa] em produ[çc][ãa]o/i,
+        exige: c => c.some(x => ['aprovados','producao','controle_qualidade','conserto_realizado','reforma','comprar_peca','aguardando_peca'].includes(x.fase)),
+        oQueExige: 'card aprovado ou em produção' },
+    ];
+
+    const porTel = {};
+    try {
+      for (const e of (await lerEvts())) {
+        const ts = new Date(e.ts || 0).getTime();
+        if (!(ts >= desdeMs)) continue;
+        const d = d8a(e.tel); if (!d) continue;
+        (porTel[d] = porTel[d] || []).push(e);
+      }
+    } catch (e) {}
+
+    const incoerentes = [], semEstado = [], porTipo = {};
+    let totalNossas = 0, avaliadas = 0;
+    for (const [d, msgs] of Object.entries(porTel)) {
+      const ctx = estado[d] || [];
+      for (const e of msgs) {
+        if (e.dir !== 'out') continue;
+        const txt = String(e.texto || '');
+        if (!txt || txt.startsWith('📨') || txt.startsWith('🔁')) continue;  // rótulo interno
+        totalNossas++;
+        for (const T of TIPOS) {
+          if (!T.re.test(txt)) continue;
+          porTipo[T.t] = (porTipo[T.t] || 0) + 1;
+          avaliadas++;
+          if (!ctx.length) {
+            semEstado.push(ha(e.ts) + ' | ' + d.slice(-4) + ' | disse "' + T.t +
+              '" | 🚨 cliente não existe em nenhum quadro');
+          } else if (!T.exige(ctx)) {
+            incoerentes.push({
+              quando: ha(e.ts), tel: d.slice(-4), afirmou: T.t,
+              exigia: T.oQueExige,
+              estaEm: ctx.map(x => x.onde + '/' + x.fase).slice(0, 3).join(' · '),
+              trecho: txt.slice(0, 110).replace(/\n/g, ' ') });
+          }
+          break;
+        }
+      }
+    }
+
+    // 🔎 segunda parte: fichas em fase com gatilho que NÃO receberam mensagem
+    const FASES_GATILHO = [
+      ['aguardando_aprovacao', ppA, 'cards', 'pipe ADM', 'aviso de orçamento'],
+      ['aguardando_aprovacao', ppT, 'cards', 'pipe TV', 'aviso de orçamento'],
+      ['conserto_realizado', board, 'cards', 'técnico', 'aviso de conserto pronto'],
+      ['conserto_realizado', fl, 'fichas', 'balcão', 'lembrete de retirada'],
+      ['orc_registrado', logA, 'fichas', 'logística ADM', 'aviso de orçamento'],
+      ['orc_registrado', logT, 'fichas', 'logística TV', 'aviso de orçamento'],
+    ];
+    const mudos = [];
+    for (const [fase, db, lista, rot, esperado] of FASES_GATILHO) {
+      for (const x of (((db || {})[lista]) || [])) {
+        if (String(x.phaseId || x.phase || x.status || '') !== fase) continue;
+        const d = d8a(x.telefone); if (!d) continue;
+        const teve = (porTel[d] || []).some(e => e.dir === 'out');
+        if (teve) continue;
+        const q = x.movedAt || x.criadoEm || x.createdAt;
+        const dd = q ? Math.floor((Date.now() - new Date(q).getTime()) / 86400000) : null;
+        if (dd != null && dd > dias) continue;      // mais antigo que a janela lida
+        mudos.push(rot + ' | ' + String(x.nomeContato || x.nome || '?').slice(0, 20) +
+          ' ' + d.slice(-4) + ' | ' + fase + ' há ' + dd + 'd | esperava: ' + esperado);
+      }
+    }
+
+    return res.status(200).json({ ok: incoerentes.length === 0 && semEstado.length === 0,
+      periodo: 'últimos ' + dias + ' dias',
+      clientesComConversa: Object.keys(porTel).length,
+      mensagensNossas: totalNossas,
+      mensagensClassificadas: avaliadas,
+      POR_TIPO: porTipo,
+      VEREDITO: (incoerentes.length || semEstado.length)
+        ? '🚨 ' + (incoerentes.length + semEstado.length) + ' mensagem(ns) fora de contexto'
+        : '✅ toda mensagem classificada corresponde à fase do cliente',
+      FORA_DE_CONTEXTO: incoerentes.slice(0, 40),
+      CLIENTE_INEXISTENTE: semEstado.slice(0, 25),
+      EM_FASE_DE_GATILHO_SEM_NENHUMA_MENSAGEM: mudos.slice(0, 40),
+      comoLer: 'fora de contexto = a mensagem afirma algo que não corresponde à fase ' +
+        'em que o cliente está; a última lista é quem entrou numa fase que dispara ' +
+        'mensagem e não recebeu nada no período' });
+  }
+
   if (action === 'raio-x-disparos') {
     const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
     const hx = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
