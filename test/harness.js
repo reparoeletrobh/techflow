@@ -1114,6 +1114,34 @@ function check(nome, cond, extra) {
   // O cérebro responde em segundos e a leitura da pesquisa rodava de hora em
   // hora: quem elogiava recebia uma proposta comercial no lugar do pedido de
   // avaliação, e o momento do elogio se perdia.
+  // ── 🛡️ aprovar duas vezes não pode duplicar o serviço ──
+  // Uma televisão aprovada há dois dias foi aprovada de novo quando a cliente
+  // perguntou a data de entrega: o segundo processamento a tratou como linha
+  // branca, criou cartão na frente errada e gerou pedido de peça inexistente.
+  console.log('▶ Cenário RA — reaprovação de serviço já em andamento');
+  {
+    delete KV['reparoeletro_almoxarifado'];
+    global.__fetchLog.length = 0;
+    const doisDias = new Date(Date.now() - 2 * 86400000).toISOString();
+    KV['wa_orc_enviados'] = { ids: { o: { telefone: '5531977776666',
+      origem: 'logistica-tv', em: doisDias } } };
+    KV['tv_pipe'] = { cards: [{ id: 'RA1', nomeContato: 'Ja Aprovada',
+      telefone: '5531977776666', phaseId: 'aprovados', aprovadoEm: doisDias,
+      equipamento: 'TV 55' }] };
+    KV['reparoeletro_pipe'] = { cards: [] };
+    KV['tv_logistica'] = { fichas: [] };
+    KV['tv_board'] = { cards: [] };
+    const rr = res();
+    await wabot(req({ action: 'aprovar-cliente', tel: '77776666', aplicar: '1', ...K }), rr);
+    const d = rr.dado || {};
+    check('a reaprovação é recusada', d.ok === false || d.jaAprovado === true);
+    const criouAlmox = global.__fetchLog.some(u =>
+      u.includes('almoxarifado') && u.includes('criar-mover'));
+    check('nenhum pedido criado no almoxarifado', !criouAlmox);
+    check('nenhum card criado na linha branca',
+      !((KV['reparoeletro_pipe'] || {}).cards || []).length);
+  }
+
   console.log('▶ Cenário PS — pesquisa trata a resposta antes do cérebro');
   {
     const fsP = require('fs');

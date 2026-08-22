@@ -212,6 +212,14 @@ async function garantirAprovacao(d8) {
   const bate = t => String(t || '').replace(/\D/g, '').endsWith(String(d8));
   const faseDe = c => c.phaseId || c.phase || '';
   const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
+  // 🛡️ fases em que a aprovação JÁ ACONTECEU. Reprocessar daqui em diante
+  // duplica o serviço: uma televisão aprovada há dois dias foi aprovada de novo
+  // e o segundo processamento a tratou como linha branca, criando cartão na
+  // frente errada e pedido de peça que não existia.
+  const JA_APROVADO = ['aprovados', 'aprovado', 'producao', 'controle_qualidade',
+    'conserto_realizado', 'video_enviado', 'solicitar_entrega', 'entrega_solicitada',
+    'programar_entrega', 'delivery_feito', 'aguardando_ret', 'reforma',
+    'comprar_peca', 'aguardando_peca', 'erp', 'finalizado', 'pago'];
   const passos = [];
 
   // 1) MOVER — acha o card no sistema certo
@@ -236,6 +244,38 @@ async function garantirAprovacao(d8) {
     origemRegistrada = cands[0] || null;                   // o mais recente é o que ele respondeu
   } catch (e) {}
   if (origemRegistrada) passos.push('origem do orçamento: ' + origemRegistrada.origem);
+
+  // 🛡️ TRAVA DE REAPROVAÇÃO: se o cliente JÁ tem card em fase posterior à
+  // negociação, ele não está aprovando — está falando de um serviço em
+  // andamento. Reprocessar aqui duplica o pedido e pode cair na frente errada.
+  {
+    const jaAndando = [];
+    for (const [banco, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((banco || {}).cards) || [])) {
+        if (!bate(c.telefone)) continue;
+        if (JA_APROVADO.includes(faseDe(c))) {
+          jaAndando.push(sis + '/' + faseDe(c) +
+            (c.aprovadoEm ? ' desde ' + String(c.aprovadoEm).slice(0, 10) : ''));
+        }
+      }
+    }
+    // só barra se NÃO houver nenhum card em negociação (o cliente pode ter dois
+    // equipamentos, um andando e outro aguardando) E a aprovação já tiver mais
+    // de uma hora: logo após aprovar, o card já está em 'aprovados' e o próprio
+    // fluxo precisa seguir espelhando no quadro técnico e no almoxarifado
+    const temEmNegociacao = [ppA, ppT].some(b =>
+      (((b || {}).cards) || []).some(c => bate(c.telefone) && NEGOC.includes(faseDe(c))));
+    const aprovadoHaMuito = [ppA, ppT].some(b =>
+      (((b || {}).cards) || []).some(c => bate(c.telefone) &&
+        JA_APROVADO.includes(faseDe(c)) && c.aprovadoEm &&
+        (Date.now() - new Date(c.aprovadoEm).getTime()) > 3600000));
+    if (jaAndando.length && !temEmNegociacao && aprovadoHaMuito) {
+      passos.push('🛡️ NÃO reprocessado: já aprovado e em andamento — ' +
+        jaAndando.join(' · '));
+      return { ok: false, jaAprovado: true, passos,
+        motivo: 'o serviço deste cliente já foi aprovado e está em andamento' };
+    }
+  }
 
   // ═══ TRAVA ANTI-LIMBO: sem origem registrada e com ficha aberta em mais de um sistema ═══
   if (!origemRegistrada) {
@@ -7302,6 +7342,24 @@ Podemos prosseguir com o atendimento?"
    - FORNO ELÉTRICO: prazo de 1 a 7 dias, conforme a peça. Se houver em BH sai
      rápido; se precisar vir de São Paulo, chega perto dos 7 dias. Diga a faixa
      inteira, não prometa o prazo curto antes de saber da peça.
+
+2y) NUNCA OFEREÇA ORÇAMENTO A QUEM JÁ APROVOU (regra nova, siga à risca):
+   Antes de dizer "o orçamento está pronto" ou "vou te enviar o orçamento",
+   OLHE O CONTEXTO DO CLIENTE que vem acima. Se o equipamento dele estiver em
+   qualquer fase a partir de APROVADO — em produção, aguardando peça, em
+   reforma, no controle de qualidade, pronto para retirada, em entrega ou já
+   entregue — então ele JÁ APROVOU e já sabe o valor.
+   Nesse caso, oferecer o orçamento de novo é erro grave: a pessoa aprova pela
+   segunda vez, o sistema duplica o serviço e cria pedido de peça que não
+   existe. Já aconteceu.
+
+   Quando alguém que já aprovou escreve, quase sempre a pergunta é OUTRA:
+   quando fica pronto, quando entregam, como paga, se pode buscar.
+   • "Quando entregam?" → responda o prazo, sem mencionar orçamento.
+   • "Está pronto?" → diga em que etapa está, pelo contexto.
+   • "Quanto ficou?" → aí sim repita o valor que ELE JÁ APROVOU, deixando
+     claro que é o mesmo combinado, não um orçamento novo.
+   Só ofereça orçamento a quem está em aguardando aprovação ou antes disso.
 
 2z) FORNO — TRIAGEM ANTES DE AGENDAR (regra nova, siga à risca):
    Quando o cliente falar de FORNO ELÉTRICO, o primeiro passo é PEDIR A FOTO DA

@@ -5,6 +5,12 @@ try { _funil = require('./_funil'); } catch (e) {
 }
 
 // ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
+// ☀️ a saudação segue o relógio: os modelos traziam "bom dia" fixo e o cliente
+// recebia bom dia às seis da tarde, o que denuncia mensagem automática
+const saudacaoAgora = () => {
+  const h = new Date(Date.now() - 3 * 3600000).getUTCHours();
+  return h < 12 ? 'bom dia' : (h < 18 ? 'boa tarde' : 'boa noite');
+};
 async function pipefyBestEffort(fn) {
   try { return await fn(); }
   catch(e) { console.warn('[Pipefy best-effort]', e.message); return null; }
@@ -647,6 +653,7 @@ export default async function handler(req,res){
       function applyTpl(tpl, pecasStr, preco) {
         return tpl
           .replace(/\[NOME\]/g, pn)
+          .replace(/\[SAUDACAO\]/g, saudacaoAgora())
           .replace(/\[peças\]/g, pecasStr || s.join(', '))
           .replace(/\[VALOR\]/g, preco || '');
       }
@@ -654,16 +661,16 @@ export default async function handler(req,res){
       if (tipo === 'microondas') {
         if (tem(['Troca de Placa','Display'])) {
           const p = pecas(['Troca de Placa','Display']);
-          const tpl = T.microondas_placa?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da [peças], será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          const tpl = T.microondas_placa?.texto || `Ola, [NOME] [SAUDACAO], sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da [peças], será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
           return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
         }
         if (tem(['Vidro','Porta'])) {
           const p = pecas(['Vidro','Porta']);
-          const tpl = T.microondas_vidro?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          const tpl = T.microondas_vidro?.texto || `Ola, [NOME] [SAUDACAO], sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
           return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
         }
-        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '370'), preco:'370' }; }
-        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '370'), preco:'370' }; }
+        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] [SAUDACAO], sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '370'), preco:'370' }; }
+        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] [SAUDACAO], sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '370'), preco:'370' }; }
         if (tem(['Reforma'])) {
           const comRevisao = tem(['Revisão']);
           const preco = comRevisao ? '390' : '370';
@@ -672,11 +679,11 @@ export default async function handler(req,res){
           return { texto: textoFinal, preco };
         }
         if (tem(['Magnetron'])) {
-          const tpl = T.microondas_magnetron?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Magnetron, peca responsavel pelo aquecimento do aparelho. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          const tpl = T.microondas_magnetron?.texto || `Ola, [NOME] [SAUDACAO], sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Magnetron, peca responsavel pelo aquecimento do aparelho. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
           return { texto: applyTpl(tpl, 'Magnetron', '390'), preco:'390' };
         }
         const p = s.join(', ');
-        const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+        const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] [SAUDACAO], sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
         return { texto: applyTpl(tpl, p, '370'), preco:'370' };
       }
       if (tipo === 'bblend') {
