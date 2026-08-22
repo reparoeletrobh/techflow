@@ -3242,6 +3242,68 @@ module.exports = async function handler(req, res) {
   // Existe para desfazer campanha criada errada — apontando para o criativo de
   // outra, com conjunto pausado e verba zero. Só alcança campanhas do ciclo
   // atual e recusa qualquer uma que já tenha gasto, para não apagar histórico.
+  // ── 🚨 duplicatas-ciclo: mesmo vídeo em mais de uma campanha ──
+  // O envio para a biblioteca foi feito duas vezes para alguns arquivos — a
+  // primeira tentativa estourou o tempo depois de já ter enviado parte — e
+  // cada cópia virou uma campanha. Aqui as repetições são identificadas pelo
+  // nome do arquivo e a mais recente de cada par pode ser removida.
+  if (action === 'duplicatas-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKD = String(req.query.token || '').trim() || TOKEN;
+    const selo = String(req.query.selo || '22082026');
+    const aplicar = String(req.query.aplicar || '') === '1';
+
+    const cps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name,created_time,lifetime_budget,insights.date_preset(today){spend}` +
+      `&limit=200&access_token=${TKD}`, 20);
+    const doCiclo = ((cps || {}).data || []).filter(c => String(c.name || '').includes(selo));
+
+    // agrupa pelo nome sem o selo: campanhas do mesmo vídeo têm o mesmo nome
+    const grupos = {};
+    for (const c of doCiclo) {
+      const base = String(c.name).replace(' ' + selo, '').trim().toLowerCase();
+      (grupos[base] = grupos[base] || []).push(c);
+    }
+    const repetidos = Object.entries(grupos).filter(([, v]) => v.length > 1);
+    const paraApagar = [];
+    for (const [base, lista] of repetidos) {
+      // mantém a MAIS ANTIGA; as demais saem, desde que não tenham gasto
+      lista.sort((a, b) => String(a.created_time).localeCompare(String(b.created_time)));
+      for (const c of lista.slice(1)) {
+        const gasto = Number((((c.insights || {}).data || [])[0] || {}).spend || 0);
+        paraApagar.push({ id: c.id, nome: c.name, gasto,
+          verba: Number(c.lifetime_budget || 0) / 100, base });
+      }
+    }
+    const comGasto = paraApagar.filter(x => x.gasto > 0);
+    const semGasto = paraApagar.filter(x => !(x.gasto > 0));
+
+    if (!aplicar) {
+      return res.status(200).json({ ok: repetidos.length === 0,
+        campanhasNoCiclo: doCiclo.length,
+        videosDistintos: Object.keys(grupos).length,
+        duplicatas: paraApagar.length,
+        verbaPresaEmDuplicatas: +paraApagar.reduce((s, x) => s + x.verba, 0).toFixed(2),
+        VAO_SER_APAGADAS: semGasto.map(x => x.nome + ' | R$ ' + x.verba.toFixed(2)),
+        NAO_APAGADAS_POR_TEREM_GASTO: comGasto.map(x =>
+          x.nome + ' | já gastou R$ ' + x.gasto.toFixed(2)),
+        dica: 'para apagar: &aplicar=1' });
+    }
+    const feitas = [], falhas = [];
+    for (const x of semGasto) {
+      try {
+        const r = await fetch(`${GRAPH}/${x.id}?access_token=${TKD}`, { method: 'DELETE' })
+          .then(y => y.json());
+        if (r && r.error) falhas.push(x.nome + ': ' + r.error.message);
+        else feitas.push(x.nome);
+      } catch (e) { falhas.push(x.nome + ': ' + e.message); }
+      await new Promise(s => setTimeout(s, 300));
+    }
+    return res.status(200).json({ ok: falhas.length === 0,
+      apagadas: feitas.length, L: feitas, falhas,
+      mantidasComGasto: comGasto.map(x => x.nome) });
+  }
+
   if (action === 'apagar-campanha') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const TKD = String(req.query.token || '').trim() || TOKEN;
