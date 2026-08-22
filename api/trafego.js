@@ -4031,8 +4031,8 @@ module.exports = async function handler(req, res) {
 
     // 🔥 FORNO ELÉTRICO: categoria nova. Os textos seguem o padrão do
     // micro-ondas, adaptados ao aparelho, conforme definido com o dono.
-    if (cat === 'forno') {
-      const s = String(nome || '').toLowerCase();
+    if (categoria === 'forno') {
+      const s = String(nomeArquivo || '').toLowerCase();
       if (/n[ãa]o esquenta|n[ãa]o aquece|frio/.test(s))
         return { titulo: 'Seu forno não esquenta?',
           corpo: 'Liga mas não aquece, ou assa só de um lado? Costuma ser a ' +
