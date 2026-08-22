@@ -1462,6 +1462,21 @@ module.exports = async function handler(req, res) {
         });
         if (up && up.error) { erros.push(v.title + ' | verba/prazo: ' + up.error.message + ' (cód ' + up.error.code + ')'); continue; }
 
+        // 🔛 ATIVA E RENOMEIA O CONJUNTO: a cópia profunda nasce inteira
+        // pausada. Ativar só a campanha deixava o conjunto parado — a campanha
+        // aparecia ativa no painel e não veiculava nada. E o nome do conjunto
+        // continuava o do modelo, atrapalhando a leitura do ciclo.
+        try {
+          const setsC = await fetch(`${GRAPH}/${nova}/adsets` +
+            `?fields=id,name,status&access_token=${TK}`).then(x => x.json());
+          for (const s of (((setsC || {}).data) || [])) {
+            await postForm(s.id, { name: nomeComData(v.title) + ' - conjunto',
+              status: 'ACTIVE' });
+          }
+        } catch (e) {
+          erros.push(v.title + ' | ⚠️ conjunto pode ter ficado pausado: ' + e.message);
+        }
+
         // 🎬 TROCA O CRIATIVO DO CLONE: a cópia profunda traz o anúncio do
         // modelo inteiro — vídeo e texto. Sem esta etapa a campanha nova
         // exibia o vídeo antigo, e quando o modelo estava sem chamada o
@@ -3247,6 +3262,64 @@ module.exports = async function handler(req, res) {
   // primeira tentativa estourou o tempo depois de já ter enviado parte — e
   // cada cópia virou uma campanha. Aqui as repetições são identificadas pelo
   // nome do arquivo e a mais recente de cada par pode ser removida.
+  // ── 🔧 corrigir-clones: conjunto pausado e com nome do modelo ──
+  // A cópia profunda nasce inteira pausada. O código ativava só a campanha, e
+  // o conjunto continuava parado — a campanha aparecia ativa e não veiculava.
+  // O nome do conjunto também ficava o do modelo, o que confunde na leitura.
+  if (action === 'corrigir-clones') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKC = String(req.query.token || '').trim() || TOKEN;
+    const selo = String(req.query.selo || '22082026');
+    const aplicar = String(req.query.aplicar || '') === '1';
+
+    const cps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns` +
+      `?fields=id,name,status,lifetime_budget&limit=200&access_token=${TKC}`, 20);
+    const doCiclo = ((cps || {}).data || []).filter(c => String(c.name || '').includes(selo));
+    const problemas = [], ok = [];
+    for (const c of doCiclo) {
+      const sets = await fetch(`${GRAPH}/${c.id}/adsets` +
+        `?fields=id,name,status,lifetime_budget,daily_budget&access_token=${TKC}`)
+        .then(x => x.json()).catch(() => null);
+      for (const s of (((sets || {}).data) || [])) {
+        const pausado = String(s.status || '') !== 'ACTIVE';
+        const verbaSet = Number(s.lifetime_budget || s.daily_budget || 0) / 100;
+        const nomeErrado = !String(s.name || '').includes(selo);
+        if (pausado || nomeErrado) {
+          problemas.push({ campanha: c.name, campanhaId: c.id, setId: s.id,
+            setNome: s.name, status: s.status, verbaSet,
+            verbaCampanha: Number(c.lifetime_budget || 0) / 100,
+            precisa: [pausado ? 'ativar' : null, nomeErrado ? 'renomear' : null]
+              .filter(Boolean).join(' + ') });
+        } else ok.push(c.name);
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
+    if (!aplicar) {
+      return res.status(200).json({ ok: problemas.length === 0,
+        campanhasDoCiclo: doCiclo.length,
+        conjuntosComProblema: problemas.length,
+        conjuntosCertos: ok.length,
+        PROBLEMAS: problemas.map(p => p.campanha.slice(0, 46) +
+          ' | conjunto "' + String(p.setNome).slice(0, 34) + '" ' + p.status +
+          ' | verba conj R$ ' + p.verbaSet.toFixed(2) +
+          ' · camp R$ ' + p.verbaCampanha.toFixed(2) +
+          ' | ' + p.precisa),
+        dica: 'para corrigir: &aplicar=1' });
+    }
+    const feitos = [], falhas = [];
+    for (const p of problemas) {
+      try {
+        const campos = { name: p.campanha + ' - conjunto', status: 'ACTIVE' };
+        const r = await postForm(p.setId, campos);
+        if (r && r.error) falhas.push(p.campanha + ': ' + r.error.message);
+        else feitos.push(p.campanha.slice(0, 46) + ' → conjunto ativo e renomeado');
+      } catch (e) { falhas.push(p.campanha + ': ' + e.message); }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return res.status(200).json({ ok: falhas.length === 0,
+      corrigidos: feitos.length, L: feitos, falhas });
+  }
+
   if (action === 'duplicatas-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const TKD = String(req.query.token || '').trim() || TOKEN;

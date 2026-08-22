@@ -1278,6 +1278,21 @@ function check(nome, cond, extra) {
       /clone criado mas o criativo NÃO foi trocado/.test(b));
   }
 
+  // ── 🔛 o conjunto do clone precisa ficar ativo ──
+  // A cópia profunda nasce inteira pausada: ativar só a campanha deixava o
+  // conjunto parado, e a campanha aparecia ativa no painel sem veicular nada.
+  console.log('▶ Cenário CJ — clone ativa e renomeia o conjunto');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    const i = ct.indexOf("action === 'subir-agora'");
+    const b = ct.slice(i, i + 26000);
+    check('o conjunto do clone é ativado', /ATIVA E RENOMEIA O CONJUNTO/.test(b));
+    check('e recebe o nome da campanha nova',
+      /nomeComData\(v\.title\) \+ ' - conjunto'/.test(b));
+    check('existe conserto para os clones já criados',
+      /corrigir-clones/.test(ct));
+  }
+
   console.log('▶ Cenário TM — trava final impede criativo mudo');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
