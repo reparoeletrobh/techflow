@@ -770,7 +770,7 @@ export default async function handler(req, res) {
         elegiveis++;
       }
     }
-    const POR_PASSAGEM = 22;
+    const POR_PASSAGEM = 27;   // 50s por passagem
     const capacidade = faltam.length * POR_PASSAGEM;
     return res.status(200).json({
       ok: capacidade >= elegiveis,
@@ -4271,7 +4271,10 @@ export default async function handler(req, res) {
     for (const x of loteGirado) {
       _percorridos++;
       // ⏱️ trava de tempo: a função da Vercel tem limite; para antes de estourar
-      if (Date.now() - _tInicio > 40000) {
+      // ⏱️ 50 segundos: a função tem limite de 60, e parar aos 40 deixava um
+      // terço da capacidade sem uso — com a fila em 78 e três passagens no
+      // sábado, faltavam doze clientes para fechar o dia
+      if (Date.now() - _tInicio > 50000) {
         mudaramDeFase.push('⏱️ parou em ' + enviados.length +
           ' por limite de tempo — a próxima passagem continua daqui');
         controle.giro = _ini + _percorridos - 1;   // onde retomar
