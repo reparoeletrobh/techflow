@@ -1158,6 +1158,8 @@ module.exports = async function handler(req, res) {
     // 📋 vídeos cujo nome o dicionário não reconheceu: o texto veio de reserva,
     // e vale saber quais para enriquecer o dicionário
     const semDicionario = [];
+    // 🎨 criativos que entraram com o teto de reforma
+    const comTetoReforma = [];
 
     // 📅 término: sábado 11h BRT — SEMPRE no futuro. Rodando num sábado depois das 11h
     // o cálculo antigo apontava para hoje, e as campanhas nasciam já encerradas.
@@ -1238,6 +1240,8 @@ module.exports = async function handler(req, res) {
       }
     } catch (e) {}
     for (const v of alvo) {
+      // 💰 cada vídeo pode ter verba própria: a de reforma é limitada
+      let verbaEfetiva = verba;
       try {
         // 🛡 DUPLICATA: não recriar campanha que já existe com o mesmo nome no ciclo.
         const nomePrev = nomeComData(v.title);
@@ -1292,7 +1296,7 @@ module.exports = async function handler(req, res) {
             billing_event: mSet.billing_event || 'IMPRESSIONS',
             bid_strategy: mSet.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
             status: 'PAUSED',
-            lifetime_budget: String(Math.round(verba * 100)),
+            lifetime_budget: String(Math.round(verbaEfetiva * 100)),
             start_time: String(inicioUnix),
             end_time: String(fimUnix),
           };
@@ -1337,6 +1341,15 @@ module.exports = async function handler(req, res) {
                   'garantia e coleta na sua casa. Chama no WhatsApp!' },
             };
             const reserva = GENERICO[cat] || GENERICO.institucional;
+            // 🎨 reforma, pintura e ferrugem entram com teto próprio: são
+            // serviço de ticket baixo e demanda estreita, e dar-lhes a verba
+            // cheia tira recurso de campanha que traz conserto
+            if (ehReforma(v.title, (txt || {}).titulo, (txt || {}).corpo,
+                          doModelo.title, doModelo.message)) {
+              verbaEfetiva = Math.min(verba, TETO_REFORMA);
+              comTetoReforma.push(String(v.title || '?').slice(0, 34));
+            }
+
             // 1º o dicionário do defeito · 2º o texto do próprio modelo · 3º o genérico
             novoOss.video_data.title =
               (txt && txt.titulo) || doModelo.title || reserva.titulo;
@@ -1383,7 +1396,7 @@ module.exports = async function handler(req, res) {
         // 2) nome, verba e término, já ativa
         const up = await postForm(nova, {
           name: nomeComData(v.title),
-          lifetime_budget: String(Math.round(verba * 100)),
+          lifetime_budget: String(Math.round(verbaEfetiva * 100)),
           stop_time: String(fimUnix),
           status: 'ACTIVE',
         });
@@ -1416,6 +1429,7 @@ module.exports = async function handler(req, res) {
     }
     return res.status(200).json({ ok: erros.length === 0, criados: feitos.length, feitos, erros,
       SEM_TEXTO_NO_DICIONARIO: semDicionario,
+      COM_TETO_DE_REFORMA: comTetoReforma,
       // 🔍 conferência imediata: anúncio sem chamada é vídeo mudo e não converte
       MUDOS: await (async () => {
         const mudos = [];
@@ -3154,6 +3168,87 @@ module.exports = async function handler(req, res) {
   // negócio: o que importa é quanto custa cada etapa até o dinheiro entrar.
   // Aqui o gasto de cada categoria é confrontado com quantas fichas chegaram,
   // quantas foram orçadas, aprovadas e pagas — e com o que faturaram.
+  // ── 📐 estudo-ciclo: a distribuição de verba antes de subir ──
+  // Montar o ciclo sem ver a conta antes leva a descobrir o desequilíbrio
+  // depois que as campanhas já estão no ar e a verba comprometida.
+  if (action === 'estudo-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKE = String(req.query.token || '').trim() || TOKEN;
+    const cfgE = await cfgTrafego();
+    const vADM = Number(req.query.adm || ((cfgE.verba || {}).adm) || 4350);
+    const vTV = Number(req.query.tv || ((cfgE.verba || {}).tv) || 870);
+    const nTV = Math.max(1, parseInt(req.query.qtdTv || '3', 10));
+    const nADM = Math.max(1, parseInt(req.query.qtdAdm || '20', 10));
+
+    // 🏆 desempenho do ciclo que está encerrando, para eleger os campeões
+    const dias = Math.max(3, Math.min(14, parseInt(req.query.dias || '7', 10)));
+    const ate = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const desde = new Date(Date.now() - 3 * 3600000 - dias * 86400000)
+      .toISOString().slice(0, 10);
+    const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}` +
+      `&fields=ad_id,ad_name,spend,impressions,actions&limit=300&access_token=${TKE}`, 25);
+
+    const CONV_E = ['onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.messaging_first_reply',
+      'onsite_conversion.total_messaging_connection', 'lead'];
+    const perf = [];
+    for (const i of ((ins || {}).data || [])) {
+      let conv = 0;
+      for (const t of CONV_E) {
+        const a = (i.actions || []).find(x => x.action_type === t);
+        if (a) { conv = Number(a.value || 0); break; }
+      }
+      const gasto = Number(i.spend || 0);
+      perf.push({ nome: i.ad_name || '?', gasto, conv,
+        custo: conv > 0 ? +(gasto / conv).toFixed(2) : null,
+        cat: categoriaDe(i.ad_name || '', 'anuncio'),
+        reforma: ehReforma(i.ad_name) });
+    }
+    // 🎨 reforma sai da disputa: teto próprio e sem direito a verba de campeão
+    const disputam = perf.filter(p => !p.reforma && p.conv >= 2)
+      .sort((a, b) => (a.custo || 9999) - (b.custo || 9999));
+    const reformas = perf.filter(p => p.reforma);
+
+    const campTV = disputam.filter(p => p.cat === 'tv').slice(0, nTV);
+    const campADM = disputam.filter(p => p.cat !== 'tv').slice(0, nADM);
+
+    // 💰 distribuição: a verba de reforma sai ANTES, e o resto é dividido
+    const nRef = reformas.length;
+    const reservaRef = Math.min(nRef * TETO_REFORMA, vADM * 0.15);
+    const porRef = nRef ? +(reservaRef / nRef).toFixed(2) : 0;
+    const sobraADM = vADM - reservaRef;
+    const porADM = campADM.length ? +(sobraADM / campADM.length).toFixed(2) : 0;
+    const porTV = campTV.length ? +(vTV / campTV.length).toFixed(2) : 0;
+
+    const fmt = v => 'R$ ' + v.toFixed(2).replace('.', ',');
+    return res.status(200).json({ ok: true,
+      periodoAvaliado: desde + ' a ' + ate,
+      VERBA: { adm: vADM, tv: vTV, total: vADM + vTV },
+      DISTRIBUICAO: {
+        tv: nTV + ' campanhas × ' + fmt(porTV) + ' = ' + fmt(porTV * campTV.length),
+        adm: campADM.length + ' campanhas × ' + fmt(porADM) + ' = ' + fmt(porADM * campADM.length),
+        reforma: nRef + ' criativo(s) × ' + fmt(porRef) + ' = ' + fmt(porRef * nRef) +
+          ' (teto de ' + fmt(TETO_REFORMA) + ' por semana, fora da disputa)',
+      },
+      CAMPEOES_TV: campTV.map((p, i) => (i + 1) + '. ' + String(p.nome).slice(0, 40).padEnd(40) +
+        ' | ' + p.conv + ' conv | ' + fmt(p.custo || 0) + '/conv → ' + fmt(porTV)),
+      CAMPEOES_ADM: campADM.map((p, i) => (i + 1) + '. ' + String(p.nome).slice(0, 40).padEnd(40) +
+        ' | ' + p.conv + ' conv | ' + fmt(p.custo || 0) + '/conv → ' + fmt(porADM)),
+      REFORMA_TETO_PROPRIO: reformas.map(p => String(p.nome).slice(0, 40).padEnd(40) +
+        ' | ' + p.conv + ' conv | ' + fmt(p.custo || 0) + '/conv → ' + fmt(porRef)),
+      FORA_POR_POUCA_ENTREGA: perf.filter(p => !p.reforma && p.conv < 2)
+        .map(p => String(p.nome).slice(0, 40) + ' | ' + p.conv + ' conv'),
+      conferencia: {
+        somaDistribuida: +(porTV * campTV.length + porADM * campADM.length +
+          porRef * nRef).toFixed(2),
+        tetoAutorizado: vADM + vTV,
+      },
+      observacao: 'criativos de reforma, pintura e ferrugem têm teto próprio e ' +
+        'não recebem verba de campeão, porque puxariam recurso de campanhas que ' +
+        'trazem conserto' });
+  }
+
   if (action === 'funil-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const TKF = String(req.query.token || '').trim() || TOKEN;
@@ -3770,7 +3865,18 @@ module.exports = async function handler(req, res) {
   }
 
   // ── ✍️ textos por DEFEITO: cada criativo fala do problema que mostra ──
-  function textoPorDefeito(nomeArquivo, categoria) {
+  // 🎨 REFORMA, PINTURA E FERRUGEM: serviço de ticket baixo e demanda estreita.
+// Recebe teto semanal próprio e NÃO participa da distribuição de campeões,
+// porque um bom desempenho aqui puxaria verba de campanhas que trazem conserto.
+const TETO_REFORMA = 100;
+// ⚠️ o nome da campanha nem sempre revela o serviço: "Influ 5 T" e
+// "Microondas Katia 5" anunciam pintura, e só o título do anúncio denuncia.
+// Por isso a verificação considera nome, título e corpo.
+const ehReforma = (...partes) =>
+  /reforma|pintura|pintar|ferrugem|enferruj|repintura|restaura/i
+    .test(partes.filter(Boolean).join(' '));
+
+function textoPorDefeito(nomeArquivo, categoria) {
     const s = String(nomeArquivo || '').toLowerCase().replace(/\.(mov|mp4|avi)$/i, '');
     const TV = [
       { re: /som.*(n[aã]o|sem).*(imagem|v[ií]deo)|sem imagem|n[aã]o d[aá] imagem/,

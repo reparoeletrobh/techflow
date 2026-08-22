@@ -1248,6 +1248,22 @@ function check(nome, cond, extra) {
       /reparar-motivo/.test(cp));
   }
 
+  // ── 🎨 reforma e pintura têm teto próprio ──
+  // São serviço de ticket baixo e demanda estreita: dar-lhes a verba cheia
+  // tira recurso de campanha que traz conserto, e um bom desempenho aqui
+  // não pode puxar verba de campeão.
+  console.log('▶ Cenário RF — criativo de reforma entra com teto limitado');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    check('há teto declarado para reforma', /const TETO_REFORMA = 100;/.test(ct));
+    check('a verificação olha nome, título e corpo',
+      /const ehReforma = \(\.\.\.partes\)/.test(ct));
+    check('a verba do conjunto usa a verba efetiva',
+      /lifetime_budget: String\(Math\.round\(verbaEfetiva \* 100\)\)/.test(ct));
+    check('o estudo tira reforma da disputa de campeões',
+      /disputam = perf\.filter\(p => !p\.reforma/.test(ct));
+  }
+
   console.log('▶ Cenário TX — criativo novo sempre nasce com texto');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
