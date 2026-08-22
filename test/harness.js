@@ -1267,8 +1267,11 @@ function check(nome, cond, extra) {
     const b = ct.slice(i, i + 24000);
     check('após clonar, o criativo é substituído',
       /TROCA O CRIATIVO DO CLONE[\s\S]{0,2200}adcreatives/.test(b));
+    // verifica os dois fatos separadamente: medir a distância entre eles
+    // fazia o teste falhar sempre que o bloco crescia
     check('o vídeo novo entra no lugar do vídeo do modelo',
-      /video_id: v\.id[\s\S]{0,1600}aplicar criativo/.test(b));
+      /const vdC = \{ \.\.\.\(ossC\.video_data \|\| \{\}\), video_id: v\.id \}/.test(b) &&
+      /aplicar criativo/.test(b));
     check('o texto do dicionário tem precedência sobre o do modelo',
       /vdC\.title = \(txtC && txtC\.titulo\) \|\| vdC\.title/.test(b));
     check('falha na troca é reportada, não silenciada',
