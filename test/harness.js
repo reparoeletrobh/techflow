@@ -1256,6 +1256,25 @@ function check(nome, cond, extra) {
   // O resguardo anterior ficava dentro da condição que trata o formato de
   // vídeo: ao copiar como modelo uma campanha que já estava muda, o bloco não
   // executava e o defeito se propagava para a campanha nova.
+  // ── 🎬 o clone precisa trocar vídeo E texto ──
+  // A cópia profunda traz o anúncio do modelo inteiro: a campanha nova exibia
+  // o vídeo antigo, e quando o modelo estava sem chamada o defeito se
+  // propagava para todas as campanhas do ciclo.
+  console.log('▶ Cenário CL — clone troca o criativo pelo vídeo novo');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    const i = ct.indexOf("action === 'subir-agora'");
+    const b = ct.slice(i, i + 24000);
+    check('após clonar, o criativo é substituído',
+      /TROCA O CRIATIVO DO CLONE[\s\S]{0,2200}adcreatives/.test(b));
+    check('o vídeo novo entra no lugar do vídeo do modelo',
+      /video_id: v\.id[\s\S]{0,900}aplicar criativo/.test(b));
+    check('o texto do dicionário tem precedência sobre o do modelo',
+      /vdC\.title = \(txtC && txtC\.titulo\) \|\| vdC\.title/.test(b));
+    check('falha na troca é reportada, não silenciada',
+      /clone criado mas o criativo NÃO foi trocado/.test(b));
+  }
+
   console.log('▶ Cenário TM — trava final impede criativo mudo');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');

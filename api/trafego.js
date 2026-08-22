@@ -1456,7 +1456,48 @@ module.exports = async function handler(req, res) {
           status: 'ACTIVE',
         });
         if (up && up.error) { erros.push(v.title + ' | verba/prazo: ' + up.error.message + ' (cód ' + up.error.code + ')'); continue; }
-        feitos.push({ video: v.title, campanha: nova, verba, videoId: v.id });
+
+        // 🎬 TROCA O CRIATIVO DO CLONE: a cópia profunda traz o anúncio do
+        // modelo inteiro — vídeo e texto. Sem esta etapa a campanha nova
+        // exibia o vídeo antigo, e quando o modelo estava sem chamada o
+        // defeito se propagava para todas as campanhas do ciclo.
+        try {
+          const adsClone = await fetch(`${GRAPH}/${nova}/ads` +
+            `?fields=id,creative{id,object_story_spec}&limit=5&access_token=${TK}`)
+            .then(x => x.json());
+          const adC = ((adsClone || {}).data || [])[0];
+          if (!adC) throw new Error('o clone não trouxe anúncio');
+          const ossC = ((adC.creative || {}).object_story_spec) || {};
+          const txtC = textoPorDefeito(String(v.title || ''), cat);
+          const gC = GENERICO[cat] || GENERICO.institucional;
+          const vdC = { ...(ossC.video_data || {}), video_id: v.id };
+          delete vdC.image_url; delete vdC.image_hash;
+          // o texto vem do dicionário do defeito; o do modelo só como reserva
+          vdC.title = (txtC && txtC.titulo) || vdC.title || gC.titulo;
+          vdC.message = (txtC && txtC.corpo) || vdC.message || gC.corpo;
+          if (!vdC.call_to_action) {
+            vdC.call_to_action = { type: 'WHATSAPP_MESSAGE',
+              value: { app_destination: 'WHATSAPP' } };
+          }
+          if (!String(vdC.title || '').trim() || !String(vdC.message || '').trim()) {
+            throw new Error('sem título ou corpo para montar');
+          }
+          const novoOssC = { page_id: ossC.page_id || process.env.META_PAGE_ID || '370283386171337', video_data: vdC };
+          const crC = await postForm('act_' + CONTA + '/adcreatives', {
+            name: nomeComData(v.title) + ' - criativo',
+            object_story_spec: JSON.stringify(novoOssC),
+          });
+          if (crC && crC.error) throw new Error('criar criativo: ' + crC.error.message);
+          const upA = await postForm(adC.id, {
+            creative: JSON.stringify({ creative_id: crC.id }),
+            name: nomeComData(v.title),
+          });
+          if (upA && upA.error) throw new Error('aplicar criativo: ' + upA.error.message);
+        } catch (e) {
+          erros.push(v.title + ' | 🚨 clone criado mas o criativo NÃO foi trocado: ' +
+            e.message + ' — a campanha está com o vídeo e o texto do modelo');
+        }
+        feitos.push({ video: v.title, campanha: nova, verba: verbaEfetiva, videoId: v.id });
       } catch (e) { erros.push(v.title + ' | ' + e.message); }
       await new Promise(r => setTimeout(r, 500));
     }
