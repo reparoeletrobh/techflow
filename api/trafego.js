@@ -3200,6 +3200,20 @@ module.exports = async function handler(req, res) {
     const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
     const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}` +
       `&fields=ad_id,ad_name,spend,impressions,actions&limit=300&access_token=${TKE}`, 25);
+    // 📝 o relatório de desempenho não traz o texto do anúncio, e sem ele a
+    // campanha de pintura passa batido: "Influ 5 T" e "Microondas Katia 5"
+    // anunciam pintura e o nome não revela. Busca os títulos à parte.
+    const titulos = {};
+    try {
+      const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads` +
+        `?fields=id,name,creative{title,body,object_story_spec}&limit=200` +
+        `&access_token=${TKE}`, 20);
+      for (const a of ((ads || {}).data || [])) {
+        const cr = a.creative || {};
+        const vd = ((cr.object_story_spec || {}).video_data) || {};
+        titulos[a.id] = { t: cr.title || vd.title || '', c: cr.body || vd.message || '' };
+      }
+    } catch (e) {}
 
     const CONV_E = ['onsite_conversion.messaging_conversation_started_7d',
       'onsite_conversion.messaging_first_reply',
@@ -3215,10 +3229,21 @@ module.exports = async function handler(req, res) {
       perf.push({ nome: i.ad_name || '?', gasto, conv,
         custo: conv > 0 ? +(gasto / conv).toFixed(2) : null,
         cat: categoriaDe(i.ad_name || '', 'anuncio'),
-        reforma: ehReforma(i.ad_name) });
+        titulo: (titulos[i.ad_id] || {}).t || null,
+        reforma: ehReforma(i.ad_name, (titulos[i.ad_id] || {}).t,
+                           (titulos[i.ad_id] || {}).c) });
     }
     // 🎨 reforma sai da disputa: teto próprio e sem direito a verba de campeão
-    const disputam = perf.filter(p => !p.reforma && p.conv >= 2)
+    // 📊 volume mínimo para disputar: com duas ou três conversas o custo por
+    // conversa é ruído, e campanha encerrada do ciclo anterior aparecia como
+    // campeã por ter gasto pouco antes de ser desligada
+    const minConv = Math.max(1, parseInt(req.query.minConv || '10', 10));
+    const seloAtual = String(req.query.selo || '');
+    const doCicloAnterior = p => seloAtual
+      ? !String(p.nome).includes(seloAtual)
+      : false;
+    const disputam = perf.filter(p => !p.reforma && p.conv >= minConv &&
+        !doCicloAnterior(p))
       .sort((a, b) => (a.custo || 9999) - (b.custo || 9999));
     const reformas = perf.filter(p => p.reforma);
 
@@ -3249,8 +3274,11 @@ module.exports = async function handler(req, res) {
         ' | ' + p.conv + ' conv | ' + fmt(p.custo || 0) + '/conv → ' + fmt(porADM)),
       REFORMA_TETO_PROPRIO: reformas.map(p => String(p.nome).slice(0, 40).padEnd(40) +
         ' | ' + p.conv + ' conv | ' + fmt(p.custo || 0) + '/conv → ' + fmt(porRef)),
-      FORA_POR_POUCA_ENTREGA: perf.filter(p => !p.reforma && p.conv < 2)
-        .map(p => String(p.nome).slice(0, 40) + ' | ' + p.conv + ' conv'),
+      criterio: 'mínimo de ' + minConv + ' conversas no período' +
+        (seloAtual ? ' e pertencer ao ciclo ' + seloAtual : ''),
+      FORA_POR_POUCA_ENTREGA: perf.filter(p => !p.reforma && p.conv < minConv)
+        .map(p => String(p.nome).slice(0, 42) + ' | ' + p.conv + ' conv')
+        .slice(0, 30),
       conferencia: {
         somaDistribuida: +(porTV * campTV.length + porADM * campADM.length +
           porRef * nRef).toFixed(2),
