@@ -31,6 +31,31 @@ const ehReforma = (...partes) => {
   return /reforma|pintura|pintar|ferrugem|enferruj|repintura|restaura/i.test(txt);
 };
 
+// 📝 texto de reserva por categoria: usado quando o dicionário do defeito não
+// reconhece o nome do vídeo e o modelo copiado também não tem chamada.
+// Fica no topo do módulo porque é usado tanto na criação do zero quanto na
+// troca do criativo depois do clone.
+const GENERICO = {
+    tv: { titulo: 'Consertamos sua TV',
+      corpo: 'Conserto de TV rápido em BH, com peças originais e garantia. ' +
+        'Coletamos na sua casa e devolvemos funcionando. Chama no WhatsApp!' },
+    microondas: { titulo: 'Seu micro-ondas parou?',
+      corpo: 'Não esquenta, não liga ou faz barulho? Consertamos com peças ' +
+        'originais e garantia. Coletamos na sua casa. Chama no WhatsApp!' },
+    purificador: { titulo: 'Purificador com problema?',
+      corpo: 'Não gela, vaza ou parou de sair água? Consertamos rápido, ' +
+        'com garantia e coleta na sua casa. Fala com a gente!' },
+    adega: { titulo: 'Sua adega parou de gelar?',
+      corpo: 'Adega ou cervejeira com defeito? Consertamos com peças ' +
+        'originais e garantia. Chama no WhatsApp!' },
+    forno: { titulo: 'Seu forno elétrico parou?',
+      corpo: 'Não esquenta, não liga ou assa desigual? Consertamos com ' +
+        'peças originais e garantia. Chama no WhatsApp!' },
+    institucional: { titulo: 'Conserto de eletrodomésticos em BH',
+      corpo: 'Micro-ondas, purificador, adega e TV. Peças originais, ' +
+        'garantia e coleta na sua casa. Chama no WhatsApp!' },
+  };
+
 function brlS(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
 
 // Busca paginada com páginas PEQUENAS (a Meta recusa requisições grandes:
@@ -1345,26 +1370,6 @@ module.exports = async function handler(req, res) {
             // campanhas de TV do ciclo. Agora há três camadas de resguardo.
             const txt = textoPorDefeito(String(v.title || ''), cat);
             const doModelo = oss.video_data || {};
-            const GENERICO = {
-              tv: { titulo: 'Consertamos sua TV',
-                corpo: 'Conserto de TV rápido em BH, com peças originais e garantia. ' +
-                  'Coletamos na sua casa e devolvemos funcionando. Chama no WhatsApp!' },
-              microondas: { titulo: 'Seu micro-ondas parou?',
-                corpo: 'Não esquenta, não liga ou faz barulho? Consertamos com peças ' +
-                  'originais e garantia. Coletamos na sua casa. Chama no WhatsApp!' },
-              purificador: { titulo: 'Purificador com problema?',
-                corpo: 'Não gela, vaza ou parou de sair água? Consertamos rápido, ' +
-                  'com garantia e coleta na sua casa. Fala com a gente!' },
-              adega: { titulo: 'Sua adega parou de gelar?',
-                corpo: 'Adega ou cervejeira com defeito? Consertamos com peças ' +
-                  'originais e garantia. Chama no WhatsApp!' },
-              forno: { titulo: 'Seu forno elétrico parou?',
-                corpo: 'Não esquenta, não liga ou assa desigual? Consertamos com ' +
-                  'peças originais e garantia. Chama no WhatsApp!' },
-              institucional: { titulo: 'Conserto de eletrodomésticos em BH',
-                corpo: 'Micro-ondas, purificador, adega e TV. Peças originais, ' +
-                  'garantia e coleta na sua casa. Chama no WhatsApp!' },
-            };
             const reserva = GENERICO[cat] || GENERICO.institucional;
             // 🎨 reforma, pintura e ferrugem entram com teto próprio: são
             // serviço de ticket baixo e demanda estreita, e dar-lhes a verba
