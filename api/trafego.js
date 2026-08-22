@@ -17,9 +17,19 @@ const TETO_REFORMA = 100;
 // ⚠️ o nome da campanha nem sempre revela o serviço: "Influ 5 T" e
 // "Microondas Katia 5" anunciam pintura, e só o título do anúncio denuncia.
 // Por isso a verificação considera nome, título e corpo.
-const ehReforma = (...partes) =>
-  /reforma|pintura|pintar|ferrugem|enferruj|repintura|restaura/i
-    .test(partes.filter(Boolean).join(' '));
+// 📌 alguns criativos são de reforma sem que texto ou nome digam: o vídeo
+// mostra o serviço e a chamada fala de conserto. Ficam listados aqui porque
+// não há como deduzi-los, e foram confirmados por quem conhece as peças.
+const REFORMA_POR_NOME = [
+  'microondas 1', 'microondas 2', 'influ 5 t', 'microondas katia 5',
+];
+const ehReforma = (...partes) => {
+  const txt = partes.filter(Boolean).join(' ');
+  const nome = String(partes[0] || '').toLowerCase()
+    .replace(/\s+\d{8}\s*$/, '').trim();            // tira o selo do ciclo
+  if (REFORMA_POR_NOME.includes(nome)) return true;
+  return /reforma|pintura|pintar|ferrugem|enferruj|repintura|restaura/i.test(txt);
+};
 
 function brlS(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
 
