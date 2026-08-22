@@ -1358,6 +1358,9 @@ module.exports = async function handler(req, res) {
               adega: { titulo: 'Sua adega parou de gelar?',
                 corpo: 'Adega ou cervejeira com defeito? Consertamos com peças ' +
                   'originais e garantia. Chama no WhatsApp!' },
+              forno: { titulo: 'Seu forno elétrico parou?',
+                corpo: 'Não esquenta, não liga ou assa desigual? Consertamos com ' +
+                  'peças originais e garantia. Chama no WhatsApp!' },
               institucional: { titulo: 'Conserto de eletrodomésticos em BH',
                 corpo: 'Micro-ondas, purificador, adega e TV. Peças originais, ' +
                   'garantia e coleta na sua casa. Chama no WhatsApp!' },
@@ -4025,6 +4028,31 @@ module.exports = async function handler(req, res) {
 
   // ── ✍️ textos por DEFEITO: cada criativo fala do problema que mostra ──
   function textoPorDefeito(nomeArquivo, categoria) {
+
+    // 🔥 FORNO ELÉTRICO: categoria nova. Os textos seguem o padrão do
+    // micro-ondas, adaptados ao aparelho, conforme definido com o dono.
+    if (cat === 'forno') {
+      const s = String(nome || '').toLowerCase();
+      if (/n[ãa]o esquenta|n[ãa]o aquece|frio/.test(s))
+        return { titulo: 'Seu forno não esquenta?',
+          corpo: 'Liga mas não aquece, ou assa só de um lado? Costuma ser a ' +
+            'resistência — trocamos com peça original e garantia. Chama no WhatsApp!' };
+      if (/n[ãa]o liga|morto|parou/.test(s))
+        return { titulo: 'Forno elétrico parou de funcionar?',
+          corpo: 'Não liga, desarma ou apaga sozinho? Consertamos com peças ' +
+            'originais e garantia. Coletamos na sua casa. Chama no WhatsApp!' };
+      if (/grande|embutir|bancada|litros/.test(s))
+        return { titulo: 'Conserto de forno elétrico em BH',
+          corpo: 'De bancada ou de embutir, qualquer marca. Peças originais, ' +
+            'garantia e coleta na sua casa. Fala com a gente!' };
+      if (/receita|assar|bolo|comida/.test(s))
+        return { titulo: 'Ficou sem forno na hora da receita?',
+          corpo: 'A gente busca, conserta e devolve funcionando. Peças originais ' +
+            'e garantia. Chama no WhatsApp!' };
+      return { titulo: 'Seu forno elétrico parou?',
+        corpo: 'Não esquenta, não liga ou assa desigual? Consertamos com peças ' +
+          'originais e garantia. Chama no WhatsApp!' };
+    }
     const s = String(nomeArquivo || '').toLowerCase().replace(/\.(mov|mp4|avi)$/i, '');
     const TV = [
       { re: /som.*(n[aã]o|sem).*(imagem|v[ií]deo)|sem imagem|n[aã]o d[aá] imagem/,
