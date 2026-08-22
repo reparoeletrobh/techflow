@@ -28,6 +28,11 @@ module.exports = async function handler(req, res) {
 
   // ── ⏱️ a cada 10 minutos: o que não pode esperar ──
   if (action === 'frequente') {
+    // 💾 arquiva as conversas a cada passagem: a janela de eventos cobre pouco
+    // mais de um dia com o volume atual, e uma hora de intervalo já bastava
+    // para perder o início de um atendimento. Como só o que é novo é
+    // processado, a passagem é barata.
+    feitos.push(await chamar('arquivar conversas', 'conversas?action=arquivar'));
     feitos.push(await chamar('devoluções pendentes do remarcar',
       'logistica?action=processar-pendentes&aplicar=1'));
     feitos.push(await chamar('mensagens aguardando a janela reabrir',
@@ -76,11 +81,6 @@ module.exports = async function handler(req, res) {
     if (horaBR >= 7 && horaBR < 21) {
       feitos.push(await chamar('corridas em andamento', 'lalamove?action=acompanhar'));
     }
-
-    // 💾 arquiva as conversas por cliente: a janela corrente cobre poucos dias
-    // com o volume atual, e a consulta de um atendimento antigo não encontrava
-    // mais nada — o valor combinado com o cliente se perdia junto
-    feitos.push(await chamar('arquivar conversas', 'conversas?action=arquivar'));
 
     // 📒 livro de entradas no ERP: gravado ao longo do dia, é o que permite
     // saber quem recebeu ontem — o histórico do cartão perde essa informação

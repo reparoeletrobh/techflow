@@ -1122,6 +1122,26 @@ function check(nome, cond, extra) {
   // A passagem para aos 40 segundos e recomeçar sempre do topo fazia os
   // últimos nunca serem alcançados: havia orçamento de R$ 2.400 elegível e
   // sem toque nenhum há cinco dias.
+  // ── 💾 o arquivo de conversas não pode ter buracos ──
+  // A janela de eventos cobre pouco mais de um dia: uma hora de intervalo já
+  // bastava para perder o início de um atendimento, e foi o que aconteceu com
+  // a conversa de um cliente que reclamou duas vezes.
+  console.log('▶ Cenário AR — arquivamento incremental e sem buraco');
+  {
+    const cv = require('fs').readFileSync('api/conversas.js', 'utf8');
+    check('guarda até onde já arquivou', /wa_conv_marca/.test(cv));
+    check('processa apenas o que é novo',
+      /String\(e\.ts \|\| ''\) > desdeTs/.test(cv));
+    check('avisa quando houve intervalo maior que a janela',
+      /houveBuraco/.test(cv));
+    const rt = require('fs').readFileSync('api/rotina.js', 'utf8');
+    const iF = rt.indexOf("action === 'frequente'");
+    const iH = rt.indexOf("action === 'de-hora-em-hora'");
+    const bloco = rt.slice(iF, iH);
+    check('o arquivamento roda no bloco de 10 em 10 minutos',
+      /conversas\?action=arquivar/.test(bloco));
+  }
+
   console.log('▶ Cenário GR — régua gira a fila e ignora quem não tem valor');
   {
     const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');

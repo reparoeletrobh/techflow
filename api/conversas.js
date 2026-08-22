@@ -66,8 +66,25 @@ export default async function handler(req, res) {
   // Roda de hora em hora. Idempotente: mensagem já arquivada não duplica,
   // porque cada uma é identificada pelo carimbo de tempo e pelo id da Meta.
   if (action === 'arquivar') {
-    const evts = await lerEvts(Number(req.query.janela || 8000));
-    if (!evts.length) return res.status(200).json({ ok: true, msg: 'nada a arquivar' });
+    // 📖 marca d'água: guarda até onde já foi arquivado, e só processa o que
+    // veio depois. Sem isso cada passagem relia tudo de novo, gastava o tempo
+    // da função e limitava a janela que dava para varrer.
+    const marca = (await dbGet('wa_conv_marca')) || {};
+    const desdeTs = String(marca.ultimoTs || '');
+    // 🔭 a janela pode ser ampla porque só o novo é processado: cobrir mais
+    // dias protege contra falhas de execução — se a passagem falhar por horas,
+    // a seguinte ainda alcança o que ficou para trás
+    const evtsBrutos = await lerEvts(Number(req.query.janela || 20000));
+    if (!evtsBrutos.length) return res.status(200).json({ ok: true, msg: 'nada a arquivar' });
+    const evts = desdeTs && String(req.query.tudo || '') !== '1'
+      ? evtsBrutos.filter(e => String(e.ts || '') > desdeTs)
+      : evtsBrutos;
+    // 🕳️ detecta buraco: se o evento mais antigo da janela for POSTERIOR à
+    // marca, houve período que a janela já não cobre e se perdeu de vez
+    const maisAntigo = String((evtsBrutos[0] || {}).ts || '');
+    const houveBuraco = !!(desdeTs && maisAntigo && maisAntigo > desdeTs);
+    if (!evts.length) return res.status(200).json({ ok: true,
+      msg: 'nada novo desde ' + desdeTs, houveBuraco });
 
     // agrupa por cliente antes de gravar: uma escrita por pessoa, não por mensagem
     const porTel = {};
@@ -99,7 +116,9 @@ export default async function handler(req, res) {
       arq.msgs.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
       // 📦 400 mensagens por cliente: cobre meses de conversa de um mesmo
       // atendimento sem que um cliente falante ocupe o espaço dos outros
-      if (arq.msgs.length > 400) arq.msgs = arq.msgs.slice(-400);
+      // 📦 800 mensagens por cliente: um atendimento com áudios transcritos e
+      // registros de status consome rápido, e 400 cortava conversas ainda vivas
+      if (arq.msgs.length > 800) arq.msgs = arq.msgs.slice(-800);
       arq.atualizadoEm = new Date().toISOString();
       await dbSet(chaveDe(d), arq);
       // índice para poder buscar por nome depois
@@ -116,9 +135,18 @@ export default async function handler(req, res) {
       }
       await dbSet('wa_conv_indice', idx);
     }
-    return res.status(200).json({ ok: true,
+    // guarda até onde chegou, para a próxima passagem continuar daqui
+    const ultimo = evts.reduce((m, e) =>
+      String(e.ts || '') > m ? String(e.ts || '') : m, desdeTs);
+    if (ultimo) await dbSet('wa_conv_marca', { ultimoTs: ultimo,
+      em: new Date().toISOString(), clientes, novas });
+    return res.status(200).json({ ok: !houveBuraco,
       clientesAtualizados: clientes, mensagensNovas: novas,
-      lidosDaJanela: evts.length });
+      processados: evts.length, naJanela: evtsBrutos.length,
+      arquivadoAte: ultimo ? ultimo.slice(0, 16).replace('T', ' ') : null,
+      alerta: houveBuraco
+        ? '🚨 houve intervalo sem arquivar maior que a janela — parte se perdeu'
+        : null });
   }
 
   // ── 📖 ver: a conversa completa de um cliente, venha de onde vier ──
