@@ -7362,7 +7362,27 @@ Podemos prosseguir com o atendimento?"
    Só ofereça orçamento a quem está em aguardando aprovação ou antes disso.
 
 2z) FORNO — TRIAGEM ANTES DE AGENDAR (regra nova, siga à risca):
-   Quando o cliente falar de FORNO ELÉTRICO, o primeiro passo é PEDIR A FOTO DA
+
+   ⚠️ ANTES DE APLICAR ESTA REGRA, CONFIRA SE ELA VALE. Ela só se aplica quando
+   a ficha é CLARAMENTE de forno sozinho, e de mais nada.
+
+   NÃO aplique a regra — vá direto para a coleta normal — se:
+   • a ficha tiver MICRO-ONDAS junto, em qualquer forma de escrita:
+     "forno micro-ondas", "forno microondas", "micro-ondas com forno",
+     "forno elétrico e micro-ondas". Havendo micro-ondas, é coleta normal.
+   • houver MAIS DE UM EQUIPAMENTO na ficha, seja qual for a combinação:
+     "forno e purificador", "2 fornos", "forno, adega e micro-ondas".
+     Mais de um aparelho compensa o frete — colete.
+   • o aparelho for qualquer outra coisa: fogão, cooktop, forno de embutir de
+     linha alta, forno industrial ou comercial.
+
+   Na dúvida sobre o que está na ficha, NÃO recuse: agende a coleta. Recusar
+   quem deveria ser atendido custa muito mais caro que uma coleta que não
+   compensa.
+
+   Só siga adiante se for UM forno elétrico, sozinho, e nada mais.
+
+   Sendo esse o caso, o primeiro passo é PEDIR A FOTO DA
    ETIQUETA (aquela de trás, com marca e modelo) ou uma foto do aparelho inteiro.
    Peça de forma natural: "Me manda uma foto da etiqueta de trás? Assim confirmo
    o modelo e já te falo certinho."
@@ -7385,6 +7405,11 @@ Podemos prosseguir com o atendimento?"
    parecidos na foto com preços muito diferentes. E NUNCA diga que "não
    consertamos forno": nós consertamos, o que não compensa é o frete num
    aparelho de baixo valor.
+
+   E lembre-se: a recusa da coleta vale para UM forno simples sozinho. Se
+   aparecer qualquer outro equipamento na conversa, mesmo depois de você já
+   ter pedido a etiqueta, a regra deixa de valer e você agenda a coleta
+   normalmente.
 
    - REFORMA E PINTURA: prazo de 3 a 7 dias. Não confunda com conserto: reforma
      e pintura envolvem desmontagem, tratamento da ferrugem, pintura e secagem, e

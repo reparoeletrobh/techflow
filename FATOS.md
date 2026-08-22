@@ -113,6 +113,11 @@ para balcão com troca de peça simples.
 
 **Forno elétrico: 1 a 7 dias**, conforme a peça estar em BH ou vir de São Paulo.
 
+**A regra do forno só vale para UM forno sozinho.** Havendo micro-ondas junto
+("forno micro-ondas"), ou mais de um equipamento na ficha, é coleta normal.
+Na dúvida, coletar: recusar quem deveria ser atendido custa mais que uma
+coleta que não compensa.
+
 **Forno com similar novo abaixo de R$ 800 não é coletado.** A mão de obra mais
 o frete inviabilizam. O bot pede a foto da etiqueta ANTES de decidir, recusa a
 coleta com franqueza e oferece a condição especial de balcão. Nunca dizer que
