@@ -719,6 +719,84 @@ export default async function handler(req, res) {
         'mensagem e não recebeu nada no período' });
   }
 
+  // ── 🚦 por-que-parado: o motivo exato de cada negociação não avançar ──
+  // Uma fila grande pode ser fila cheia ou fila travada, e a diferença muda o
+  // que fazer. Aqui cada card em negociação recebe o motivo pelo qual não
+  // recebeu disparo hoje, com a mesma lógica que a régua usa para decidir.
+  if (action === 'por-que-parado') {
+    const d8p = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const hp = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [ppA, ppT, evts, reg, pros, prosT] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), lerEvts(),
+      dbGet('wa_recuperacao_7d'), dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
+    ]);
+    const clientes = ((reg || {}).clientes) || {};
+
+    // as MESMAS exclusões que a régua aplica
+    const respondeu24h = {};
+    for (const e of (evts || [])) {
+      if (e.dir !== 'in') continue;
+      const h = Date.now() - new Date(e.ts || 0).getTime();
+      if (h > 24 * 3600000) continue;
+      const d = d8p(e.tel);
+      if (!respondeu24h[d] || new Date(e.ts) > new Date(respondeu24h[d])) {
+        respondeu24h[d] = e.ts;
+      }
+    }
+    const emConflito = {};
+    for (const [db, fr] of [[pros, 'ADM'], [prosT, 'TV']]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        if (/conflito/i.test(String(f.status || ''))) emConflito[d8p(f.telefone)] = fr;
+      }
+    }
+
+    const MOTIVOS = {};
+    const linhas = [];
+    for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((db || {}).cards) || [])) {
+        if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+        const d = d8p(c.telefone);
+        const ctrl = clientes[d] || {};
+        const t = Number(ctrl.tentativas || 0);
+        const valor = Number(c.valor || 0);
+        let motivo, acao = null;
+        if (d.length < 8) { motivo = 'telefone incompleto'; acao = 'corrigir o cadastro'; }
+        else if (!(valor > 0)) { motivo = 'sem valor lançado'; acao = 'o técnico precisa orçar'; }
+        else if (emConflito[d] === sis) { motivo = 'conflito aberto nesta frente'; acao = 'resolver o conflito'; }
+        else if (ctrl.encerrado) { motivo = 'régua encerrada'; }
+        else if (t >= 7) { motivo = '7 toques esgotados'; acao = 'ligar — está em conflito'; }
+        else if (respondeu24h[d]) {
+          motivo = 'respondeu nas últimas 24h';
+          acao = 'a régua espera — o cérebro está conduzindo';
+        }
+        else if (ctrl.ultimo === hoje) { motivo = 'já recebeu hoje'; acao = 'volta amanhã'; }
+        else motivo = '✅ ELEGÍVEL — deve receber na próxima passagem';
+        MOTIVOS[motivo] = (MOTIVOS[motivo] || 0) + 1;
+        linhas.push({ sis, nome: String(c.nomeContato || '?').slice(0, 20), tel: d,
+          valor, toques: t + '/7', motivo, acao,
+          ultimoToque: hp(ctrl.ultimo), respondeuEm: hp(respondeu24h[d]),
+          equipamento: String(c.equipamento || '').slice(0, 22) });
+      }
+    }
+    linhas.sort((a, b) => b.valor - a.valor);
+    const elegiveis = linhas.filter(l => l.motivo.startsWith('✅'));
+    const col = (x, n) => String(x).padStart(n);
+    return res.status(200).json({ ok: true,
+      emNegociacao: linhas.length,
+      valorTotal: +linhas.reduce((s, l) => s + l.valor, 0).toFixed(2),
+      POR_MOTIVO: MOTIVOS,
+      ELEGIVEIS_AGORA: elegiveis.length,
+      janelaDeEventos: (evts || []).length + ' eventos — a exclusão por resposta ' +
+        'em 24h só enxerga quem está nessa janela',
+      LISTA: linhas.map(l => l.sis.padEnd(3) + ' | ' + l.nome.padEnd(20) +
+        ' ' + l.tel.slice(-4) + ' | R$ ' + col(l.valor.toFixed(2), 8) +
+        ' | ' + l.toques + ' | ' + l.motivo +
+        (l.acao ? ' → ' + l.acao : '')),
+      DETALHE: linhas });
+  }
+
   if (action === 'raio-x-disparos') {
     const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
     const hx = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
