@@ -88,7 +88,10 @@ export default async function handler(req, res) {
         if (jaTem.has(id)) continue;
         jaTem.add(id);
         arq.msgs.push({ ts: e.ts, dir: e.dir, texto: e.texto, tipo: e.tipo,
-          msgId: e.msgId, via: e.via || null });
+          msgId: e.msgId, via: e.via || null,
+          // 📷 o identificador da mídia permite recuperar a foto depois: sem
+          // ele a conversa registra que houve foto mas não há como vê-la
+          mediaId: e.mediaId || null });
         acrescentou++;
         if (e.nome && !arq.nome) arq.nome = e.nome;
       }
@@ -169,6 +172,59 @@ export default async function handler(req, res) {
         String(m.texto || '(' + (m.tipo || 'sem texto') + ')').replace(/\n/g, ' ⏎ ')) });
   }
 
+  // ── 📷 foto: recupera uma imagem que o cliente enviou ──
+  // A plataforma guarda a mídia por um tempo e entrega mediante o identificador
+  // que veio no recebimento. Sem esta ação a conversa registrava que houve foto
+  // e não havia como abri-la.
+  if (action === 'foto') {
+    const mid = String(req.query.mediaId || '').trim();
+    const alvo = String(req.query.tel || '');
+    const cfg = (await dbGet('wa_credenciais')) || {};
+    const tk = cfg.token || process.env.WA_TOKEN;
+
+    // sem identificador, lista as fotos daquele cliente para escolher
+    if (!mid) {
+      if (!alvo) return res.status(400).json({ ok: false,
+        error: 'informe &tel= para listar as fotos, ou &mediaId= para abrir uma' });
+      const arq = await dbGet(chaveDe(alvo));
+      const msgs = ((arq || {}).msgs) || [];
+      const fotos = msgs.filter(m => m.mediaId ||
+        /📷|🎬|\[foto\]|\[vídeo\]/.test(String(m.texto || '')));
+      return res.status(200).json({ ok: true,
+        cliente: (arq || {}).nome || null,
+        fotosEncontradas: fotos.length,
+        FOTOS: fotos.map(m => ({
+          quando: new Date(new Date(m.ts).getTime() - 3 * 3600000)
+            .toISOString().slice(5, 16).replace('T', ' '),
+          de: m.dir === 'in' ? 'cliente' : 'nós',
+          texto: m.texto,
+          mediaId: m.mediaId,
+          link: m.mediaId
+            ? 'https://reparoeletroadm.com/api/conversas?action=foto&mediaId=' +
+              m.mediaId + '&k=' + ((process.env.TECHFLOW_KEY || '').trim())
+            : '⚠️ sem identificador — foto anterior ao registro de mídia' })) });
+    }
+
+    try {
+      const meta = await fetch('https://graph.facebook.com/v20.0/' + mid,
+        { headers: { Authorization: 'Bearer ' + tk } }).then(x => x.json());
+      if (!meta || !meta.url) {
+        return res.status(404).json({ ok: false,
+          error: (meta && meta.error && meta.error.message) ||
+            'a plataforma não devolveu a mídia — pode ter expirado' });
+      }
+      const bin = await fetch(meta.url, { headers: { Authorization: 'Bearer ' + tk } });
+      if (!bin.ok) return res.status(502).json({ ok: false,
+        error: 'falha ao baixar: HTTP ' + bin.status });
+      const buf = Buffer.from(await bin.arrayBuffer());
+      res.setHeader('Content-Type', meta.mime_type || 'image/jpeg');
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      return res.status(200).send(buf);
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── 📊 estado: o que o arquivo já cobre ──
   if (action === 'estado') {
     const idx = (await dbGet('wa_conv_indice')) || { tels: {} };
@@ -189,5 +245,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(404).json({ ok: false, error: 'ação não encontrada',
-    disponiveis: ['arquivar', 'ver', 'estado'] });
+    disponiveis: ['arquivar', 'ver', 'estado', 'foto'] });
 }
