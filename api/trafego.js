@@ -1476,7 +1476,31 @@ module.exports = async function handler(req, res) {
           const txtC = textoPorDefeito(String(v.title || ''), cat);
           const gC = GENERICO[cat] || GENERICO.institucional;
           const vdC = { ...(ossC.video_data || {}), video_id: v.id };
-          delete vdC.image_url; delete vdC.image_hash;
+          // 🖼️ MINIATURA: a plataforma exige image_hash ou image_url, e manter
+          // a do modelo mostraria o quadro do vídeo antigo. Busca a do vídeo
+          // novo, que a própria plataforma gera ao processar o arquivo.
+          delete vdC.image_hash;
+          let miniOk = false;
+          for (let t = 0; t < 6 && !miniOk; t++) {
+            try {
+              const th = await fetch(`${GRAPH}/${v.id}/thumbnails` +
+                `?fields=uri,is_preferred&access_token=${TK}`).then(x => x.json());
+              const lista = ((th || {}).data) || [];
+              const esc = lista.find(x => x.is_preferred) || lista[0];
+              if (esc && esc.uri) { vdC.image_url = esc.uri; miniOk = true; break; }
+            } catch (e) {}
+            await new Promise(s => setTimeout(s, 4000));   // ainda processando
+          }
+          if (!miniOk) {
+            // sem miniatura própria, mantém a do modelo: melhor um quadro
+            // errado do que campanha sem criativo trocado
+            if (!vdC.image_url && (ossC.video_data || {}).image_url) {
+              vdC.image_url = ossC.video_data.image_url;
+            } else if (!vdC.image_url) {
+              throw new Error('a plataforma ainda não gerou a miniatura do vídeo — ' +
+                'tente de novo em alguns minutos');
+            }
+          }
           // o texto vem do dicionário do defeito; o do modelo só como reserva
           vdC.title = (txtC && txtC.titulo) || vdC.title || gC.titulo;
           vdC.message = (txtC && txtC.corpo) || vdC.message || gC.corpo;

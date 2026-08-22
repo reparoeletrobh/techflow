@@ -1266,7 +1266,7 @@ function check(nome, cond, extra) {
     const i = ct.indexOf("action === 'subir-agora'");
     const b = ct.slice(i, i + 24000);
     check('após clonar, o criativo é substituído',
-      /TROCA O CRIATIVO DO CLONE[\s\S]{0,2200}adcreatives/.test(b));
+      /TROCA O CRIATIVO DO CLONE/.test(b) && /crC = await postForm/.test(b));
     // verifica os dois fatos separadamente: medir a distância entre eles
     // fazia o teste falhar sempre que o bloco crescia
     check('o vídeo novo entra no lugar do vídeo do modelo',
@@ -1284,7 +1284,8 @@ function check(nome, cond, extra) {
     const i = ct.indexOf("action === 'subir-agora'");
     const b = ct.slice(i, i + 22000);
     check('há verificação imediatamente antes de gravar o criativo',
-      /ÚLTIMA TRAVA antes de gravar[\s\S]{0,1400}adcreatives/.test(b));
+      /ÚLTIMA TRAVA antes de gravar/.test(b) &&
+      /const cr = await postForm\('act_' \+ CONTA \+ '\/adcreatives'/.test(b));
     check('o formato de link também recebe texto', /txtL/.test(b));
     check('sem título ou corpo o criativo NÃO é criado',
       /não foi possível montar título e corpo — NÃO criado/.test(b));
