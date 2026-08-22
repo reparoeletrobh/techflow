@@ -1252,6 +1252,22 @@ function check(nome, cond, extra) {
   // São serviço de ticket baixo e demanda estreita: dar-lhes a verba cheia
   // tira recurso de campanha que traz conserto, e um bom desempenho aqui
   // não pode puxar verba de campeão.
+  // ── 🛡️ nenhum criativo pode ser gravado sem título e corpo ──
+  // O resguardo anterior ficava dentro da condição que trata o formato de
+  // vídeo: ao copiar como modelo uma campanha que já estava muda, o bloco não
+  // executava e o defeito se propagava para a campanha nova.
+  console.log('▶ Cenário TM — trava final impede criativo mudo');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    const i = ct.indexOf("action === 'subir-agora'");
+    const b = ct.slice(i, i + 22000);
+    check('há verificação imediatamente antes de gravar o criativo',
+      /ÚLTIMA TRAVA antes de gravar[\s\S]{0,1400}adcreatives/.test(b));
+    check('o formato de link também recebe texto', /txtL/.test(b));
+    check('sem título ou corpo o criativo NÃO é criado',
+      /não foi possível montar título e corpo — NÃO criado/.test(b));
+  }
+
   console.log('▶ Cenário RF — criativo de reforma entra com teto limitado');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');

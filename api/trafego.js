@@ -1386,6 +1386,13 @@ module.exports = async function handler(req, res) {
             }
           } else if (oss.link_data) {
             novoOss.link_data = oss.link_data;
+            // 🛡️ o mesmo resguardo do formato de vídeo: sem isto, um modelo em
+            // formato de link produzia criativo sem chamada nenhuma
+            const txtL = textoPorDefeito(String(v.title || ''), cat);
+            const gL = GENERICO[cat] || GENERICO.institucional;
+            novoOss.link_data = { ...novoOss.link_data,
+              name: (txtL && txtL.titulo) || novoOss.link_data.name || gL.titulo,
+              message: (txtL && txtL.corpo) || novoOss.link_data.message || gL.corpo };
           }
           // ⏳ vídeo recém-subido leva alguns segundos para processar; criar o criativo
           // antes disso faz a Meta recusar. Espera até ficar pronto (máx 40s).
@@ -1401,6 +1408,29 @@ module.exports = async function handler(req, res) {
           } catch (e) {
             erros.push(v.title + ': ' + e.message);
             continue;
+          }
+          // 🛡️ ÚLTIMA TRAVA antes de gravar: o modelo copiado pode não ter o
+          // formato esperado — foi o que aconteceu ao usar como base uma
+          // campanha que já estava muda, propagando o defeito. Aqui o criativo
+          // é montado do zero se preciso, e NUNCA sobe sem título e corpo.
+          {
+            const txtF = textoPorDefeito(String(v.title || ''), cat);
+            const gF = GENERICO[cat] || GENERICO.institucional;
+            const tF = (txtF && txtF.titulo) || gF.titulo;
+            const cF = (txtF && txtF.corpo) || gF.corpo;
+            if (!novoOss.video_data && !novoOss.link_data) {
+              novoOss.video_data = { video_id: v.id,
+                call_to_action: { type: 'WHATSAPP_MESSAGE',
+                  value: { app_destination: 'WHATSAPP' } } };
+            }
+            const alvo = novoOss.video_data || novoOss.link_data;
+            const chaveTit = novoOss.video_data ? 'title' : 'name';
+            if (!String(alvo[chaveTit] || '').trim()) alvo[chaveTit] = tF;
+            if (!String(alvo.message || '').trim()) alvo.message = cF;
+            if (!String(alvo[chaveTit] || '').trim() || !String(alvo.message || '').trim()) {
+              erros.push(v.title + ' | 🚨 não foi possível montar título e corpo — NÃO criado');
+              continue;
+            }
           }
           const cr = await postForm('act_' + CONTA + '/adcreatives', {
             name: nome + ' - criativo', object_story_spec: JSON.stringify(novoOss),
