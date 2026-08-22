@@ -770,7 +770,10 @@ export default async function handler(req, res) {
         elegiveis++;
       }
     }
-    const POR_PASSAGEM = 27;   // 50s por passagem
+    // 📏 medido em produção: a passagem das 9h de 22/08 enviou 14. A estimativa
+    // anterior, de 27, vinha de cálculo e não de observação, e fazia a projeção
+    // prometer uma cobertura que o ritmo real não entrega.
+    const POR_PASSAGEM = 14;
     const capacidade = faltam.length * POR_PASSAGEM;
     return res.status(200).json({
       ok: capacidade >= elegiveis,
