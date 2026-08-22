@@ -544,6 +544,183 @@ export default async function handler(req, res) {
   // O painel resume por grupo; aqui é linha a linha, com as três dimensões que
   // a operação usa para decidir o que fazer com cada cliente: onde ele está no
   // atendimento, em que fase da venda, e quantos toques da régua já recebeu.
+  // ── 📡 raio-x-disparos: cada situação de disparo, sua fila e o que saiu ──
+  // O sistema tem sete momentos em que fala com o cliente, cada um com fila e
+  // trava próprias. Sem uma visão única não dá para saber se algum parou de
+  // funcionar — e um disparo que falha em silêncio é cliente sem resposta.
+  if (action === 'raio-x-disparos') {
+    const d8x = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hx = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
+      .toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const diasX = d => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+    const agoraB = new Date(Date.now() - 3 * 3600000);
+    const horaB = agoraB.getUTCHours(), diaB = agoraB.getUTCDay();
+
+    const [fa, ft, logA, logT, ppA, ppT, board, fl, gmb,
+           abord, orcEnv, consEnv, rec, pesq] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_board'), dbGet('reparoeletro_frenteloja'),
+      dbGet('gmb_pendentes'),
+      dbGet('wa_abordados'), dbGet('wa_orc_enviados'), dbGet('wa_conserto_avisados'),
+      dbGet('wa_recuperacao_7d'), dbGet('wa_pesquisa_satisfacao'),
+    ]);
+    const R = [];
+
+    // 1) ABORDAGEM — ficha nova
+    {
+      const tels = ((abord || {}).tels) || {};
+      const fila = [], perdidos = [];
+      for (const [db, sis] of [[fa, 'ADM'], [ft, 'TV']]) {
+        for (const f of (((db || {}).fichas) || [])) {
+          if (String(f.status || '') !== 'criada') continue;
+          const d = d8x(f.telefone);
+          const dias = diasX(f.criadoEm || f.createdAt);
+          const linha = sis + ' | ' + String(f.nome || '?').slice(0, 20) + ' ' +
+            d.slice(-4) + ' | há ' + (dias == null ? '?' : dias) + 'd';
+          if (tels[d]) continue;                       // já abordado
+          (dias != null && dias >= 1 ? perdidos : fila).push(linha);
+        }
+      }
+      R.push({ nome: 'Abordagem de ficha nova', modelo: 'cadastro_recebido',
+        objetivo: 'primeira mensagem: cliente cadastrou e ainda não foi contatado',
+        janela: '7h–18h seg-sáb, a cada 30 min',
+        naFila: fila.length, jaReceberam: Object.keys(tels).length,
+        PERDIDOS: perdidos.slice(0, 25),
+        alerta: perdidos.length ? '🚨 ' + perdidos.length +
+          ' ficha(s) em "criada" há mais de 1 dia sem abordagem' : null });
+    }
+
+    // 2) ORÇAMENTO PRONTO — valor lançado
+    {
+      const env = ((orcEnv || {}).tels) || orcEnv || {};
+      const fila = [], perdidos = [];
+      for (const [db, sis] of [[logA, 'ADM'], [logT, 'TV']]) {
+        for (const f of (((db || {}).fichas) || [])) {
+          if (String(f.status || '') !== 'orc_registrado') continue;
+          const d = d8x(f.telefone);
+          const dias = diasX(f.movedAt || f.criadoEm);
+          const linha = sis + ' | ' + String(f.nome || f.nomeContato || '?').slice(0, 20) +
+            ' ' + d.slice(-4) + ' | há ' + (dias == null ? '?' : dias) + 'd';
+          if (env[d]) continue;
+          (dias != null && dias >= 1 ? perdidos : fila).push(linha);
+        }
+      }
+      R.push({ nome: 'Aviso de orçamento pronto', modelo: 'orcamento_pronto',
+        objetivo: 'o valor foi lançado e o cliente ainda não sabe',
+        janela: '7h–18h seg-sáb, a cada 30 min',
+        naFila: fila.length, jaReceberam: Object.keys(env).length,
+        PERDIDOS: perdidos.slice(0, 25),
+        alerta: perdidos.length ? '🚨 ' + perdidos.length +
+          ' orçamento(s) lançado(s) há mais de 1 dia sem aviso' : null });
+    }
+
+    // 3) RÉGUA DE RECUPERAÇÃO — 7 toques
+    {
+      const cl = ((rec || {}).clientes) || {};
+      const porToque = {};
+      let semNenhum = 0; const perdidos = [];
+      for (const [db, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+        for (const c of (((db || {}).cards) || [])) {
+          if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+          const d = d8x(c.telefone);
+          const r = cl[d] || {};
+          const t = Number(r.tentativas || 0);
+          porToque[t + '/7'] = (porToque[t + '/7'] || 0) + 1;
+          const dias = diasX(c.orcamentoEm || c.movedAt);
+          if (t === 0) {
+            semNenhum++;
+            if (dias != null && dias >= 2 && Number(c.valor || 0) > 0) {
+              perdidos.push(sis + ' | ' + String(c.nomeContato || '?').slice(0, 20) +
+                ' ' + d.slice(-4) + ' | R$ ' + Number(c.valor).toFixed(2) +
+                ' | parado há ' + dias + 'd sem nenhum toque');
+            }
+          }
+        }
+      }
+      R.push({ nome: 'Régua de recuperação', modelo: 'orcamento_pronto (reenvio)',
+        objetivo: 'retomar orçamento parado — até 7 toques, depois vira conflito',
+        janela: '10h, 13h, 14h e 17h seg-sáb',
+        naFila: Object.values(porToque).reduce((a, b) => a + b, 0),
+        POR_TOQUE: porToque, semNenhumToque: semNenhum,
+        PERDIDOS: perdidos.slice(0, 25),
+        alerta: perdidos.length ? '🚨 ' + perdidos.length +
+          ' com valor definido e 2+ dias sem nenhum toque' : null });
+    }
+
+    // 4) CONSERTO FINALIZADO
+    {
+      const env = ((consEnv || {}).tels) || consEnv || {};
+      const fila = [], perdidos = [];
+      for (const c of (((board || {}).cards) || [])) {
+        if (String(c.phase || c.phaseId || '') !== 'conserto_realizado') continue;
+        const d = d8x(c.telefone);
+        const dias = diasX(c.movedAt);
+        const linha = String(c.nomeContato || c.nome || '?').slice(0, 20) + ' ' +
+          d.slice(-4) + ' | há ' + (dias == null ? '?' : dias) + 'd';
+        if (env[d]) continue;
+        (dias != null && dias >= 1 ? perdidos : fila).push(linha);
+      }
+      R.push({ nome: 'Aviso de conserto finalizado', modelo: 'conserto_finalizado',
+        objetivo: 'o conserto ficou pronto e o cliente precisa saber',
+        janela: '7h–18h seg-sáb, a cada 30 min',
+        naFila: fila.length, jaReceberam: Object.keys(env).length,
+        PERDIDOS: perdidos.slice(0, 25),
+        alerta: perdidos.length ? '🚨 ' + perdidos.length +
+          ' conserto(s) pronto(s) há mais de 1 dia sem aviso' : null });
+    }
+
+    // 5) RETIRADA NA LOJA
+    {
+      const fila = [], perdidos = [];
+      for (const f of (((fl || {}).fichas) || [])) {
+        if (String(f.phase || '') !== 'conserto_realizado') continue;
+        const dias = diasX(f.movedAt);
+        const ctrl = f.lembreteRetirada || { enviados: 0 };
+        const linha = String(f.nomeContato || '?').slice(0, 20) + ' ' +
+          String(f.telefone || '').slice(-4) + ' | há ' + (dias == null ? '?' : dias) +
+          'd | ' + (ctrl.enviados || 0) + ' lembrete(s)';
+        if (!(ctrl.enviados > 0) && dias != null && dias >= 2) perdidos.push(linha);
+        else fila.push(linha);
+      }
+      R.push({ nome: 'Lembrete de retirada na loja', modelo: 'equipamento_pronto_retirada',
+        objetivo: 'equipamento pronto no balcão, cliente não veio buscar',
+        janela: '⚠️ apenas às 10h, e é a ÚLTIMA da fila da rotina',
+        naFila: fila.length,
+        PERDIDOS: perdidos.slice(0, 25),
+        alerta: perdidos.length ? '🚨 ' + perdidos.length +
+          ' pronto(s) há 2+ dias sem nenhum lembrete' : null });
+    }
+
+    // 6) PESQUISA DE SATISFAÇÃO
+    {
+      const cl = ((pesq || {}).clientes) || {};
+      const noPainel = (((gmb || {}).fichas) || []).length;
+      let aguardando = 0, elogios = 0, comLink = 0;
+      for (const c of Object.values(cl)) {
+        if (c.aguardandoResposta) aguardando++;
+        if (c.avaliacaoPedida) comLink++;
+        if (c.respostaCliente && !c.reclamou && !c.teveRessalva) elogios++;
+      }
+      R.push({ nome: 'Pesquisa de satisfação', modelo: 'pesquisa_satisfacao',
+        objetivo: 'saber se o serviço ficou bom e pedir avaliação a quem elogiar',
+        janela: '8h–19h seg-sáb, de hora em hora',
+        naFila: noPainel, jaReceberam: Object.keys(cl).length,
+        aguardandoResposta: aguardando, receberamOLink: comLink,
+        alerta: (elogios > comLink)
+          ? '🚨 ' + (elogios - comLink) + ' elogiaram e não receberam o link' : null });
+    }
+
+    const alertas = R.filter(x => x.alerta);
+    return res.status(200).json({ ok: alertas.length === 0,
+      agoraBRT: String(horaB).padStart(2, '0') + 'h',
+      RESUMO: R.map(x => (x.alerta ? '🚨 ' : '✅ ') + x.nome.padEnd(30) +
+        ' fila ' + String(x.naFila).padStart(3) +
+        (x.alerta ? ' — ' + x.alerta.replace('🚨 ', '') : '')),
+      DISPAROS: R });
+  }
+
   if (action === 'mapa-negociacao') {
     const d8m = t => String(t || '').replace(/\D/g, '').slice(-8);
     const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
