@@ -727,6 +727,69 @@ export default async function handler(req, res) {
   // Um cartão em negociação sem valor pode ser televisão condenada esperando a
   // escolha do cliente, pode estar aguardando peça, ou pode ser simplesmente
   // um diagnóstico que ninguém lançou. A conduta é diferente em cada caso.
+  // ── ⏱️ projecao-regua: quantos ainda serão alcançados hoje ──
+  // Cada passagem para aos 40 segundos e alcança cerca de 22 clientes. Saber
+  // quantas passagens ainda faltam no dia, e se elas cobrem a fila, evita
+  // descobrir só amanhã que metade ficou sem contato.
+  if (action === 'projecao-regua') {
+    const d8j = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const ag = new Date(Date.now() - 3 * 3600000);
+    const horaB = ag.getUTCHours(), diaB = ag.getUTCDay();
+    const hoje = ag.toISOString().slice(0, 10);
+    const HORAS = diaB === 6 ? [8, 9, 10, 11] : (diaB === 0 ? [] : [10, 14, 17]);
+    const jaPassaram = HORAS.filter(x => x < horaB);
+    const faltam = HORAS.filter(x => x >= horaB);
+
+    const [ppA, ppT, reg, evts, pros, prosT] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+      lerEvts(), dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
+    ]);
+    const cl = ((reg || {}).clientes) || {};
+    const resp24 = new Set();
+    for (const e of (evts || [])) {
+      if (e.dir !== 'in') continue;
+      if (Date.now() - new Date(e.ts || 0).getTime() > 24 * 3600000) continue;
+      resp24.add(d8j(e.tel));
+    }
+    const conf = new Set();
+    for (const db of [pros, prosT]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        if (/conflito/i.test(String(f.status || ''))) conf.add(d8j(f.telefone));
+      }
+    }
+    let elegiveis = 0, jaHoje = 0;
+    for (const [db] of [[ppA], [ppT]]) {
+      for (const c of (((db || {}).cards) || [])) {
+        if (String(c.phaseId || c.phase || '') !== 'aguardando_aprovacao') continue;
+        const d = d8j(c.telefone);
+        if (d.length < 8 || !(Number(c.valor || 0) > 0)) continue;
+        const ctrl = cl[d] || {};
+        if (ctrl.encerrado || Number(ctrl.tentativas || 0) >= 7) continue;
+        if (conf.has(d) || resp24.has(d)) continue;
+        if (ctrl.ultimo === hoje) { jaHoje++; continue; }
+        elegiveis++;
+      }
+    }
+    const POR_PASSAGEM = 22;
+    const capacidade = faltam.length * POR_PASSAGEM;
+    return res.status(200).json({
+      ok: capacidade >= elegiveis,
+      agoraBRT: String(horaB).padStart(2, '0') + 'h',
+      diaDaSemana: ['domingo','segunda','terça','quarta','quinta','sexta','sábado'][diaB],
+      passagensDoDia: HORAS.length ? HORAS.map(x => x + 'h').join(', ') : 'não roda hoje',
+      jaPassaram: jaPassaram.map(x => x + 'h'),
+      aindaFaltam: faltam.map(x => x + 'h'),
+      aguardandoToque: elegiveis,
+      jaReceberamHoje: jaHoje,
+      capacidadeRestante: capacidade + ' (≈' + POR_PASSAGEM + ' por passagem)',
+      VEREDITO: !HORAS.length
+        ? 'domingo — a régua não roda'
+        : capacidade >= elegiveis
+          ? '✅ as ' + faltam.length + ' passagens restantes cobrem os ' + elegiveis
+          : '🚨 faltam ' + (elegiveis - capacidade) + ' — não serão alcançados hoje',
+      observacao: 'a fila gira: quem não for alcançado hoje entra primeiro amanhã' });
+  }
+
   if (action === 'sem-valor-tv') {
     const d8v = t => String(t || '').replace(/\D/g, '').slice(-8);
     const hv = d => d ? new Date(new Date(d).getTime() - 3 * 3600000)
