@@ -3309,8 +3309,14 @@ module.exports = async function handler(req, res) {
     const feitos = [], falhas = [];
     for (const p of problemas) {
       try {
-        const campos = { name: p.campanha + ' - conjunto', status: 'ACTIVE' };
-        const r = await postForm(p.setId, campos);
+        // envio direto: o auxiliar de POST vive dentro de outra ação e não
+        // alcança este ponto
+        const r = await fetch(`${GRAPH}/${p.setId}?access_token=${TKC}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            name: p.campanha + ' - conjunto', status: 'ACTIVE' }).toString(),
+        }).then(y => y.json());
         if (r && r.error) falhas.push(p.campanha + ': ' + r.error.message);
         else feitos.push(p.campanha.slice(0, 46) + ' → conjunto ativo e renomeado');
       } catch (e) { falhas.push(p.campanha + ': ' + e.message); }
