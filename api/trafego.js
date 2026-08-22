@@ -9,6 +9,18 @@ async function dbSet(k, v) {
   await fetch(`${U}/set/${k}`, { method: 'POST', headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
 }
 const GRAPH = 'https://graph.facebook.com/v20.0';
+
+// 🎨 REFORMA, PINTURA E FERRUGEM: serviço de ticket baixo e demanda estreita.
+// Recebe teto semanal próprio e NÃO participa da distribuição de campeões,
+// porque um bom desempenho aqui puxaria verba de campanhas que trazem conserto.
+const TETO_REFORMA = 100;
+// ⚠️ o nome da campanha nem sempre revela o serviço: "Influ 5 T" e
+// "Microondas Katia 5" anunciam pintura, e só o título do anúncio denuncia.
+// Por isso a verificação considera nome, título e corpo.
+const ehReforma = (...partes) =>
+  /reforma|pintura|pintar|ferrugem|enferruj|repintura|restaura/i
+    .test(partes.filter(Boolean).join(' '));
+
 function brlS(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
 
 // Busca paginada com páginas PEQUENAS (a Meta recusa requisições grandes:
@@ -3865,18 +3877,7 @@ module.exports = async function handler(req, res) {
   }
 
   // ── ✍️ textos por DEFEITO: cada criativo fala do problema que mostra ──
-  // 🎨 REFORMA, PINTURA E FERRUGEM: serviço de ticket baixo e demanda estreita.
-// Recebe teto semanal próprio e NÃO participa da distribuição de campeões,
-// porque um bom desempenho aqui puxaria verba de campanhas que trazem conserto.
-const TETO_REFORMA = 100;
-// ⚠️ o nome da campanha nem sempre revela o serviço: "Influ 5 T" e
-// "Microondas Katia 5" anunciam pintura, e só o título do anúncio denuncia.
-// Por isso a verificação considera nome, título e corpo.
-const ehReforma = (...partes) =>
-  /reforma|pintura|pintar|ferrugem|enferruj|repintura|restaura/i
-    .test(partes.filter(Boolean).join(' '));
-
-function textoPorDefeito(nomeArquivo, categoria) {
+  function textoPorDefeito(nomeArquivo, categoria) {
     const s = String(nomeArquivo || '').toLowerCase().replace(/\.(mov|mp4|avi)$/i, '');
     const TV = [
       { re: /som.*(n[aã]o|sem).*(imagem|v[ií]deo)|sem imagem|n[aã]o d[aá] imagem/,
