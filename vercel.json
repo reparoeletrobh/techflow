@@ -1587,6 +1587,9 @@
     },
     "api/wa-webhook.js": {
       "maxDuration": 60
+    },
+    "api/trafego.js": {
+      "maxDuration": 300
     }
   },
   "github": {

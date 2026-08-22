@@ -3991,7 +3991,16 @@ module.exports = async function handler(req, res) {
     }
     // 3) sobe cada vídeo para a Meta pelo link direto do Drive
     const subidos = [], falhas = [];
-    for (const p of plano) {
+    // 📦 LOTES: são arquivos de centenas de megabytes e a função tem limite de
+    // tempo. Processar tudo de uma vez estourava sem enviar nada. Cada chamada
+    // cuida de um punhado e informa quantos faltam.
+    const deVez = Math.max(1, Math.min(20, parseInt(req.query.lote || '4', 10)));
+    const pular = Math.max(0, parseInt(req.query.pular || '0', 10));
+    const planoLote = plano.slice(pular, pular + deVez);
+    const _t0Env = Date.now();
+    for (const p of planoLote) {
+      // para antes do limite, para não perder o que já subiu
+      if (Date.now() - _t0Env > 240000) break;
       const urlDireta = p.url;                              // link público direto do R2
       const up = await fetch(`${GRAPH}/act_${CONTA}/advideos?access_token=${tkP}`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -4001,13 +4010,23 @@ module.exports = async function handler(req, res) {
       subidos.push({ arquivo: p.arquivo, videoId: up.id, titulo: p.titulo, corpo: p.corpo });
       await new Promise(s => setTimeout(s, 800));
     }
+    // 📊 progresso do lote: quantos faltam e como continuar de onde parou
+    const feitosAte = pular + subidos.length;
+    const faltam = Math.max(0, plano.length - feitosAte);
     return res.status(200).json({ ok: falhas.length === 0,
-      subidosParaMeta: subidos.length,
+      subidosNesteLote: subidos.length,
+      totalNoArmazenamento: plano.length,
+      jaEnviados: feitosAte,
+      faltam,
       videos: subidos.map(s => s.arquivo + ' → id ' + s.videoId),
       falhas,
-      proximoPasso: subidos.length
-        ? 'agora rode: action=subir-agora&cat=' + cat + '&verba=' + verba + '&aplicar=1 — os vídeos já estão na biblioteca da Meta e vão entrar com o texto certo'
-        : 'nenhum vídeo subiu' });
+      proximoPasso: faltam > 0
+        ? '▶️ continue: &action=da-pasta&aplicar=1&pular=' + feitosAte +
+          '&lote=' + deVez + '  (faltam ' + faltam + ')'
+        : (feitosAte
+          ? '✅ todos no ar. Agora crie as campanhas com action=subir-agora, ' +
+            'uma categoria por vez, usando &desde da data de hoje'
+          : 'nenhum vídeo subiu') });
   }
 
   // ── 📅 selo de data no nome da campanha: DDMMAAAA, para rastreabilidade ──
