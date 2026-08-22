@@ -1281,6 +1281,20 @@ function check(nome, cond, extra) {
   // ── 🔛 o conjunto do clone precisa ficar ativo ──
   // A cópia profunda nasce inteira pausada: ativar só a campanha deixava o
   // conjunto parado, e a campanha aparecia ativa no painel sem veicular nada.
+  // ── 🆕 categoria estreante não pode ficar sem modelo ──
+  // O forno estreou sem nenhuma campanha anterior e a criação foi recusada.
+  // Emprestar a estrutura de uma categoria parecida resolve: a segmentação é
+  // a mesma região e o mesmo público, e o texto vem do dicionário do aparelho.
+  console.log('▶ Cenário CN — categoria nova empresta modelo de outra');
+  {
+    const ct = require('fs').readFileSync('api/trafego.js', 'utf8');
+    check('há lista de categorias parecidas', /const PARECIDAS = \{/.test(ct));
+    check('o forno recorre a micro-ondas primeiro',
+      /forno: \['microondas'/.test(ct));
+    check('o empréstimo é informado no retorno',
+      /MODELO_EMPRESTADO/.test(ct));
+  }
+
   console.log('▶ Cenário CJ — clone ativa e renomeia o conjunto');
   {
     const ct = require('fs').readFileSync('api/trafego.js', 'utf8');

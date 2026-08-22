@@ -1246,6 +1246,29 @@ module.exports = async function handler(req, res) {
         return (x.razaoMeta || 9) - (y.razaoMeta || 9);
       })[0];
     if (!modelo) modelo = await modeloDaMeta(cat, TK);
+    // 🆕 CATEGORIA NOVA: sem histórico não há modelo próprio. Em vez de recusar,
+    // empresta a estrutura de uma categoria parecida — a segmentação é a mesma
+    // região e o mesmo público, e o texto já vem do dicionário do aparelho.
+    // Foi o caso do forno, que estreou sem nenhuma campanha anterior.
+    let modeloEmprestado = null;
+    if (!modelo) {
+      const PARECIDAS = {
+        forno: ['microondas', 'adega', 'purificador'],
+        microondas: ['forno', 'purificador', 'adega'],
+        adega: ['purificador', 'microondas'],
+        purificador: ['adega', 'microondas'],
+        tv: ['microondas'],
+      };
+      for (const outra of (PARECIDAS[cat] || ['microondas'])) {
+        const m2 = (base.dados.anuncios || [])
+          .filter(a => a.categoria === outra && a.campanhaId && a.adsetId)
+          .sort((x, y) => {
+            if (!!x.ativo !== !!y.ativo) return x.ativo ? -1 : 1;
+            return (x.razaoMeta || 9) - (y.razaoMeta || 9);
+          })[0] || await modeloDaMeta(outra, TK);
+        if (m2) { modelo = m2; modeloEmprestado = outra; break; }
+      }
+    }
     if (!modelo) return res.status(200).json({ ok: false,
       error: 'nenhum anúncio de ' + cat + ' encontrado para usar de modelo',
       dica: 'recarregue o painel: /api/trafego?action=painel&periodo=ciclo&forcar=1' });
@@ -1576,6 +1599,10 @@ module.exports = async function handler(req, res) {
     }
     return res.status(200).json({ ok: erros.length === 0, criados: feitos.length, feitos, erros,
       SEM_TEXTO_NO_DICIONARIO: semDicionario,
+      MODELO_EMPRESTADO: modeloEmprestado
+        ? 'categoria nova: estrutura emprestada de ' + modeloEmprestado +
+          ' — confira a segmentação antes de deixar rodando'
+        : null,
       COM_TETO_DE_REFORMA: comTetoReforma,
       // 🔍 conferência imediata: anúncio sem chamada é vídeo mudo e não converte
       MUDOS: await (async () => {
