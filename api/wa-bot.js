@@ -4044,6 +4044,10 @@ export default async function handler(req, res) {
       const d8 = d8de(c.telefone);
       if (d8.length < 8) continue;
       if (respondeu.has(d8)) continue;
+      // 💰 sem valor lançado não há orçamento a comunicar: avisar que "o
+      // orçamento está pronto" quando o técnico ainda não orçou queima o toque
+      // e confunde o cliente, que responde e não encontra valor nenhum
+      if (!(Number(c.valor || 0) > 0)) continue;
       const ctrl = controle.clientes[d8] || { tentativas: 0, ultimo: null };
       // 🚨 esgotou as 7 sem resposta → abre CONFLITO BOT uma vez e para de tentar
       if (ctrl.tentativas >= 7) {
@@ -4124,10 +4128,21 @@ export default async function handler(req, res) {
     const enviados = [], falhas = [], mudaramDeFase = [];
     let _faseCache = null, _faseCacheEm = 0;
     const _tInicio = Date.now();
-    for (const x of lote) {
+    // 🔄 RODÍZIO: a passagem para aos 40 segundos, e recomeçar sempre do topo
+    // fazia os últimos da fila nunca serem alcançados — havia orçamento de
+    // R$ 2.400 elegível e sem toque nenhum há cinco dias. A fila passa a
+    // girar: cada passagem começa depois de onde a anterior parou.
+    const _giro = Number(((controle || {}).giro) || 0);
+    const _ini = lote.length ? (_giro % lote.length) : 0;
+    const loteGirado = lote.slice(_ini).concat(lote.slice(0, _ini));
+    let _percorridos = 0;
+    for (const x of loteGirado) {
+      _percorridos++;
       // ⏱️ trava de tempo: a função da Vercel tem limite; para antes de estourar
       if (Date.now() - _tInicio > 40000) {
-        mudaramDeFase.push('⏱️ parou em ' + enviados.length + ' por limite de tempo — o resto vai no próximo ciclo');
+        mudaramDeFase.push('⏱️ parou em ' + enviados.length +
+          ' por limite de tempo — a próxima passagem continua daqui');
+        controle.giro = _ini + _percorridos - 1;   // onde retomar
         break;
       }
       // 🔒 RECONFERÊNCIA com cache curto: reler o pipe inteiro (689 cards) a cada envio

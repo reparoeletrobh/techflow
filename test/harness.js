@@ -1118,6 +1118,23 @@ function check(nome, cond, extra) {
   // Uma televisão aprovada há dois dias foi aprovada de novo quando a cliente
   // perguntou a data de entrega: o segundo processamento a tratou como linha
   // branca, criou cartão na frente errada e gerou pedido de peça inexistente.
+  // ── 🔄 a régua precisa girar a fila ──
+  // A passagem para aos 40 segundos e recomeçar sempre do topo fazia os
+  // últimos nunca serem alcançados: havia orçamento de R$ 2.400 elegível e
+  // sem toque nenhum há cinco dias.
+  console.log('▶ Cenário GR — régua gira a fila e ignora quem não tem valor');
+  {
+    const cw = require('fs').readFileSync('api/wa-bot.js', 'utf8');
+    const i = cw.indexOf("action === 'recuperacao-7d'");
+    const b = cw.slice(i, i + 12000);
+    check('quem não tem valor lançado não recebe toque',
+      /if \(!\(Number\(c\.valor \|\| 0\) > 0\)\) continue;/.test(b));
+    check('a fila é girada a partir de onde parou',
+      /loteGirado/.test(b) && /controle\.giro/.test(b));
+    check('o ponto de parada é guardado no controle',
+      /controle\.giro = _ini \+ _percorridos/.test(b));
+  }
+
   console.log('▶ Cenário RA — reaprovação de serviço já em andamento');
   {
     delete KV['reparoeletro_almoxarifado'];
