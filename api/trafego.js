@@ -1492,7 +1492,14 @@ module.exports = async function handler(req, res) {
             name: nomeComData(v.title) + ' - criativo',
             object_story_spec: JSON.stringify(novoOssC),
           });
-          if (crC && crC.error) throw new Error('criar criativo: ' + crC.error.message);
+          if (crC && crC.error) {
+            // a plataforma costuma dizer "parâmetro inválido" sem apontar qual;
+            // o detalhe vem nos campos auxiliares e no que foi enviado
+            throw new Error('criar criativo: ' + crC.error.message +
+              (crC.error.error_user_msg ? ' · ' + crC.error.error_user_msg : '') +
+              (crC.error.error_data ? ' · ' + JSON.stringify(crC.error.error_data).slice(0, 200) : '') +
+              ' | ENVIADO: ' + JSON.stringify(novoOssC).slice(0, 420));
+          }
           const upA = await postForm(adC.id, {
             creative: JSON.stringify({ creative_id: crC.id }),
             name: nomeComData(v.title),
